@@ -157,9 +157,9 @@ body.dark{
 <div id="chatbot-container" role="dialog" aria-modal="true">
   <div id="chatbot-header">
     <span id="title"
-          data-en="OPS AI – Chattia"
-          data-es="OPS AI – Chattia">
-      Ops Online Assistant
+          data-en="OPS Online Assistant"
+          data-es="Asistente OPS en Línea">
+      OPS Online Assistant
     </span>
 
     <!-- tiny controls -->
@@ -193,8 +193,8 @@ body.dark{
 const qs  = s => document.querySelector(s);
 const qsa = s => [...document.querySelectorAll(s)];
 
-const API_URL = "https://llm-chattia.grabem-holdem-nuts-right.workers.dev/api/chattia-chat";
-const STORAGE_KEY = "chattia_history_v1";
+const API_URL     = "https://ops-online-assistant.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat";
+const STORAGE_KEY = "ops_online_history_v1";
 
 // ====== Language toggle ======
 const langCtrl   = qs('#langCtrl');
@@ -447,7 +447,7 @@ function isOpsQuestion(message){
 
 function localOpsFallback(lang){
   if(lang === "es"){
-    return "Soy El Asistente OPS, asistente de OPS Remote Professional Network. Solo respondo preguntas sobre servicios OPS: operaciones de negocio, contact center, soporte de TI, profesionales bajo demanda y gobernanza de seguridad.";
+    return "Soy el Asistente OPS, asistente de OPS Remote Professional Network. Solo respondo preguntas sobre servicios OPS: operaciones de negocio, contact center, soporte de TI, profesionales bajo demanda y gobernanza de seguridad.";
   }
   return "I’m OPS Online Assistant, the OPS Remote Professional Network assistant. I only answer questions about OPS services: business operations, contact center, IT support, professionals-on-demand, and security governance.";
 }
