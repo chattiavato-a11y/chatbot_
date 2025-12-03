@@ -435,7 +435,7 @@ resetCtrl.onclick = () => {
   if(window.speechSynthesis){ window.speechSynthesis.cancel(); }
 };
 
-// ====== OPS-only gate using BM25 ======
+// ====== OPS-only gate using BM25 (FIRST MESSAGE ONLY) ======
 const OPS_MIN_SCORE = 0.6;
 
 function isOpsQuestion(message){
@@ -465,20 +465,26 @@ form.onsubmit = async (e) => {
   input.value = "";
   input.focus();
 
-  // quick OPS-only check using BM25
-  const gate = isOpsQuestion(msg);
   const placeholder = addMsg('…', 'bot');
 
-  if(!gate.ok){
-    const fb = localOpsFallback(gate.lang);
-    placeholder.textContent = fb;
-    chatHistory.push({ role:'assistant', content:fb });
-    saveHistory();
-    speak(fb);
-    return;
+  // Determine if this is the FIRST user turn in this session
+  const hasPriorUser = chatHistory.slice(0, -1).some(m => m.role === 'user');
+
+  // On FIRST user message: enforce OPS-only with BM25 gate
+  if (!hasPriorUser) {
+    const gate = isOpsQuestion(msg);
+    if(!gate.ok){
+      const fb = localOpsFallback(gate.lang);
+      placeholder.textContent = fb;
+      chatHistory.push({ role:'assistant', content:fb });
+      saveHistory();
+      speak(fb);
+      return;
+    }
+    // If gate.ok, continue to backend call
   }
 
-  // call backend (Worker)
+  // call backend (Worker) for all allowed messages (first + followups)
   send.disabled = true;
   try{
     const body = {
@@ -491,10 +497,12 @@ form.onsubmit = async (e) => {
       body: JSON.stringify(body)
     });
 
+    const lang = (document.documentElement.lang || "en").toLowerCase().startsWith("es") ? "es" : "en";
+
     if(!r.ok){
-      const errText = gate.lang === "es"
-        ? "Error: no se pudo contactar a OPS AI."
-        : "Error: couldn’t reach OPS AI.";
+      const errText = lang === "es"
+        ? "Error: no se pudo contactar a OPS Online Assistant."
+        : "Error: couldn’t reach OPS Online Assistant.";
       placeholder.textContent = errText;
       chatHistory.push({ role:'assistant', content:errText });
       saveHistory();
@@ -503,7 +511,7 @@ form.onsubmit = async (e) => {
     }
 
     const d = await r.json().catch(() => ({}));
-    const reply = d.reply || (gate.lang === "es"
+    const reply = d.reply || (lang === "es"
       ? "Por ahora no tengo una respuesta mejor sobre este tema OPS."
       : "I don’t have a better answer about this OPS topic yet.");
 
@@ -513,9 +521,10 @@ form.onsubmit = async (e) => {
     speak(reply);
   }catch(err){
     console.error(err);
-    const errText = gate.lang === "es"
-      ? "Error: no se pudo contactar a OPS AI."
-      : "Error: couldn’t reach OPS AI.";
+    const lang = (document.documentElement.lang || "en").toLowerCase().startsWith("es") ? "es" : "en";
+    const errText = lang === "es"
+      ? "Error: no se pudo contactar a OPS Online Assistant."
+      : "Error: couldn’t reach OPS Online Assistant.";
     placeholder.textContent = errText;
     chatHistory.push({ role:'assistant', content:errText });
     saveHistory();
