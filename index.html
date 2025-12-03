@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Ops Online Assistant</title>
+<title>OPS Online Assistant</title>
 
 <!-- FontAwesome (CSP + SRI + CORS Safe) -->
 <link rel="stylesheet"
@@ -189,7 +189,7 @@ body.dark{
 
 <!-- ---------- CHATBOT LOGIC ---------- -->
 <script>
-// ====== Helpers ======
+// ====== Helpers & config ======
 const qs  = s => document.querySelector(s);
 const qsa = s => [...document.querySelectorAll(s)];
 
@@ -230,155 +230,16 @@ themeCtrl.onclick = () => {
   themeCtrl.textContent = dark ? 'Light' : 'Dark';
 };
 
-// ====== OPS Professional Services Corpus (EN + ES) ======
-const OPS_DOCS = [
-  {
-    id: "ops-business-en",
-    lang: "en",
-    title: "Business Operations",
-    text: "OPS Business Operations provides remote back-office teams for billing, invoicing, collections, data entry, reporting, scheduling, and admin support. Bilingual coordinators manage workflows, SLAs, and handoffs between executives, finance, HR, and operations."
-  },
-  {
-    id: "ops-contact-en",
-    lang: "en",
-    title: "Contact Center & CX",
-    text: "OPS Contact Center delivers 24/7 bilingual pods for phone, chat, email, and social media support. Services include inbound support, simple outbound campaigns, help desk triage, ticketing, QA monitoring, and CX reporting such as SLA, CSAT, NPS, and FCR."
-  },
-  {
-    id: "ops-it-en",
-    lang: "en",
-    title: "IT Support & Help Desk",
-    text: "OPS IT Support offers remote help desk L1–L2, device onboarding, password resets, basic networking checks, software installation, and coordination with senior engineers. Incident and request tickets are tracked against clear escalation paths and response times."
-  },
-  {
-    id: "ops-pod-en",
-    lang: "en",
-    title: "Professionals on Demand",
-    text: "OPS Professionals on Demand provides part-time and project-based specialists such as project managers, analysts, digital marketers, HR partners, and technical coordinators. Engagements are scoped with clear outcomes, timelines, and communication channels."
-  },
-  {
-    id: "ops-security-en",
-    lang: "en",
-    title: "OPS Security & Governance",
-    text: "OPS Core CyberSec governance aligns services with NIST, CISA, and PCI-style controls. It covers access management, basic data handling guidelines, remote work policies, logging, and coordination with client security teams for reviews and improvements."
-  },
-  // ---- Spanish mirrors ----
-  {
-    id: "ops-business-es",
-    lang: "es",
-    title: "Operaciones de Negocio",
-    text: "OPS Operaciones de Negocio ofrece equipos remotos de back office para facturación, cobranza, digitación de datos, reportes, programación y apoyo administrativo. Coordinadores bilingües gestionan flujos de trabajo, SLAs y entregables entre finanzas, RRHH y operaciones."
-  },
-  {
-    id: "ops-contact-es",
-    lang: "es",
-    title: "Contact Center y Experiencia del Cliente",
-    text: "OPS Contact Center brinda pods bilingües 24/7 para teléfono, chat, correo y redes sociales. Incluye soporte entrante, campañas simples salientes, mesa de ayuda, ticketing, monitoreo de calidad y reportes de SLA, CSAT, NPS y FCR."
-  },
-  {
-    id: "ops-it-es",
-    lang: "es",
-    title: "Soporte de TI y Mesa de Ayuda",
-    text: "OPS Soporte de TI ofrece mesa de ayuda remota Niveles 1–2, alta de dispositivos, restablecimiento de contraseñas, revisiones básicas de red, instalación de software y coordinación con ingenieros senior. Los tickets se gestionan con rutas claras de escalamiento."
-  },
-  {
-    id: "ops-pod-es",
-    lang: "es",
-    title: "Profesionales Bajo Demanda",
-    text: "OPS Profesionales Bajo Demanda asigna especialistas por horas o por proyecto: project managers, analistas, especialistas en marketing digital, RRHH y coordinadores técnicos. Cada servicio se define con resultados, plazos y canales de comunicación."
-  },
-  {
-    id: "ops-security-es",
-    lang: "es",
-    title: "Seguridad y Gobernanza OPS",
-    text: "OPS Core CyberSec alinea los servicios con buenas prácticas tipo NIST, CISA y PCI. Incluye lineamientos de acceso, manejo básico de datos, políticas de trabajo remoto, registros y coordinación con el equipo de seguridad del cliente."
-  }
-];
-
-// ====== Tiny BM25 Index ======
-function tokenize(text) {
-  return text
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
-function buildOpsIndex(docs){
-  const indexedDocs = [];
-  const df = {};
-  let totalLen = 0;
-
-  for(const doc of docs){
-    const tokens = tokenize(doc.text + " " + doc.title);
-    const tf = {};
-    for(const t of tokens){
-      tf[t] = (tf[t] || 0) + 1;
-    }
-    const seen = new Set();
-    for(const t of tokens){
-      if(seen.has(t)) continue;
-      seen.add(t);
-      df[t] = (df[t] || 0) + 1;
-    }
-    totalLen += tokens.length;
-    indexedDocs.push({
-      ...doc,
-      tokens,
-      tf,
-      len: tokens.length
-    });
-  }
-
-  const N = indexedDocs.length;
-  const avgDocLen = N ? (totalLen / N) : 0;
-
-  return { docs:indexedDocs, df, N, avgDocLen };
-}
-
-const OPS_INDEX = buildOpsIndex(OPS_DOCS);
-
-function bm25SearchOps(query, lang){
-  const qTokens = tokenize(query);
-  if(!qTokens.length || !OPS_INDEX.N) return null;
-
-  const { docs, df, N, avgDocLen } = OPS_INDEX;
-  const langDocs = docs.filter(d => d.lang === lang) || docs;
-  const k1 = 1.5;
-  const b  = 0.75;
-
-  let best = null;
-
-  for(const doc of langDocs){
-    let score = 0;
-    for(const term of qTokens){
-      const tf = doc.tf[term] || 0;
-      if(!tf) continue;
-      const dfTerm = df[term] || 1;
-      const idf = Math.log(1 + (N - dfTerm + 0.5)/(dfTerm + 0.5));
-      const denom = tf + k1 * (1 - b + b * (doc.len / (avgDocLen || 1)));
-      score += idf * (tf * (k1 + 1)) / denom;
-    }
-    if(score > 0 && (!best || score > best.score)){
-      best = { doc, score };
-    }
-  }
-  return best;
-}
-
-// ====== Web Speech Synthesis ======
+// ====== Web Speech Synthesis (improved) ======
 let englishVoice = null;
 let spanishVoice = null;
 
-// Pick good EN/ES voices if available
 function pickVoices() {
   if (!("speechSynthesis" in window)) return;
   const voices = window.speechSynthesis.getVoices();
   if (!voices || !voices.length) return;
 
-  // Prefer "Google" voices if present, then any EN/ES
+  // Prefer Google voices if available, then any EN/ES
   englishVoice =
     voices.find(v => v.lang.startsWith("en-US") && v.name.includes("Google")) ||
     voices.find(v => v.lang.startsWith("en-")) ||
@@ -390,16 +251,13 @@ function pickVoices() {
     null;
 }
 
-// Some browsers load voices async
 if ("speechSynthesis" in window) {
   window.speechSynthesis.onvoiceschanged = pickVoices;
   pickVoices();
 }
 
-// Clean LLM text so it sounds natural when spoken
 function cleanForSpeech(text) {
   if (!text) return "";
-
   let t = String(text);
 
   // Remove fenced code blocks ```...```
@@ -408,18 +266,16 @@ function cleanForSpeech(text) {
   // Remove inline code `like this`
   t = t.replace(/`([^`]+)`/g, "$1");
 
-  // Replace Markdown bullets at the start of lines
-  // "* item" / "- item" / "+ item" → short bullet marker
+  // Replace Markdown bullets at line starts
   t = t.replace(/^\s*[-*+]\s+/gm, "• ");
 
   // Remove emphasis markers *word* or _word_
   t = t.replace(/(\s)[*_]+([^*_]+)[*_]+(\s)/g, "$1$2$3");
 
-  // Sometimes models use a lot of "/" — soften a bit
-  // "SLA/CSAT/NPS" → "SLA, CSAT, NPS"
+  // Turn "SLA/CSAT/NPS" into "SLA, CSAT, NPS"
   t = t.replace(/([A-Za-z0-9])\/([A-Za-z0-9])/g, "$1, $2");
 
-  // Normalize newlines into sentence breaks
+  // Normalize newlines to sentence breaks
   t = t.replace(/\r/g, "");
   t = t.replace(/\n{2,}/g, ". ");
   t = t.replace(/\n/g, " ");
@@ -437,16 +293,19 @@ function speak(text) {
   try {
     const langAttr = (document.documentElement.lang || "en").toLowerCase();
     const isEs = langAttr.startsWith("es");
+
     const cleaned = cleanForSpeech(text);
+    if (!cleaned) return;
+
     window.speechSynthesis.cancel();
+
     const u = new SpeechSynthesisUtterance(cleaned);
     u.lang = isEs ? "es-ES" : "en-US";
 
-    // Attach better voice if we have one
     if (isEs && spanishVoice) u.voice = spanishVoice;
     if (!isEs && englishVoice) u.voice = englishVoice;
 
-    // Small tuning: English often sounds smoother a bit slower
+    // Slightly smoother English
     if (isEs) {
       u.rate = 1.0;
       u.pitch = 1.0;
@@ -462,10 +321,10 @@ function speak(text) {
 }
 
 // ====== Chat state + history cache ======
-const log   = qs('#chat-log');
-const form  = qs('#chatbot-input-row');
-const input = qs('#chatbot-input');
-const send  = qs('#chatbot-send');
+const log       = qs('#chat-log');
+const form      = qs('#chatbot-input-row');
+const input     = qs('#chatbot-input');
+const send      = qs('#chatbot-send');
 const resetCtrl = qs('#resetCtrl');
 
 let chatHistory = []; // { role: 'user' | 'assistant', content: string }
@@ -495,7 +354,6 @@ function loadHistory(){
     const arr = JSON.parse(raw);
     if(!Array.isArray(arr)) return;
     chatHistory = arr;
-    // render
     log.innerHTML = "";
     for(const msg of chatHistory){
       addMsg(msg.content, msg.role === "assistant" ? "bot" : "user");
@@ -505,32 +363,17 @@ function loadHistory(){
   }
 }
 
-// Reset button clears history + UI
+// Reset button: clear history + UI + stop speech
 resetCtrl.onclick = () => {
   chatHistory = [];
   log.innerHTML = "";
-  try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
-  if(window.speechSynthesis){ window.speechSynthesis.cancel(); }
+  try { localStorage.removeItem(STORAGE_KEY); } catch(e){}
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
 };
 
-// ====== OPS-only gate using BM25 (FIRST MESSAGE ONLY) ======
-const OPS_MIN_SCORE = 0.6;
-
-function isOpsQuestion(message){
-  const lang = (document.documentElement.lang || "en").toLowerCase().startsWith("es") ? "es" : "en";
-  const best = bm25SearchOps(message, lang);
-  if(!best) return { ok:false, reason:"no-match", lang };
-  return { ok: best.score >= OPS_MIN_SCORE, best, lang };
-}
-
-function localOpsFallback(lang){
-  if(lang === "es"){
-    return "Soy el Asistente OPS, asistente de OPS Remote Professional Network. Solo respondo preguntas sobre servicios OPS: operaciones de negocio, contact center, soporte de TI, profesionales bajo demanda y gobernanza de seguridad.";
-  }
-  return "I’m OPS Online Assistant, the OPS Remote Professional Network assistant. I only answer questions about OPS services: business operations, contact center, IT support, professionals-on-demand, and security governance.";
-}
-
-// ====== Chat submit logic ======
+// ====== Chat submit logic (OPS-only enforced in Worker) ======
 form.onsubmit = async (e) => {
   e.preventDefault();
   const msg = input.value.trim();
@@ -544,41 +387,26 @@ form.onsubmit = async (e) => {
   input.focus();
 
   const placeholder = addMsg('…', 'bot');
-
-  // Determine if this is the FIRST user turn in this session
-  const hasPriorUser = chatHistory.slice(0, -1).some(m => m.role === 'user');
-
-  // On FIRST user message: enforce OPS-only with BM25 gate
-  if (!hasPriorUser) {
-    const gate = isOpsQuestion(msg);
-    if(!gate.ok){
-      const fb = localOpsFallback(gate.lang);
-      placeholder.textContent = fb;
-      chatHistory.push({ role:'assistant', content:fb });
-      saveHistory();
-      speak(fb);
-      return;
-    }
-    // If gate.ok, continue to backend call
-  }
-
-  // call backend (Worker) for all allowed messages (first + followups)
   send.disabled = true;
+
   try{
     const body = {
       message: msg,
       history: chatHistory
     };
+
     const r = await fetch(API_URL, {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify(body)
     });
 
-    const lang = (document.documentElement.lang || "en").toLowerCase().startsWith("es") ? "es" : "en";
+    const langIsEs = (document.documentElement.lang || "en")
+      .toLowerCase()
+      .startsWith("es");
 
     if(!r.ok){
-      const errText = lang === "es"
+      const errText = langIsEs
         ? "Error: no se pudo contactar a OPS Online Assistant."
         : "Error: couldn’t reach OPS Online Assistant.";
       placeholder.textContent = errText;
@@ -589,9 +417,9 @@ form.onsubmit = async (e) => {
     }
 
     const d = await r.json().catch(() => ({}));
-    const reply = d.reply || (lang === "es"
-      ? "Por ahora no tengo una respuesta mejor sobre este tema OPS."
-      : "I don’t have a better answer about this OPS topic yet.");
+    const reply = d.reply || (langIsEs
+      ? "Por ahora no tengo una respuesta mejor sobre este tema."
+      : "I don’t have a better answer for this topic yet.");
 
     placeholder.textContent = reply;
     chatHistory.push({ role:'assistant', content:reply });
@@ -599,8 +427,10 @@ form.onsubmit = async (e) => {
     speak(reply);
   }catch(err){
     console.error(err);
-    const lang = (document.documentElement.lang || "en").toLowerCase().startsWith("es") ? "es" : "en";
-    const errText = lang === "es"
+    const langIsEs = (document.documentElement.lang || "en")
+      .toLowerCase()
+      .startsWith("es");
+    const errText = langIsEs
       ? "Error: no se pudo contactar a OPS Online Assistant."
       : "Error: couldn’t reach OPS Online Assistant.";
     placeholder.textContent = errText;
