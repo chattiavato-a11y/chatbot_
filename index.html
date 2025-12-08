@@ -106,6 +106,13 @@ body.dark{
   font-size:.8rem;
 }
 
+#privacy-banner{
+  padding:.35rem .8rem;
+  background:#2f1950;
+  color:#e8e8e8;
+  font-size:.82rem;
+}
+
 .privacy-toggle{
   display:flex;
   align-items:center;
@@ -242,6 +249,12 @@ body.dark{
     </div>
   </div>
 
+  <div id="privacy-banner" role="status" aria-live="polite"
+       data-en="Local chat storage is optional. Toggle it below; clear anytime."
+       data-es="El almacenamiento local del chat es opcional. Actívelo abajo; puede borrarlo en cualquier momento.">
+    Local chat storage is optional. Toggle it below; clear anytime.
+  </div>
+
   <div id="controls-row">
     <label class="privacy-toggle">
       <input type="checkbox" id="storageOptIn">
@@ -287,7 +300,7 @@ const transNodes    = qsa('[data-en]');
 const phNodes       = qsa('[data-en-ph]');
 const statusArea    = qs('#status');
 const storageOptIn  = qs('#storageOptIn');
-
+const privacyBanner = qs('#privacy-banner');
 const isEs = () => (document.documentElement.lang || 'en').toLowerCase().startsWith('es');
 const t = (en, es) => isEs() ? es : en;
 
