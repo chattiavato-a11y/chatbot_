@@ -77,3 +77,8 @@ seven-layers/
 ```
 
 Start by populating the docs and policies, then iteratively harden the client (move inline code to files, tighten CSP) and build out the Worker protections. Each completed artifact should be referenced from a living security README in this folder.
+
+## FAQ and design clarifications
+- **What is `worker/src/logging.ts` for?** It centralizes structured logging, redaction, and correlation ID handling for the Worker so telemetry and audits are consistent and privacy-preserving. The logging utilities can also emit metrics-friendly events for SIEM/observability pipelines without duplicating logic across handlers.
+- **Will the seven layers sanitize and protect user-to-chatbot interactions?** Yes. The Protect/Detect/Respond layers explicitly add validation, rate limiting, CSP hardening, and abuse/threat monitoring, while the Worker router and tests ensure requests are sanitized before processing. Front-end guidance includes removing inline scripts, enforcing strict headers, and keeping client-side telemetry minimal and consent-aware.
+- **Do the layers stay separate from the existing chatbot?** Yes. All planning, scaffolds, and tests live under `seven-layers/` and are designed to be hermetic. They do not alter the current `index.html` behavior; integration can be staged later with feature flags and mockable endpoints to avoid performance impact on the live chatbot.
