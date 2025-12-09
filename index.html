@@ -630,9 +630,19 @@ form.onsubmit = async (e) => {
     }
 
     const d = await r.json().catch(() => ({}));
-    const reply = d.reply || (langIsEs
-      ? "Por ahora no tengo una respuesta mejor sobre este tema."
-      : "I don’t have a better answer for this topic yet.");
+    let reply = d.reply;
+
+    // If the backend returns an error payload, surface a friendlier offline fallback
+    // rather than the raw error string the Worker might emit.
+    if(!reply && d.error){
+      reply = offlineFallback(langIsEs);
+    }
+
+    if(!reply){
+      reply = langIsEs
+        ? "Por ahora no tengo una respuesta mejor sobre este tema."
+        : "I don’t have a better answer for this topic yet.";
+    }
 
     placeholder.textContent = reply;
     chatHistory.push({ role:'assistant', content:reply });
