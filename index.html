@@ -43,19 +43,19 @@ body.dark{
 
 /* ---------- CHATBOT ---------- */
 #chatbot-container{
-  width:320px;
-  height:560px;
-  background:#251541;
+  width:300px;
+  height:540px;
+  background:linear-gradient(180deg,#f8f9ff 0%,#eef1ff 100%);
   border:2px solid var(--clr-accent);
   border-radius:18px;
   box-shadow:0 8px 32px #0006;
   display:flex;
   flex-direction:column;
   overflow:hidden;
-  transition:background .3s,border-color .3s,color .3s;
+  transition:background .3s,border-color .3s;
 }
 #chatbot-container.dark-skin{
-  background:#0c0c12;
+  background:linear-gradient(180deg,#0f0f19 0%,#161626 100%);
   border-color:#5e2f86;
 }
 #chatbot-header{
@@ -72,15 +72,15 @@ body.dark{
 #chatbot-header .ctrl{
   cursor:pointer;
   font-size:.7rem;
-  font-weight:500;
+  font-weight:600;
   user-select:none;
-  opacity:.85;
+  opacity:.9;
   border:none;
   background:transparent;
   color:#fff;
-  padding:.15rem .35rem;
+  padding:.15rem .4rem;
   border-radius:6px;
-  transition:background .2s,outline .2s,opacity .2s;
+  transition:background .2s,outline .2s;
 }
 #chatbot-header .ctrl:focus-visible{outline:2px solid #fff;outline-offset:1px}
 #chatbot-header .ctrl:hover{opacity:1; background:#ffffff2b}
@@ -91,34 +91,55 @@ body.dark{
   font-size:.7rem;
 }
 
-#info-row{
+#mode-row{
   display:flex;
   align-items:center;
-  justify-content:space-between;
-  gap:.75rem;
-  padding:.6rem .85rem;
-  background:#351f58;
-  color:#f5f5ff;
+  justify-content:center;
+  gap:.45rem;
+  padding:.55rem .8rem;
+  background:#f0f3ff;
+  color:#1f1f2e;
+  font-weight:600;
   font-size:.82rem;
+  border-bottom:1px solid #e0e3f5;
 }
-#info-text{flex:1; line-height:1.3}
-.privacy-toggle{
-  display:flex;
-  align-items:center;
-  gap:.35rem;
-  cursor:pointer;
-  white-space:nowrap;
-}
-.privacy-toggle input{accent-color:var(--clr-accent)}
+#mode-row .ctrl{color:inherit}
+#mode-row .dot{opacity:.55}
 
 #chat-log{
   flex:1;
   overflow-y:auto;
   padding:1rem;
-  background:#1b0e2d;
-  color:#eee;
+  background:#ffffff;
+  color:#111;
   font-size:.94rem;
 }
+
+#controls-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:.5rem;
+  padding:.4rem .8rem;
+  background:#2a1343;
+  color:#e8e8e8;
+  font-size:.8rem;
+}
+
+#privacy-banner{
+  padding:.35rem .8rem;
+  background:#2f1950;
+  color:#e8e8e8;
+  font-size:.82rem;
+}
+
+.privacy-toggle{
+  display:flex;
+  align-items:center;
+  gap:.35rem;
+  cursor:pointer;
+}
+.privacy-toggle input{accent-color:var(--clr-accent)}
 
 .sr-only{
   position:absolute;
@@ -166,7 +187,7 @@ body.dark{
   border-radius:14px 14px 14px 0;
 }
 #chatbot-form-container{
-  background:#220f3a;
+  background:#f0f3ff;
   border-top:1px solid var(--clr-accent);
   padding:.55rem .7rem;
 }
@@ -178,7 +199,7 @@ body.dark{
   flex:1;
   background:transparent;
   border:none;
-  color:#fff;
+  color:#111;
   font-size:.95rem;
   padding:.55rem .6rem;
 }
@@ -206,11 +227,12 @@ body.dark{
 }
 
 body.dark #chatbot-container{color:var(--clr-tx-dark)}
-body.dark #chatbot-container.dark-skin{background:#07070b;border-color:#8032b6}
+body.dark #chatbot-container.dark-skin{background:linear-gradient(180deg,#0d0d0f 0%,#0e0e14 100%);border-color:#8032b6}
 body.dark #chatbot-header{background:linear-gradient(135deg,#2f1555 0%,#421c65 100%)}
-body.dark #info-row{background:#161622;color:#e6e6ff}
-body.dark #chat-log{background:#0f0f16;color:#f4f4ff}
-body.dark #chatbot-form-container{background:#0e0e15}
+body.dark #mode-row{background:#171726;color:#f0f0ff;border-bottom-color:#23233a}
+body.dark #chat-log{background:#1b1b26;color:#f4f4ff}
+body.dark #controls-row{background:#131320;color:#e6e6ff}
+body.dark #chatbot-form-container{background:#161624}
 body.dark #chatbot-input{color:#f4f4ff}
 
 @media(max-width:480px){
@@ -233,25 +255,42 @@ body.dark #chatbot-input{color:#f4f4ff}
           data-es="Asistente OPS en Línea">
       OPS Online Assistant
     </span>
-    <div class="ctrl-group" aria-label="Chat controls">
+  </div>
+
+    <!-- tiny controls -->
+    <div class="ctrl-group" aria-label="Chat settings">
       <button type="button" id="langCtrl"  class="ctrl"
               data-en="ES" data-es="EN"
-              aria-label="Switch language">ES</button>
+              aria-label="Switch language">
+        ES
+      </button>
       <span aria-hidden="true">•</span>
       <button type="button" id="themeCtrl" class="ctrl"
               data-en="Dark" data-es="Oscuro"
-              aria-label="Toggle theme">Dark</button>
+              aria-label="Toggle theme">
+        Dark
+      </button>
       <span aria-hidden="true">•</span>
       <button type="button" id="resetCtrl" class="ctrl"
               data-en="Reset" data-es="Reiniciar"
-              aria-label="Clear chat history">Reset</button>
+              aria-label="Clear chat history">
+        Reset
+      </button>
     </div>
+    <label class="privacy-toggle">
+      <input type="checkbox" id="storageOptIn">
+      <span id="storageLabel" data-en="Remember chat on this device" data-es="Recordar el chat en este dispositivo">Remember chat on this device</span>
+    </label>
+    <div id="status" role="status" aria-live="polite" class="sr-only"></div>
   </div>
 
-  <div id="info-row">
-    <div id="info-text" data-en="Local chat storage is optional. Toggle it below; clear anytime." data-es="El almacenamiento local del chat es opcional. Actívelo abajo; puede borrarlo en cualquier momento.">
-      Local chat storage is optional. Toggle it below; clear anytime.
-    </div>
+  <div id="privacy-banner" role="status" aria-live="polite"
+       data-en="Local chat storage is optional. Toggle it below; clear anytime."
+       data-es="El almacenamiento local del chat es opcional. Actívelo abajo; puede borrarlo en cualquier momento.">
+    Local chat storage is optional. Toggle it below; clear anytime.
+  </div>
+
+  <div id="controls-row">
     <label class="privacy-toggle">
       <input type="checkbox" id="storageOptIn">
       <span id="storageLabel" data-en="Remember chat on this device" data-es="Recordar el chat en este dispositivo">Remember chat on this device</span>
@@ -290,37 +329,15 @@ const MIN_GAP_MS        = 1200;
 const REQUEST_TIMEOUT   = 12000;
 const RETENTION_DAYS    = 30;
 
-function offlineFallback(langIsEs) {
-  return langIsEs
-    ? "El asistente no está disponible en este momento. Verifique su conexión o inténtelo nuevamente en breve."
-    : "The assistant is unavailable right now. Check your connection or try again in a moment.";
-}
-
 // ====== Language toggle ======
 const langCtrl      = qs('#langCtrl');
 const transNodes    = qsa('[data-en]');
 const phNodes       = qsa('[data-en-ph]');
 const statusArea    = qs('#status');
 const storageOptIn  = qs('#storageOptIn');
-const container     = qs('#chatbot-container');
-let darkMode        = document.body.classList.contains('dark');
-
+const privacyBanner = qs('#privacy-banner');
 const isEs = () => (document.documentElement.lang || 'en').toLowerCase().startsWith('es');
 const t = (en, es) => isEs() ? es : en;
-
-function setThemeLabel(){
-  if(!themeCtrl) return;
-  themeCtrl.textContent = darkMode ? t('Light','Claro') : t('Dark','Oscuro');
-}
-
-function applyThemeMode(dark){
-  darkMode = !!dark;
-  document.body.classList.toggle('dark', darkMode);
-  if(container){
-    container.classList.toggle('dark-skin', darkMode);
-  }
-  setThemeLabel();
-}
 
 langCtrl.onclick = () => {
   const toES = (langCtrl.textContent.trim().toUpperCase() === 'ES'); // going EN→ES ?
@@ -342,17 +359,18 @@ langCtrl.onclick = () => {
     else if (!toES && enPh) node.placeholder = enPh;
   });
 
-  setThemeLabel();
   setStatus("");
 };
 
 // ====== Theme toggle ======
 const themeCtrl = qs('#themeCtrl');
 themeCtrl.onclick = () => {
-  applyThemeMode(!darkMode);
+  const dark = themeCtrl.textContent.trim().toLowerCase() === 'dark' || themeCtrl.textContent.trim().toLowerCase() === 'oscuro';
+  document.body.classList.toggle('dark', dark);
+  themeCtrl.textContent = dark
+    ? (themeCtrl.dataset.en === 'Dark' ? 'Light' : 'Claro')
+    : (themeCtrl.dataset.en || 'Dark');
 };
-
-applyThemeMode(darkMode);
 
 // ====== Status + rate limiting ======
 let requestTimes = [];
@@ -361,7 +379,7 @@ let lastSubmitTs = 0;
 function setStatus(message){
   if(!statusArea) return;
   statusArea.textContent = message;
-  statusArea.classList.add('sr-only');
+  statusArea.classList.toggle('sr-only', !message);
 }
 
 function withinRateLimit(){
@@ -555,6 +573,10 @@ function initStoragePreference(){
     }catch(e){
       console.warn('Cannot persist preference', e);
     }
+    setStatus(storageAllowed
+      ? t('Local saving enabled.', 'Guardado local activado.')
+      : t('Local saving disabled.', 'Guardado local desactivado.'));
+
     if(storageAllowed){
       loadHistory();
     }
@@ -571,9 +593,7 @@ resetCtrl.onclick = () => {
   if (window.speechSynthesis) {
     window.speechSynthesis.cancel();
   }
-  input.value = "";
   setStatus(t('Chat cleared.', 'Chat borrado.'));
-  input.focus();
 };
 
 // ====== Chat submit logic (OPS-only enforced in Worker) ======
@@ -606,9 +626,6 @@ form.onsubmit = async (e) => {
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-  const langIsEs = (document.documentElement.lang || "en")
-    .toLowerCase()
-    .startsWith("es");
 
   try{
     const body = {
@@ -650,19 +667,21 @@ form.onsubmit = async (e) => {
     speak(reply);
   }catch(err){
     console.error(err);
-    if(err.name === 'AbortError'){
-      const timeoutMsg = langIsEs
+    const langIsEs = (document.documentElement.lang || "en")
+      .toLowerCase()
+      .startsWith("es");
+    const errText = err.name === 'AbortError'
+      ? (langIsEs
         ? "Tiempo de espera excedido. Intente de nuevo."
-        : "Request timed out. Please try again.";
-      placeholder.textContent = timeoutMsg;
-      chatHistory.push({ role:'assistant', content:timeoutMsg });
-      saveHistory();
-      speak(timeoutMsg);
-      setStatus(timeoutMsg);
-      return;
-    }
-
-    handleAssistantFailure(langIsEs, placeholder);
+        : "Request timed out. Please try again.")
+      : (langIsEs
+        ? "Error: no se pudo contactar a OPS Online Assistant."
+        : "Error: couldn’t reach OPS Online Assistant.");
+    placeholder.textContent = errText;
+    chatHistory.push({ role:'assistant', content:errText });
+    saveHistory();
+    speak(errText);
+    setStatus(errText);
   }finally{
     clearTimeout(timeout);
     send.disabled = false;
