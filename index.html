@@ -482,6 +482,17 @@ function speak(text) {
   }
 }
 
+function handleAssistantFailure(langIsEs, placeholder){
+  const fallback = offlineFallback(langIsEs);
+  if(placeholder){
+    placeholder.textContent = fallback;
+  }
+  chatHistory.push({ role:'assistant', content:fallback });
+  saveHistory();
+  speak(fallback);
+  setStatus(fallback);
+}
+
 // ====== Chat state + history cache ======
 const log       = qs('#chat-log');
 const form      = qs('#chatbot-input-row');
@@ -630,25 +641,25 @@ form.onsubmit = async (e) => {
       signal: controller.signal
     });
 
-    const langIsEs = (document.documentElement.lang || "en")
-      .toLowerCase()
-      .startsWith("es");
-
     if(!r.ok){
-      const errText = langIsEs
-        ? "Error: no se pudo contactar a OPS Online Assistant."
-        : "Error: couldn’t reach OPS Online Assistant.";
-      placeholder.textContent = errText;
-      chatHistory.push({ role:'assistant', content:errText });
-      saveHistory();
-      speak(errText);
+      handleAssistantFailure(langIsEs, placeholder);
       return;
     }
 
     const d = await r.json().catch(() => ({}));
-    const reply = d.reply || (langIsEs
-      ? "Por ahora no tengo una respuesta mejor sobre este tema."
-      : "I don’t have a better answer for this topic yet.");
+    let reply = d.reply;
+
+    // If the backend returns an error payload, surface a friendlier offline fallback
+    // rather than the raw error string the Worker might emit.
+    if(!reply && d.error){
+      reply = offlineFallback(langIsEs);
+    }
+
+    if(!reply){
+      reply = langIsEs
+        ? "Por ahora no tengo una respuesta mejor sobre este tema."
+        : "I don’t have a better answer for this topic yet.";
+    }
 
     placeholder.textContent = reply;
     chatHistory.push({ role:'assistant', content:reply });
