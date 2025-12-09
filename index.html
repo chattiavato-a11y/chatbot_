@@ -219,8 +219,8 @@ const log   = qs('#chat-log');
 const form  = qs('#chatbot-input-row');
 const input = qs('#chatbot-input');
 
-// Backend endpoint for Chattia
-const API_URL = 'https://ops-online-assistant.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat';
+// Backend endpoint for Chattia (Cloudflare Worker)
+const API_URL = new URL('https://ops-online-assistant.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat');
 
 function addMsg(txt, cls) {
   const div = document.createElement('div');
@@ -247,7 +247,7 @@ form.onsubmit = async e => {
   const botDiv = addMsg('…', 'bot');
 
   try {
-    const res = await fetch(API_URL, {
+    const res = await fetch(API_URL.href, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: msg })
