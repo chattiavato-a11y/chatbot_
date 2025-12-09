@@ -122,6 +122,28 @@ body.dark {
   display:flex;
   gap:.6rem;
 }
+#listenCtrl {
+  background:#ffb703;
+  border:none;
+  color:#1b0e2d;
+  font-weight:700;
+  padding:.45rem .65rem;
+  border-radius:8px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:transform .2s, box-shadow .2s;
+}
+#listenCtrl .btn-label {
+  margin-left:.35rem;
+  font-weight:700;
+}
+#listenCtrl.active {
+  box-shadow:0 0 0 2px #fff3;
+  transform:scale(1.02);
+}
+#listenCtrl i { pointer-events:none; }
 #chatbot-input {
   flex:1;
   background:transparent;
@@ -176,6 +198,10 @@ body.dark {
       <button type="button" class="ctrl lang" data-lang="es">ES</button>
       &nbsp;|&nbsp;
       <button type="button" id="themeCtrl" class="ctrl">Dark</button>
+      &nbsp;|&nbsp;
+      <button type="button" id="speechToggle" class="ctrl"
+        data-en="Speech"
+        data-es="Voz">Speech</button>
     </div>
   </div>
 
@@ -191,6 +217,12 @@ body.dark {
         maxlength="256"
         data-en-ph="Type your message..."
         data-es-ph="Escriba su mensaje...">
+      <button id="listenCtrl" type="button" aria-label="Start voice input"
+        data-en-label="Start voice input"
+        data-es-label="Comenzar voz">
+        <i class="fas fa-microphone"></i>
+        <span class="btn-label" data-en="Speak" data-es="Hablar">Speak</span>
+      </button>
       <button id="chatbot-send" type="submit" aria-label="Send">
         <i class="fas fa-paper-plane"></i>
       </button>
@@ -207,10 +239,88 @@ const qsa = s => [...document.querySelectorAll(s)];
 const langButtons = qsa('[data-lang]');
 const transNodes  = qsa('[data-en]');
 const phNodes     = qsa('[data-en-ph]');
+const ariaNodes   = qsa('[data-en-label]');
+
+const speechToggle = qs('#speechToggle');
+const listenCtrl   = qs('#listenCtrl');
+const log   = qs('#chat-log');
+const form  = qs('#chatbot-input-row');
+const input = qs('#chatbot-input');
+
+let currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
+
+const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = Recognition ? new Recognition() : null;
+let listening = false;
+let speechEnabled = false;
+
+if (recognition) {
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
+}
+
+function updateSpeechToggleUI() {
+  speechToggle.classList.toggle('active', speechEnabled);
+  speechToggle.setAttribute('aria-pressed', speechEnabled ? 'true' : 'false');
+}
+
+function updateListenUI() {
+  listenCtrl.classList.toggle('active', listening);
+  listenCtrl.setAttribute('aria-pressed', listening ? 'true' : 'false');
+}
+
+function getVoiceForLang(langCode) {
+  if (!synth) return null;
+  const voices = synth.getVoices();
+  const match = voices.find(v => v.lang.toLowerCase().startsWith(langCode));
+  return match || voices.find(v => v.lang.toLowerCase().includes(langCode)) || null;
+}
+
+function speak(text) {
+  if (!synth || !speechEnabled) return;
+  synth.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  const langCode = currentLang === 'es' ? 'es-ES' : 'en-US';
+  utter.lang = langCode;
+  const voice = getVoiceForLang(currentLang);
+  if (voice) utter.voice = voice;
+  synth.speak(utter);
+}
+
+function startListening() {
+  if (!recognition) return;
+  recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
+  listening = true;
+  updateListenUI();
+  recognition.start();
+}
+
+if (recognition) {
+  recognition.onresult = event => {
+    const transcript = event.results[0][0].transcript.trim();
+    if (transcript) {
+      input.value = transcript;
+      input.focus();
+    }
+  };
+
+  recognition.onerror = () => {
+    listening = false;
+    updateListenUI();
+  };
+
+  recognition.onend = () => {
+    listening = false;
+    updateListenUI();
+  };
+}
 
 function setLanguage(lang) {
   const toES = lang === 'es';
-  document.documentElement.lang = toES ? 'es' : 'en';
+  currentLang = toES ? 'es' : 'en';
+  document.documentElement.lang = currentLang;
 
   langButtons.forEach(btn => {
     btn.classList.toggle('active', btn.dataset.lang === lang);
@@ -223,6 +333,14 @@ function setLanguage(lang) {
   phNodes.forEach(node => {
     node.placeholder = toES ? node.dataset.esPh : node.dataset.enPh;
   });
+
+  ariaNodes.forEach(node => {
+    node.setAttribute('aria-label', toES ? node.dataset.esLabel : node.dataset.enLabel);
+  });
+
+  if (recognition) {
+    recognition.lang = toES ? 'es-ES' : 'en-US';
+  }
 }
 
 langButtons.forEach(btn => {
@@ -230,6 +348,12 @@ langButtons.forEach(btn => {
 });
 
 setLanguage(document.documentElement.lang === 'es' ? 'es' : 'en');
+updateSpeechToggleUI();
+updateListenUI();
+
+if (synth) {
+  synth.onvoiceschanged = () => getVoiceForLang(currentLang);
+}
 
 // === Theme toggle ===
 const themeCtrl = qs('#themeCtrl');
@@ -239,10 +363,28 @@ themeCtrl.onclick = () => {
   themeCtrl.textContent = dark ? 'Light' : 'Dark';
 };
 
-// === Chatbot core (linked to LLM Chat App Worker) ===
-const log   = qs('#chat-log');
-const form  = qs('#chatbot-input-row');
-const input = qs('#chatbot-input');
+speechToggle.onclick = () => {
+  if (!synth) {
+    addMsg(currentLang === 'es' ? 'La síntesis de voz no está disponible.' : 'Speech synthesis is not available.', 'bot');
+    return;
+  }
+  speechEnabled = !speechEnabled;
+  updateSpeechToggleUI();
+};
+
+listenCtrl.onclick = () => {
+  if (!recognition) {
+    addMsg(currentLang === 'es' ? 'Entrada por voz no disponible en este navegador.' : 'Voice input is not available in this browser.', 'bot');
+    return;
+  }
+
+  if (listening) {
+    recognition.stop();
+    return;
+  }
+
+  startListening();
+};
 
 // Backend endpoint for Chattia (Cloudflare Worker)
 const API_URL = new URL('https://ops-online-assistant.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat');
@@ -284,10 +426,13 @@ form.onsubmit = async e => {
       : (lang === 'es' ? 'Sin respuesta.' : 'No reply.');
 
     botDiv.textContent = reply;
+    speak(reply);
   } catch (err) {
-    botDiv.textContent = (lang === 'es')
+    const fallback = (lang === 'es')
       ? 'Error: no puedo conectar con Chattia.'
       : 'Error: can’t reach Chattia.';
+    botDiv.textContent = fallback;
+    speak(fallback);
   }
 };
 </script>
