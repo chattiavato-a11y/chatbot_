@@ -248,41 +248,34 @@ body.dark #chatbot-input{color:#f4f4ff}
 <a href="#chatbot-input" class="skip-link" data-en="Skip to chat input" data-es="Saltar al campo del chat">Skip to chat input</a>
 
 <!-- ---------- CHATBOT HTML ---------- -->
-<div id="chatbot-container" role="dialog" aria-modal="true" aria-labelledby="title">
-  <div id="chatbot-header">
-    <span id="title"
-          data-en="OPS Online Assistant"
-          data-es="Asistente OPS en Línea">
-      OPS Online Assistant
-    </span>
-  </div>
-
-    <!-- tiny controls -->
-    <div class="ctrl-group" aria-label="Chat settings">
-      <button type="button" id="langCtrl"  class="ctrl"
-              data-en="ES" data-es="EN"
-              aria-label="Switch language">
-        ES
-      </button>
-      <span aria-hidden="true">•</span>
-      <button type="button" id="themeCtrl" class="ctrl"
-              data-en="Dark" data-es="Oscuro"
-              aria-label="Toggle theme">
-        Dark
-      </button>
-      <span aria-hidden="true">•</span>
-      <button type="button" id="resetCtrl" class="ctrl"
-              data-en="Reset" data-es="Reiniciar"
-              aria-label="Clear chat history">
-        Reset
-      </button>
+  <div id="chatbot-container" role="dialog" aria-modal="true" aria-labelledby="title">
+    <div id="chatbot-header">
+      <span id="title"
+            data-en="OPS Online Assistant"
+            data-es="Asistente OPS en Línea">
+        OPS Online Assistant
+      </span>
+      <!-- tiny controls -->
+      <div class="ctrl-group" aria-label="Chat settings">
+        <button type="button" id="langCtrl"  class="ctrl"
+                data-en="ES" data-es="EN"
+                aria-label="Switch language">
+          ES
+        </button>
+        <span aria-hidden="true">•</span>
+        <button type="button" id="themeCtrl" class="ctrl"
+                data-en="Dark" data-es="Oscuro"
+                aria-label="Toggle theme">
+          Dark
+        </button>
+        <span aria-hidden="true">•</span>
+        <button type="button" id="resetCtrl" class="ctrl"
+                data-en="Reset" data-es="Reiniciar"
+                aria-label="Clear chat history">
+          Reset
+        </button>
+      </div>
     </div>
-    <label class="privacy-toggle">
-      <input type="checkbox" id="storageOptIn">
-      <span id="storageLabel" data-en="Remember chat on this device" data-es="Recordar el chat en este dispositivo">Remember chat on this device</span>
-    </label>
-    <div id="status" role="status" aria-live="polite" class="sr-only"></div>
-  </div>
 
   <div id="privacy-banner" role="status" aria-live="polite"
        data-en="Local chat storage is optional. Toggle it below; clear anytime."
@@ -335,7 +328,6 @@ const transNodes    = qsa('[data-en]');
 const phNodes       = qsa('[data-en-ph]');
 const statusArea    = qs('#status');
 const storageOptIn  = qs('#storageOptIn');
-const privacyBanner = qs('#privacy-banner');
 const isEs = () => (document.documentElement.lang || 'en').toLowerCase().startsWith('es');
 const t = (en, es) => isEs() ? es : en;
 
@@ -482,6 +474,12 @@ function speak(text) {
   }
 }
 
+function offlineFallback(langIsEs){
+  return langIsEs
+    ? "El asistente no está disponible en este momento. Intente nuevamente en breve."
+    : "The assistant is not available right now. Please try again shortly.";
+}
+
 function handleAssistantFailure(langIsEs, placeholder){
   const fallback = offlineFallback(langIsEs);
   if(placeholder){
@@ -602,6 +600,8 @@ form.onsubmit = async (e) => {
   const msg = input.value.trim();
   if(!msg) return;
 
+  const langIsEs = isEs();
+
   if(!navigator.onLine){
     setStatus(t('You appear offline. Please reconnect before sending.', 'Parece que está sin conexión. Vuelva a conectarse antes de enviar.'));
     return;
@@ -667,9 +667,6 @@ form.onsubmit = async (e) => {
     speak(reply);
   }catch(err){
     console.error(err);
-    const langIsEs = (document.documentElement.lang || "en")
-      .toLowerCase()
-      .startsWith("es");
     const errText = err.name === 'AbortError'
       ? (langIsEs
         ? "Tiempo de espera excedido. Intente de nuevo."
