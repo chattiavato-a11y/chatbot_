@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Chattia — OPS AI Chatbot</title>
+
+<!-- Patched FontAwesome (CSP + SRI + CORS Safe) -->
+<link rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+  integrity="sha512-RXf+QSDCUqpphKAa+WAc3XQ8fE5H1aO/8e2wY+8Q1n8yVwDh1RZTf1TDN8E+u1n7eU5KyY7X2Qo+hqeZZn+UAQ=="
+  crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+<style>
+/* ---------- COLOR SYSTEM ---------- */
+:root {
+  --clr-primary:#00c4ff;
+  --clr-accent:#ff3bdb;
+  --clr-bg:#ffffff;
+  --clr-bg-dark:#121212;
+  --clr-tx:#333333;
+  --clr-tx-dark:#f0f0f0;
+}
+body {
+  margin:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+  font-family:'Segoe UI',Arial,sans-serif;
+  background:var(--clr-bg);
+  color:var(--clr-tx);
+  transition:background .3s,color .3s;
+}
+body.dark {
+  --clr-bg:var(--clr-bg-dark);
+  --clr-tx:var(--clr-tx-dark);
+}
+
+/* ---------- CHATBOT ---------- */
+#chatbot-container {
+  width:300px;
+  height:540px;
+  background:#251541;
+  border:2px solid var(--clr-accent);
+  border-radius:18px;
+  box-shadow:0 8px 32px #0006;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+#chatbot-header {
+  display:flex;
+  align-items:center;
+  background:linear-gradient(135deg,var(--clr-primary) 0%,var(--clr-accent) 100%);
+  color:#fff;
+  font-weight:600;
+  font-size:1.1rem;
+  padding:.75rem 1rem;
+}
+
+/* generic controls (now used in Rectangle 3) */
+.ctrl-group {
+  display:flex;
+  align-items:center;
+  gap:.3rem;
+}
+.ctrl {
+  cursor:pointer;
+  font-size:.75rem;
+  font-weight:600;
+  user-select:none;
+  opacity:.9;
+  color:inherit;
+  background:transparent;
+  border:1px solid #fff5;
+  border-radius:6px;
+  padding:.2rem .45rem;
+  transition:background .2s, color .2s, opacity .2s;
+}
+.ctrl:hover {
+  opacity:1;
+  background:#fff2;
+}
+.ctrl.lang.active {
+  background:#fff;
+  color:#321b53;
+  opacity:1;
+}
+
+#chat-log {
+  flex:1;
+  overflow-y:auto;
+  padding:1rem;
+  background:#1b0e2d;
+  color:#eee;
+  font-size:.94rem;
+}
+.chat-msg {
+  margin:.5rem 0;
+  max-width:90%;
+}
+.user {
+  margin-left:auto;
+  background:var(--clr-primary);
+  color:#000;
+  padding:.5rem .7rem;
+  border-radius:14px 14px 0 14px;
+}
+.bot {
+  margin-right:auto;
+  background:#321b53;
+  color:#fff;
+  padding:.5rem .7rem;
+  border-radius:14px 14px 14px 0;
+}
+
+/* Rectangle 3 toolbar */
+#chatbot-form-container {
+  background:#220f3a;
+  border-top:1px solid var(--clr-accent);
+  padding:.55rem .7rem;
+}
+#chatbot-toolbar {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.6rem;
+  margin-bottom:.5rem;
+  padding:.3rem .4rem;
+  background:#2b1347;
+  border-radius:10px;
+  border:1px solid #ffb70355;
+}
+
+/* listen / Hablar button now in toolbar */
+#listenCtrl {
+  background:#ffb703;
+  border:none;
+  color:#1b0e2d;
+  font-weight:700;
+  padding:.35rem .7rem;
+  border-radius:8px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:transform .2s, box-shadow .2s;
+  flex-shrink:0;
+}
+#listenCtrl .btn-label {
+  margin-left:.35rem;
+  font-weight:700;
+}
+#listenCtrl.active {
+  box-shadow:0 0 0 2px #fff3;
+  transform:scale(1.02);
+}
+#listenCtrl i { pointer-events:none; }
+
+#chatbot-input-row {
+  display:flex;
+  gap:.6rem;
+}
+#chatbot-input {
+  flex:1;
+  background:transparent;
+  border:none;
+  color:#fff;
+  font-size:.95rem;
+  padding:.55rem .6rem;
+}
+#chatbot-input::placeholder {
+  color:#bfbfbf;
+}
+#chatbot-send {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  background:var(--clr-accent);
+  border:none;
+  color:#fff;
+  font-weight:600;
+  padding:.5rem .9rem;
+  border-radius:8px;
+  cursor:pointer;
+  transition:.3s;
+}
+#chatbot-send i {
+  transition:transform .3s;
+}
+#chatbot-send:hover i {
+  transform:rotate(-45deg);
+}
+
+@media (max-width:480px) {
+  #chatbot-container {
+    height:75vh;
+    width:90%;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ---------- CHATBOT HTML ---------- -->
+<div id="chatbot-container" role="dialog" aria-modal="true">
+  <div id="chatbot-header">
+    <span id="title"
+          data-en="OPS AI Chatbot"
+          data-es="Chatbot OPS AI">OPS AI Chatbot</span>
+  </div>
+
+  <div id="chat-log" aria-live="polite"></div>
+
+  <div id="chatbot-form-container">
+
+    <!-- Rectangle 3: controls + Hablar -->
+    <div id="chatbot-toolbar">
+      <div class="ctrl-group" aria-label="Language and theme controls">
+        <button type="button" class="ctrl lang active" data-lang="en">EN</button>
+        <button type="button" class="ctrl lang" data-lang="es">ES</button>
+        &nbsp;|&nbsp;
+        <button type="button" id="themeCtrl" class="ctrl">Dark</button>
+        &nbsp;|&nbsp;
+        <button type="button" id="speechToggle" class="ctrl"
+          data-en="Speech"
+          data-es="Voz">Speech</button>
+      </div>
+
+      <button id="listenCtrl" type="button" aria-label="Start voice input"
+        data-en-label="Start voice input"
+        data-es-label="Comenzar voz">
+        <i class="fas fa-microphone"></i>
+        <span class="btn-label" data-en="Speak" data-es="Hablar">Speak</span>
+      </button>
+    </div>
+
+    <!-- input row (only text + send) -->
+    <form id="chatbot-input-row" autocomplete="off">
+      <input
+        id="chatbot-input"
+        type="text"
+        placeholder="Type your message..."
+        required
+        maxlength="256"
+        data-en-ph="Type your message..."
+        data-es-ph="Escriba su mensaje...">
+      <button id="chatbot-send" type="submit" aria-label="Send">
+        <i class="fas fa-paper-plane"></i>
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ---------- CHATBOT LOGIC ---------- -->
+<script>
+const qs  = s => document.querySelector(s);
+const qsa = s => [...document.querySelectorAll(s)];
+
+// === Language toggle ===
+const langButtons = qsa('[data-lang]');
+const transNodes  = qsa('[data-en]');
+const phNodes     = qsa('[data-en-ph]');
+const ariaNodes   = qsa('[data-en-label]');
+
+const speechToggle = qs('#speechToggle');
+const listenCtrl   = qs('#listenCtrl');
+const log   = qs('#chat-log');
+const form  = qs('#chatbot-input-row');
+const input = qs('#chatbot-input');
+
+let currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
+
+const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = Recognition ? new Recognition() : null;
+let listening = false;
+let speechEnabled = false;
+
+if (recognition) {
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
+}
+
+function updateSpeechToggleUI() {
+  speechToggle.classList.toggle('active', speechEnabled);
+  speechToggle.setAttribute('aria-pressed', speechEnabled ? 'true' : 'false');
+}
+
+function updateListenUI() {
+  listenCtrl.classList.toggle('active', listening);
+  listenCtrl.setAttribute('aria-pressed', listening ? 'true' : 'false');
+}
+
+function getVoiceForLang(langCode) {
+  if (!synth) return null;
+  const voices = synth.getVoices();
+  const match = voices.find(v => v.lang.toLowerCase().startsWith(langCode));
+  return match || voices.find(v => v.lang.toLowerCase().includes(langCode)) || null;
+}
+
+function speak(text) {
+  if (!synth || !speechEnabled) return;
+  synth.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  const langCode = currentLang === 'es' ? 'es-ES' : 'en-US';
+  utter.lang = langCode;
+  const voice = getVoiceForLang(currentLang);
+  if (voice) utter.voice = voice;
+  synth.speak(utter);
+}
+
+function startListening() {
+  if (!recognition) return;
+  recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
+  listening = true;
+  updateListenUI();
+  recognition.start();
+}
+
+if (recognition) {
+  recognition.onresult = event => {
+    const transcript = event.results[0][0].transcript.trim();
+    if (transcript) {
+      input.value = transcript;
+      input.focus();
+    }
+  };
+
+  recognition.onerror = () => {
+    listening = false;
+    updateListenUI();
+  };
+
+  recognition.onend = () => {
+    listening = false;
+    updateListenUI();
+  };
+}
+
+function setLanguage(lang) {
+  const toES = lang === 'es';
+  currentLang = toES ? 'es' : 'en';
+  document.documentElement.lang = currentLang;
+
+  langButtons.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === lang);
+  });
+
+  transNodes.forEach(node => {
+    node.textContent = toES ? node.dataset.es : node.dataset.en;
+  });
+
+  phNodes.forEach(node => {
+    node.placeholder = toES ? node.dataset.esPh : node.dataset.enPh;
+  });
+
+  ariaNodes.forEach(node => {
+    node.setAttribute('aria-label', toES ? node.dataset.esLabel : node.dataset.enLabel);
+  });
+
+  if (recognition) {
+    recognition.lang = toES ? 'es-ES' : 'en-US';
+  }
+}
+
+langButtons.forEach(btn => {
+  btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
+});
+
+setLanguage(document.documentElement.lang === 'es' ? 'es' : 'en');
+updateSpeechToggleUI();
+updateListenUI();
+
+if (synth) {
+  synth.onvoiceschanged = () => getVoiceForLang(currentLang);
+}
+
+// === Theme toggle ===
+const themeCtrl = qs('#themeCtrl');
+themeCtrl.onclick = () => {
+  const dark = themeCtrl.textContent === 'Dark';
+  document.body.classList.toggle('dark', dark);
+  themeCtrl.textContent = dark ? 'Light' : 'Dark';
+};
+
+speechToggle.onclick = () => {
+  if (!synth) {
+    addMsg(currentLang === 'es' ? 'La síntesis de voz no está disponible.' : 'Speech synthesis is not available.', 'bot');
+    return;
+  }
+  speechEnabled = !speechEnabled;
+  updateSpeechToggleUI();
+};
+
+listenCtrl.onclick = () => {
+  if (!recognition) {
+    addMsg(currentLang === 'es' ? 'Entrada por voz no disponible en este navegador.' : 'Voice input is not available in this browser.', 'bot');
+    return;
+  }
+
+  if (listening) {
+    recognition.stop();
+    return;
+  }
+
+  startListening();
+};
+
+// Backend endpoint for Chattia (Cloudflare Worker)
+const API_URL = new URL('https://ops-online-assistant.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat');
+
+function addMsg(txt, cls) {
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + cls;
+  div.textContent = txt;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+form.onsubmit = async e => {
+  e.preventDefault();
+
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  const lang = (document.documentElement.lang === 'es') ? 'es' : 'en';
+
+  // user bubble
+  addMsg(msg, 'user');
+  input.value = '';
+
+  // temporary bot bubble
+  const botDiv = addMsg('…', 'bot');
+
+  try {
+    const res = await fetch(API_URL.href, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, lang })
+    });
+
+    const data = await res.json();
+    const reply = data && data.reply
+      ? data.reply
+      : (lang === 'es' ? 'Sin respuesta.' : 'No reply.');
+
+    botDiv.textContent = reply;
+    speak(reply);
+  } catch (err) {
+    const fallback = (lang === 'es')
+      ? 'Error: no puedo conectar con Chattia.'
+      : 'Error: can’t reach Chattia.';
+    botDiv.textContent = fallback;
+    speak(fallback);
+  }
+};
+</script>
+</body>
+</html>
