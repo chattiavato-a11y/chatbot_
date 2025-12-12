@@ -252,7 +252,7 @@ const log   = qs('#chat-log');
 const form  = qs('#chatbot-input-row');
 const input = qs('#chatbot-input');
 
-/* IMPORTANT: Gateway Worker endpoint (NOT the brain directly) */
+/* Gateway Worker endpoint */
 const GATEWAY_URL = "https://ops-gateway.grabem-holdem-nuts-right.workers.dev";
 const API_URL = new URL(GATEWAY_URL + "/api/ops-online-chat");
 
@@ -378,7 +378,7 @@ if (recognition) {
     if (transcript) {
       input.value = transcript;
       input.focus();
-      sendMessage(transcript); // auto-send from speech
+      sendMessage(transcript); // auto-send
     }
   };
   recognition.onerror = () => {
@@ -408,7 +408,7 @@ listenCtrl.onclick = () => {
   startListening();
 };
 
-/* Chat send logic → talks to gateway Worker */
+/* Chat → gateway */
 async function sendMessage(msg) {
   const trimmed = msg.trim();
   if (!trimmed) return;
