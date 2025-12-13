@@ -4,6 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>OPS AI Chatbot</title>
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev; img-src 'self' data:; font-src 'self' https://cdnjs.cloudflare.com data:; frame-src 'self';">
+<meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains; preload">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+<meta http-equiv="Permissions-Policy"
+  content="camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=()">
+<meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+<meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+<!-- Deployment guidance: set equivalent HTTP response headers for CSP, HSTS, X-Frame-Options,
+     Referrer-Policy, Permissions-Policy, Cross-Origin-Opener-Policy, and
+     Cross-Origin-Embedder-Policy on the hosting platform (e.g., Netlify/Cloudflare config):
+     Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev; img-src 'self' data:; font-src 'self' https://cdnjs.cloudflare.com data:; frame-src 'self';
+     Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+     X-Frame-Options: SAMEORIGIN
+     Referrer-Policy: strict-origin-when-cross-origin
+     Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=()
+     Cross-Origin-Opener-Policy: same-origin
+     Cross-Origin-Embedder-Policy: require-corp -->
 
 <!-- Patched FontAwesome (CSP + SRI + CORS Safe) -->
 <link rel="stylesheet"
