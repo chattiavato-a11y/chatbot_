@@ -465,7 +465,26 @@ form.onsubmit = async e => {
       body: JSON.stringify({ message: msg, lang })
     });
 
-    const data = await res.json().catch(() => null);
+    const responseText = await res.text();
+    let data = null;
+    try {
+      data = JSON.parse(responseText);
+    } catch (err) {
+      // Not JSON; we'll handle below
+    }
+
+    if (!res.ok) {
+      const fallback = (lang === 'es')
+        ? 'Error del gateway de OPS.'
+        : 'OPS gateway error.';
+      const errorMsg = (data && data.error)
+        ? data.error
+        : (responseText || fallback);
+
+      botDiv.textContent = `${errorMsg}`;
+      speak(errorMsg);
+      return;
+    }
 
     if (!data) {
       const fallback = (lang === 'es')
