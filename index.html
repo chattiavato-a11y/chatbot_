@@ -51,7 +51,7 @@ body.dark {
 }
 #chatbot-header {
   display:flex;
-  justify-content:space-between;
+  justify-content:center;
   align-items:center;
   gap:.5rem;
   background:linear-gradient(135deg,var(--clr-primary) 0%,var(--clr-accent) 100%);
@@ -60,32 +60,34 @@ body.dark {
   font-size:1.1rem;
   padding:.75rem 1rem;
 }
-#chatbot-header .ctrl-group {
+.ctrl-group {
   display:flex;
   align-items:center;
-  gap:.3rem;
+  gap:.35rem;
+  flex-wrap:wrap;
 }
-#chatbot-header .ctrl {
+.ctrl {
   cursor:pointer;
   font-size:.75rem;
   font-weight:600;
   user-select:none;
   opacity:.9;
-  color:inherit;
-  background:transparent;
-  border:1px solid #fff5;
+  color:#fff;
+  background:#321b53;
+  border:1px solid #fff3;
   border-radius:6px;
-  padding:.2rem .45rem;
-  transition:background .2s, color .2s, opacity .2s;
+  padding:.25rem .55rem;
+  transition:background .2s, color .2s, opacity .2s, box-shadow .2s;
 }
-#chatbot-header .ctrl:hover {
+.ctrl:hover {
   opacity:1;
-  background:#fff2;
+  background:#3d2264;
 }
-#chatbot-header .ctrl.lang.active {
+.ctrl.active {
   background:#fff;
   color:#321b53;
   opacity:1;
+  box-shadow:0 0 0 1px #fff4;
 }
 #chat-log {
   flex:1;
@@ -116,7 +118,15 @@ body.dark {
 #chatbot-form-container {
   background:#220f3a;
   border-top:1px solid var(--clr-accent);
-  padding:.55rem .7rem;
+  padding:.55rem .7rem .75rem;
+  color:#fff;
+}
+#control-row {
+  display:flex;
+  justify-content:flex-start;
+  align-items:center;
+  gap:.45rem;
+  margin-bottom:.55rem;
 }
 #chatbot-input-row {
   display:flex;
@@ -191,23 +201,27 @@ body.dark {
     <span id="title"
           data-en="OPS AI Chatbot"
           data-es="Chatbot OPS AI">OPS AI Chatbot</span>
-
-    <!-- tiny controls -->
-    <div class="ctrl-group" aria-label="Language and theme controls">
-      <button type="button" class="ctrl lang active" data-lang="en">EN</button>
-      <button type="button" class="ctrl lang" data-lang="es">ES</button>
-      &nbsp;|&nbsp;
-      <button type="button" id="themeCtrl" class="ctrl">Dark</button>
-      &nbsp;|&nbsp;
-      <button type="button" id="speechToggle" class="ctrl"
-        data-en="Speech"
-        data-es="Voz">Speech</button>
-    </div>
   </div>
 
   <div id="chat-log" aria-live="polite"></div>
 
   <div id="chatbot-form-container">
+    <div id="control-row" class="ctrl-group" aria-label="Language, theme, speech, and voice controls">
+      <button type="button" id="langCtrl" class="ctrl"
+        aria-label="Toggle language"
+        data-en-label="Toggle language"
+        data-es-label="Cambiar idioma">EN</button>
+      <button type="button" id="themeCtrl" class="ctrl">Dark</button>
+      <button type="button" id="speechToggle" class="ctrl"
+        data-en="Speech"
+        data-es="Voz">Speech</button>
+      <button id="listenCtrl" type="button" aria-label="Start voice input"
+        data-en-label="Start voice input"
+        data-es-label="Comenzar voz">
+        <i class="fas fa-microphone"></i>
+        <span class="btn-label" data-en="Speak" data-es="Hablar">Speak</span>
+      </button>
+    </div>
     <form id="chatbot-input-row" autocomplete="off">
       <input
         id="chatbot-input"
@@ -217,12 +231,6 @@ body.dark {
         maxlength="256"
         data-en-ph="Type your message..."
         data-es-ph="Escriba su mensaje...">
-      <button id="listenCtrl" type="button" aria-label="Start voice input"
-        data-en-label="Start voice input"
-        data-es-label="Comenzar voz">
-        <i class="fas fa-microphone"></i>
-        <span class="btn-label" data-en="Speak" data-es="Hablar">Speak</span>
-      </button>
       <button id="chatbot-send" type="submit" aria-label="Send">
         <i class="fas fa-paper-plane"></i>
       </button>
@@ -242,10 +250,10 @@ const ASSET_ID = "CAFF600A21B457E5D909FD887AF48018B3CBFDDF6F9746E56238B23AF061F9
 const EXPECTED_ORIGIN = "https://chattiavato-a11y.github.io";
 
 /* ===== Language / UI wiring ===== */
-const langButtons = qsa('[data-lang]');
-const transNodes  = qsa('[data-en]');
-const phNodes     = qsa('[data-en-ph]');
-const ariaNodes   = qsa('[data-en-label]');
+const langCtrl     = qs('#langCtrl');
+const transNodes   = qsa('[data-en]');
+const phNodes      = qsa('[data-en-ph]');
+const ariaNodes    = qsa('[data-en-label]');
 
 const speechToggle = qs('#speechToggle');
 const listenCtrl   = qs('#listenCtrl');
@@ -339,9 +347,9 @@ function setLanguage(lang) {
   currentLang = toES ? 'es' : 'en';
   document.documentElement.lang = currentLang;
 
-  langButtons.forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.lang === lang);
-  });
+  langCtrl.textContent = toES ? 'ES' : 'EN';
+  langCtrl.setAttribute('aria-pressed', toES ? 'true' : 'false');
+  langCtrl.classList.toggle('active', toES);
 
   transNodes.forEach(node => {
     node.textContent = toES ? node.dataset.es : node.dataset.en;
@@ -360,8 +368,9 @@ function setLanguage(lang) {
   }
 }
 
-langButtons.forEach(btn => {
-  btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
+langCtrl.addEventListener('click', () => {
+  const nextLang = currentLang === 'es' ? 'en' : 'es';
+  setLanguage(nextLang);
 });
 
 setLanguage(document.documentElement.lang === 'es' ? 'es' : 'en');
