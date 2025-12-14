@@ -231,6 +231,71 @@ body.dark {
 #chatbot-send:hover i {
   transform:rotate(-45deg);
 }
+#tnc-row {
+  display:flex;
+  justify-content:flex-end;
+  margin-top:.4rem;
+}
+#tnc-trigger {
+  background:transparent;
+  color:#fff;
+  border:1px solid #ffffff40;
+  border-radius:8px;
+  padding:.35rem .7rem;
+  font-weight:600;
+  cursor:pointer;
+  transition:background .2s, color .2s, border-color .2s;
+}
+#tnc-trigger:hover,
+#tnc-trigger:focus-visible {
+  background:#ffffff12;
+  border-color:#ffffff70;
+}
+#tnc-modal {
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.75);
+  backdrop-filter:blur(2px);
+  z-index:2000;
+}
+#tnc-modal.active { display:flex; }
+#tnc-dialog {
+  background:#f8f8ff;
+  color:#1b0e2d;
+  width:92%;
+  max-width:520px;
+  border-radius:16px;
+  padding:1.4rem 1.2rem 1.2rem;
+  box-shadow:0 12px 36px rgba(0,0,0,0.35);
+  border:2px solid var(--clr-primary);
+}
+#tnc-dialog h3 {
+  margin-top:0;
+  margin-bottom:.6rem;
+  color:#1b0e2d;
+}
+#tnc-dialog p {
+  margin:.35rem 0;
+  line-height:1.5;
+}
+#tnc-close {
+  display:inline-flex;
+  align-items:center;
+  gap:.25rem;
+  margin-top:1rem;
+  background:var(--clr-primary);
+  color:#0d0b1e;
+  border:none;
+  border-radius:10px;
+  padding:.45rem .8rem;
+  font-weight:700;
+  cursor:pointer;
+  box-shadow:0 4px 12px rgba(0,0,0,0.25);
+}
+#tnc-close i { font-size:.9rem; }
 
 @media (max-width:480px) {
   #chatbot-container {
@@ -301,6 +366,23 @@ body.dark {
         <i class="fas fa-paper-plane"></i>
       </button>
     </form>
+    <div id="tnc-row">
+      <button id="tnc-trigger" type="button" aria-haspopup="dialog" aria-controls="tnc-modal">
+        T&amp;C | Consent Notice
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="tnc-modal" role="dialog" aria-modal="true" aria-labelledby="tnc-title" aria-hidden="true">
+  <div id="tnc-dialog">
+    <h3 id="tnc-title">Terms &amp; Consent</h3>
+    <p>By interacting with the Chatbot you consent 100% the process your chat and optional voice input to respond. Audio stays in your browser; typed messages are sent to our service for reviewing, analyzing and chatbot training purposes. We do not collect any personal identifiable information of any kind.</p>
+    <p>I consent to send my messages for processing, training and analysis from the interaction between "I" the end user and the chatbot.</p>
+    <button id="tnc-close" type="button" aria-label="Close terms dialog">
+      <i class="fas fa-check"></i>
+      Close
+    </button>
   </div>
 </div>
 
@@ -329,6 +411,9 @@ const input = qs('#chatbot-input');
 const consentToggle = qs('#consentToggle');
 const consentStatus = qs('#consent-status');
 const sendBtn = qs('#chatbot-send');
+const tncTrigger = qs('#tnc-trigger');
+const tncModal = qs('#tnc-modal');
+const tncClose = qs('#tnc-close');
 
 const CONSENT_KEY = 'opsChatConsent';
 let consentGranted = localStorage.getItem(CONSENT_KEY) === 'true';
@@ -386,6 +471,20 @@ function setConsent(granted) {
   consentGranted = granted;
   localStorage.setItem(CONSENT_KEY, granted ? 'true' : 'false');
   updateConsentUI();
+}
+
+function openTncDialog() {
+  if (!tncModal) return;
+  tncModal.classList.add('active');
+  tncModal.setAttribute('aria-hidden', 'false');
+  tncClose?.focus();
+}
+
+function closeTncDialog() {
+  if (!tncModal) return;
+  tncModal.classList.remove('active');
+  tncModal.setAttribute('aria-hidden', 'true');
+  tncTrigger?.focus();
 }
 
 function updateListenUI() {
@@ -474,6 +573,19 @@ langCtrl.addEventListener('click', () => {
 });
 
 consentToggle.addEventListener('change', () => setConsent(consentToggle.checked));
+
+if (tncTrigger && tncModal && tncClose) {
+  tncTrigger.addEventListener('click', openTncDialog);
+  tncClose.addEventListener('click', closeTncDialog);
+  tncModal.addEventListener('click', e => {
+    if (e.target === tncModal) closeTncDialog();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && tncModal.classList.contains('active')) {
+      closeTncDialog();
+    }
+  });
+}
 
 function requireConsentMessage() {
   return currentLang === 'es'
