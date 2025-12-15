@@ -5,31 +5,37 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>OPS AI Chatbot</title>
 
-<!-- ✅ CSP updated:
-     - adds frame-ancestors (note: meta version is a warning; real enforcement requires HTTP header)
-     - allows ONLY this inline script via the hash below
-     - keeps connect-src to your gateway
+<!-- ✅ CSP (meta) -->
+<!-- Notes:
+  - Enforces self-only loads; allows ONLY this exact inline script by SHA-256 hash and the listed nonce.
+  - 'connect-src' is restricted to your gateway.
+  - 'frame-ancestors' limits embedding to self.
+  - Real HSTS/TT enforcement should be HTTP headers; meta here is best-effort on static hosting.
 -->
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'self';
     base-uri 'self';
-    object-src 'none';
     frame-ancestors 'self';
-    script-src 'self' 'sha256-PNRT7X5j6A2nsUN5thtpONlowxYq4Whijr4FaSiL6Y0=';
+    object-src 'none';
     style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
-    connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev;
     img-src 'self' data:;
     font-src 'self' https://cdnjs.cloudflare.com data:;
-    frame-src 'self';">
+    frame-src 'self';
+    connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev;
+    form-action 'self';
+    worker-src 'self';
+    script-src 'self'
+      'sha256-0FKQdhfEQr1z39I1RfslN+3RtRYpEcxlgQ2wn3MF7lI='
+      'nonce-ops-inline-2025';
+    upgrade-insecure-requests;">
 
 <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains; preload">
 <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
-<meta http-equiv="Permissions-Policy"
-  content="camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=()">
+<meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=()">
 <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
 <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
 
-<!-- ✅ FontAwesome SRI fixed to match DevTools computed SHA-512 -->
+<!-- ✅ FontAwesome (SRI) -->
 <link rel="stylesheet"
   href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
   integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw=="
@@ -56,7 +62,6 @@ body {
   color:var(--clr-tx);
   transition:background .3s,color .3s;
 }
-body.awaiting-consent #chatbot-container { display:none; }
 body.dark {
   --clr-bg:var(--clr-bg-dark);
   --clr-tx:var(--clr-tx-dark);
@@ -104,293 +109,100 @@ body.dark {
   padding:.25rem .55rem;
   transition:background .2s, color .2s, opacity .2s, box-shadow .2s;
 }
-.ctrl:hover {
-  opacity:1;
-  background:#3d2264;
-}
+.ctrl:hover { opacity:1; background:#3d2264; }
 .ctrl.active {
-  background:#fff;
-  color:#321b53;
-  opacity:1;
-  box-shadow:0 0 0 1px #fff4;
+  background:#fff; color:#321b53; opacity:1; box-shadow:0 0 0 1px #fff4;
 }
 #chat-log {
-  flex:1;
-  overflow-y:auto;
-  padding:1rem;
-  background:#1b0e2d;
-  color:#eee;
-  font-size:.94rem;
+  flex:1; overflow-y:auto; padding:1rem;
+  background:#1b0e2d; color:#eee; font-size:.94rem;
 }
-.chat-msg {
-  margin:.5rem 0;
-  max-width:90%;
-}
+.chat-msg { margin:.5rem 0; max-width:90%; }
 .user {
-  margin-left:auto;
-  background:var(--clr-primary);
-  color:#000;
-  padding:.5rem .7rem;
-  border-radius:14px 14px 0 14px;
+  margin-left:auto; background:var(--clr-primary); color:#000;
+  padding:.5rem .7rem; border-radius:14px 14px 0 14px;
 }
 .bot {
-  margin-right:auto;
-  background:#321b53;
-  color:#fff;
-  padding:.5rem .7rem;
-  border-radius:14px 14px 14px 0;
+  margin-right:auto; background:#321b53; color:#fff;
+  padding:.5rem .7rem; border-radius:14px 14px 14px 0;
 }
 #chatbot-form-container {
-  background:#220f3a;
-  border-top:1px solid var(--clr-accent);
-  padding:.55rem .7rem .75rem;
-  color:#fff;
+  background:#220f3a; border-top:1px solid var(--clr-accent);
+  padding:.55rem .7rem .75rem; color:#fff;
 }
-#control-row {
-  display:flex;
-  justify-content:flex-start;
-  margin-bottom:.55rem;
-}
-#chatbot-input-row {
-  display:flex;
-  gap:.6rem;
-}
+#control-row { display:flex; justify-content:flex-start; margin-bottom:.55rem; }
+#chatbot-input-row { display:flex; gap:.6rem; }
 #listenCtrl {
-  background:#ffb703;
-  border:none;
-  color:#1b0e2d;
-  font-weight:700;
-  padding:.45rem .65rem;
-  border-radius:8px;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+  background:#ffb703; border:none; color:#1b0e2d; font-weight:700;
+  padding:.45rem .65rem; border-radius:8px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
   transition:transform .2s, box-shadow .2s;
 }
-#listenCtrl .btn-label {
-  margin-left:.35rem;
-  font-weight:700;
-}
-#listenCtrl.active {
-  box-shadow:0 0 0 2px #fff3;
-  transform:scale(1.02);
-}
+#listenCtrl .btn-label { margin-left:.35rem; font-weight:700; }
+#listenCtrl.active { box-shadow:0 0 0 2px #fff3; transform:scale(1.02); }
 #listenCtrl i { pointer-events:none; }
 #chatbot-input {
-  flex:1;
-  background:transparent;
-  border:none;
-  color:#fff;
-  font-size:.95rem;
-  padding:.55rem .6rem;
+  flex:1; background:transparent; border:none; color:#fff;
+  font-size:.95rem; padding:.55rem .6rem;
 }
-#chatbot-input::placeholder {
-  color:#bfbfbf;
-}
+#chatbot-input::placeholder { color:#bfbfbf; }
 #chatbot-send {
-  display:flex;
-  align-items:center;
-  gap:6px;
-  background:var(--clr-accent);
-  border:none;
-  color:#fff;
-  font-weight:600;
-  padding:.5rem .9rem;
-  border-radius:8px;
-  cursor:pointer;
-  transition:.3s;
+  display:flex; align-items:center; gap:6px; background:var(--clr-accent);
+  border:none; color:#fff; font-weight:600; padding:.5rem .9rem;
+  border-radius:8px; cursor:pointer; transition:.3s;
 }
-#chatbot-send i {
-  transition:transform .3s;
-}
-#chatbot-send:hover i {
-  transform:rotate(-45deg);
-}
-#tnc-row {
-  display:flex;
-  justify-content:flex-end;
-  margin-top:.4rem;
-}
+#chatbot-send i { transition:transform .3s; }
+#chatbot-send:hover i { transform:rotate(-45deg); }
+
+#tnc-row { display:flex; justify-content:flex-end; margin-top:.4rem; }
 #tnc-trigger {
-  background:transparent;
-  color:#fff;
-  border:1px solid #ffffff40;
-  border-radius:8px;
-  padding:.35rem .7rem;
-  font-weight:600;
-  cursor:pointer;
+  background:transparent; color:#fff; border:1px solid #ffffff40;
+  border-radius:8px; padding:.35rem .7rem; font-weight:600; cursor:pointer;
   transition:background .2s, color .2s, border-color .2s;
 }
-#tnc-trigger:hover,
-#tnc-trigger:focus-visible {
-  background:#ffffff12;
-  border-color:#ffffff70;
+#tnc-trigger:hover, #tnc-trigger:focus-visible {
+  background:#ffffff12; border-color:#ffffff70;
 }
 #tnc-modal {
-  position:fixed;
-  inset:0;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  background:rgba(0,0,0,0.75);
-  backdrop-filter:blur(2px);
-  z-index:2000;
+  position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+  background:rgba(0,0,0,0.75); backdrop-filter:blur(2px); z-index:2000;
 }
 #tnc-modal.active { display:flex; }
 #tnc-dialog {
-  background:#f8f8ff;
-  color:#1b0e2d;
-  width:92%;
-  max-width:520px;
-  border-radius:16px;
-  padding:1.4rem 1.2rem 1.2rem;
-  box-shadow:0 12px 36px rgba(0,0,0,0.35);
-  border:2px solid var(--clr-primary);
+  background:#f8f8ff; color:#1b0e2d; width:92%; max-width:520px;
+  border-radius:16px; padding:1.4rem 1.2rem 1.2rem;
+  box-shadow:0 12px 36px rgba(0,0,0,0.35); border:2px solid var(--clr-primary);
 }
-#tnc-dialog h3 {
-  margin-top:0;
-  margin-bottom:.6rem;
-  color:#1b0e2d;
-}
-#tnc-dialog p {
-  margin:.35rem 0;
-  line-height:1.5;
-}
+#tnc-dialog h3 { margin-top:0; margin-bottom:.6rem; color:#1b0e2d; }
+#tnc-dialog p { margin:.35rem 0; line-height:1.5; }
 #consent-banner {
-  background:#0d0b1e;
-  color:#f5f7fb;
-  border:2px solid var(--clr-primary);
-  border-radius:14px;
-  padding:1rem 1.25rem;
-  margin:0 0 1rem;
-  box-shadow:0 10px 25px #0005;
+  background:#0d0b1e; color:#f5f7fb; border:2px solid var(--clr-primary);
+  border-radius:14px; padding:1rem 1.25rem; margin:0 0 1rem; box-shadow:0 10px 25px #0005;
 }
-#consent-banner a {
-  color:var(--clr-primary);
-  font-weight:600;
-}
+#consent-banner a { color:var(--clr-primary); font-weight:600; }
 #consent-banner .consent-row {
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  gap:.55rem;
-  margin-top:.75rem;
+  display:flex; align-items:center; gap:.65rem; margin-top:.75rem; flex-wrap:wrap;
 }
-#consent-message {
-  margin:0;
-}
-#consent-accept-inline {
-  background:#00c4ff;
-  color:#0d0b1e;
-  border:none;
-  border-radius:10px;
-  padding:.45rem .8rem;
-  font-weight:700;
-  cursor:pointer;
-  box-shadow:0 6px 18px rgba(0,0,0,0.2);
-}
-#consent-status {
-  font-size:.95rem;
-}
+#consentToggle { width:18px; height:18px; }
+#consent-status { font-size:.95rem; }
 #tnc-close {
-  display:inline-flex;
-  align-items:center;
-  gap:.25rem;
-  margin-top:1rem;
-  background:var(--clr-primary);
-  color:#0d0b1e;
-  border:none;
-  border-radius:10px;
-  padding:.45rem .8rem;
-  font-weight:700;
-  cursor:pointer;
+  display:inline-flex; align-items:center; gap:.25rem; margin-top:1rem;
+  background:var(--clr-primary); color:#0d0b1e; border:none; border-radius:10px;
+  padding:.45rem .8rem; font-weight:700; cursor:pointer;
   box-shadow:0 4px 12px rgba(0,0,0,0.25);
 }
 #tnc-close i { font-size:.9rem; }
 
-/* ---------- GENERIC CONSENT ---------- */
-#consent-modal {
-  position:fixed;
-  inset:0;
-  background:rgba(12,10,26,0.65);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:2000;
-  opacity:0;
-  pointer-events:none;
-  transition:opacity .2s ease;
-}
-#consent-modal.active {
-  opacity:1;
-  pointer-events:auto;
-}
-#consent-card {
-  background:#fff;
-  color:#1b0e2d;
-  border-radius:16px;
-  padding:1.2rem 1.25rem 1.35rem;
-  box-shadow:0 14px 40px rgba(0,0,0,0.35);
-  width:min(360px,92vw);
-  text-align:center;
-}
-#consent-card h2 {
-  margin:0 0 .7rem;
-  font-size:1.1rem;
-  color:#1b0e2d;
-}
-#consent-card p {
-  margin:.35rem 0 .9rem;
-  font-size:.95rem;
-  line-height:1.4;
-}
-#consent-accept {
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:.45rem;
-  background:linear-gradient(135deg,var(--clr-primary),var(--clr-accent));
-  color:#0d0b1e;
-  border:none;
-  border-radius:12px;
-  padding:.55rem 1rem;
-  font-weight:800;
-  cursor:pointer;
-  box-shadow:0 8px 20px rgba(0,0,0,0.25);
-  width:100%;
-}
-#consent-accept i { font-size:.95rem; }
-
 @media (max-width:480px) {
-  #chatbot-container {
-    height:75vh;
-    width:90%;
-  }
+  #chatbot-container { height:75vh; width:90%; }
 }
 </style>
 </head>
-<body class="awaiting-consent">
-
-<!-- ---------- GENERIC CONSENT POPUP ---------- -->
-<div id="consent-modal" role="dialog" aria-modal="true" aria-labelledby="consent-title">
-  <div id="consent-card">
-    <h2 id="consent-title">Consent Needed</h2>
-    <p id="consent-copy">
-      When using Chatbot, End User allows us to use the interaction between the Chatbot and the End User for training purposes, no Personal Identifiable Information is collected.
-    </p>
-    <button id="consent-accept" type="button" aria-label="Accept and continue">
-      <i class="fas fa-check"></i>
-      Accept &amp; Continue
-    </button>
-  </div>
-</div>
+<body>
 
 <div id="chatbot-container" role="dialog" aria-modal="true">
   <div id="chatbot-header">
-    <span id="title"
-          data-en="OPS AI Chatbot"
-          data-es="Chatbot OPS AI">OPS AI Chatbot</span>
+    <span id="title" data-en="OPS AI Chatbot" data-es="Chatbot OPS AI">OPS AI Chatbot</span>
   </div>
 
   <div id="chat-log" aria-live="polite"></div>
@@ -398,88 +210,62 @@ body.dark {
   <div id="chatbot-form-container">
     <div id="control-row" class="ctrl-group" aria-label="Language, theme, and speech controls">
       <button type="button" id="langCtrl" class="ctrl"
-        aria-label="Toggle language"
-        data-en-label="Toggle language"
-        data-es-label="Cambiar idioma">EN</button>
+        aria-label="Toggle language" data-en-label="Toggle language" data-es-label="Cambiar idioma">EN</button>
       <button type="button" id="themeCtrl" class="ctrl">Dark</button>
-      <button type="button" id="speechToggle" class="ctrl"
-        data-en="Speech"
-        data-es="Voz">Speech</button>
+      <button type="button" id="speechToggle" class="ctrl" data-en="Speech" data-es="Voz">Speech</button>
       <button id="listenCtrl" type="button" aria-label="Start voice input"
-        data-en-label="Start voice input"
-        data-es-label="Comenzar voz">
+        data-en-label="Start voice input" data-es-label="Comenzar voz">
         <i class="fas fa-microphone"></i>
         <span class="btn-label" data-en="Speak" data-es="Hablar">Speak</span>
       </button>
     </div>
     <form id="chatbot-input-row" autocomplete="off">
-      <input
-        id="chatbot-input"
-        type="text"
-        placeholder="Type your message..."
-        required
-        maxlength="256"
-        data-en-ph="Type your message..."
-        data-es-ph="Escriba su mensaje...">
-      <button id="chatbot-send" type="submit" aria-label="Send">
-        <i class="fas fa-paper-plane"></i>
-      </button>
+      <input id="chatbot-input" type="text" placeholder="Type your message..." required maxlength="256"
+        data-en-ph="Type your message..." data-es-ph="Escriba su mensaje...">
+      <button id="chatbot-send" type="submit" aria-label="Send"><i class="fas fa-paper-plane"></i></button>
     </form>
     <div id="tnc-row">
-      <button
-        id="tnc-trigger"
-        type="button"
-        aria-haspopup="dialog"
-        aria-controls="tnc-modal"
-        data-en="Consent Notice"
-        data-es="Aviso de consentimiento">
-        Consent Notice
-      </button>
+      <button id="tnc-trigger" type="button" aria-haspopup="dialog" aria-controls="tnc-modal"
+        data-en="Consent Notice" data-es="Aviso de consentimiento">Consent Notice</button>
     </div>
   </div>
 </div>
 
 <div id="tnc-modal" role="dialog" aria-modal="true" aria-labelledby="tnc-title" aria-hidden="true">
   <div id="tnc-dialog">
-    <h3
-      id="tnc-title"
-      data-en="Consent Notice &amp; Terms"
-      data-es="Aviso de consentimiento y términos">
+    <h3 id="tnc-title" data-en="Consent Notice &amp; Terms" data-es="Aviso de consentimiento y términos">
       Consent Notice &amp; Terms
     </h3>
     <div id="consent-banner" role="region" aria-live="polite">
-      <p
-        data-en="We process your chat and optional voice input to respond. Audio stays in your browser; typed messages are sent to our service. Please review our"
-        data-es="Procesamos tu chat y la entrada de voz opcional para responder. El audio permanece en tu navegador; los mensajes escritos se envían a nuestro servicio. Revisa nuestra">
+      <p data-en="We process your chat and optional voice input to respond. Audio stays in your browser; typed messages are sent to our service. Please review our"
+         data-es="Procesamos tu chat y la entrada de voz opcional para responder. El audio permanece en tu navegador; los mensajes escritos se envían a nuestro servicio. Revisa nuestra">
         We process your chat and optional voice input to respond. Audio stays in your browser; typed messages are sent to our service. Please review our
-        <a href="#" target="_blank" rel="noreferrer noopener">Privacy Policy</a>
-        &amp;
+        <a href="#" target="_blank" rel="noreferrer noopener">Privacy Policy</a> &amp;
         <a href="#" target="_blank" rel="noreferrer noopener">Terms of Service</a>
         before proceeding.
       </p>
-      <p
-        data-en="Grant consent to enable voice controls and sending messages to the assistant."
-        data-es="Otorga consentimiento para activar los controles de voz y el envío de mensajes al asistente.">
+      <p data-en="Grant consent to enable voice controls and sending messages to the assistant."
+         data-es="Otorga consentimiento para activar los controles de voz y el envío de mensajes al asistente.">
         Grant consent to enable voice controls and sending messages to the assistant.
       </p>
       <div class="consent-row">
-        <p id="consent-message" data-en="When using the chatbot, you allow us to use these interactions for training; no personal identifiable information is collected." data-es="Al usar el chatbot, permites que usemos las interacciones para entrenamiento; no se recopila información personal identificable.">
-          When using the chatbot, you allow us to use these interactions for training; no personal identifiable information is collected.
-        </p>
-        <button id="consent-accept-inline" type="button" aria-describedby="consent-status">
-          Accept &amp; Continue
-        </button>
+        <label for="consentToggle"
+          data-en="I consent to send my messages for processing."
+          data-es="Consiento enviar mis mensajes para su procesamiento.">
+          I consent to send my messages for processing.
+        </label>
+        <input type="checkbox" id="consentToggle" aria-describedby="consent-status">
         <span id="consent-status"></span>
       </div>
     </div>
     <button id="tnc-close" type="button" aria-label="Close terms dialog">
-      <i class="fas fa-check"></i>
-      Close
+      <i class="fas fa-check"></i> Close
     </button>
   </div>
 </div>
 
-<script>
+<!-- Inline script: hash must match CSP above; nonce also listed for redundancy -->
+<script nonce="ops-inline-2025">
 const qs  = s => document.querySelector(s);
 const qsa = s => [...document.querySelectorAll(s)];
 
@@ -533,6 +319,8 @@ function normalizeUserText(s) {
   let out = String(s || '');
   out = out.replace(/[\u0000-\u001F\u007F]/g, ' ');
   out = out.replace(/\s+/g, ' ').trim();
+  // limit length as final guard (input also has maxlength)
+  if (out.length > 256) out = out.slice(0, 256);
   return out;
 }
 
@@ -577,17 +365,12 @@ function updateListenUI() {
 
 function updateConsentUI() {
   consentToggle.checked = consentGranted;
+
   const consentNeeded = !consentGranted;
   speechToggle.disabled = consentNeeded;
   listenCtrl.disabled = consentNeeded;
   sendBtn.disabled = consentNeeded;
   input.disabled = consentNeeded;
-  chatbotContainer?.classList.toggle('locked', consentNeeded);
-
-  if (consentModal) {
-    consentModal.classList.toggle('active', consentNeeded);
-  }
-  document.body.classList.toggle('awaiting-consent', consentNeeded);
 
   const statusText = consentGranted
     ? (currentLang === 'es'
@@ -621,12 +404,23 @@ function closeTncDialog() {
   tncTrigger?.focus();
 }
 
+/* ===== Trusted Types (no-op policy; helps if TT enforced by headers) ===== */
+try {
+  if (window.trustedTypes && !window.trustedTypes.getPolicy('opsPolicy')) {
+    window.trustedTypes.createPolicy('opsPolicy', {
+      createHTML: s => s,
+      createScript: s => s,
+      createScriptURL: s => s
+    });
+  }
+} catch { /* ignore */ }
+
 /* ===== Origin lock (repo must run ONLY from official GH Pages origin) ===== */
 let originLocked = false;
 if (window.location.origin !== EXPECTED_ORIGIN) {
   originLocked = true;
   addMsg(
-    "OPS assistant only works from " + EXPECTED_ORIGIN + "/ops-online-support/ for security reasons.",
+    "OPS assistant only works from " + EXPECTED_ORIGIN + " for security reasons.",
     "bot"
   );
 }
@@ -864,14 +658,24 @@ form.onsubmit = async e => {
   const botDiv = addMsg('…', 'bot');
 
   try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 15000); // 15s client timeout
+
     const res = await fetch(API_URL.href, {
       method: 'POST',
+      mode: 'cors',
+      cache: 'no-store',
+      credentials: 'omit',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer',
       headers: {
         'Content-Type': 'application/json',
         'X-Ops-Asset-Id': ASSET_ID
       },
-      body: JSON.stringify({ message: msg, lang })
+      body: JSON.stringify({ message: msg, lang, v: 1 }),
+      signal: ctrl.signal
     });
+    clearTimeout(to);
 
     const responseText = await res.text();
     let data = null;
