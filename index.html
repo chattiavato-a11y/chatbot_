@@ -6,13 +6,12 @@
 <title>OPS AI Chatbot</title>
 
 <!-- ✅ CSP updated:
-     - adds frame-ancestors
+     - adds frame-ancestors (note: meta version is a warning; real enforcement requires HTTP header)
      - allows ONLY this inline script via the hash you saw in DevTools
      - keeps connect-src to your gateway
 -->
 <meta http-equiv="Content-Security-Policy"
-  content="
-    default-src 'self';
+  content="default-src 'self';
     base-uri 'self';
     object-src 'none';
     frame-ancestors 'self';
@@ -21,8 +20,7 @@
     connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev;
     img-src 'self' data:;
     font-src 'self' https://cdnjs.cloudflare.com data:;
-    frame-src 'self';
-  ">
+    frame-src 'self';">
 
 <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains; preload">
 <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
@@ -33,15 +31,6 @@
 
 <!-- NOTE:
   - ✅ Removed X-Frame-Options meta (browsers ignore it unless it's an HTTP header)
--->
-
-<!-- Deployment guidance: set equivalent HTTP response headers for CSP, HSTS,
-     Referrer-Policy, Permissions-Policy, Cross-Origin-Opener-Policy, and
-     Cross-Origin-Embedder-Policy on the hosting platform.
-
-     If you want clickjacking protection at the server level, set:
-       X-Frame-Options: SAMEORIGIN
-     as an HTTP header (not a meta tag).
 -->
 
 <!-- ✅ FontAwesome SRI fixed to match DevTools computed SHA-512 -->
@@ -324,7 +313,6 @@ body.dark {
 </head>
 <body>
 
-<!-- ---------- CHATBOT HTML ---------- -->
 <div id="chatbot-container" role="dialog" aria-modal="true">
   <div id="chatbot-header">
     <span id="title"
@@ -416,7 +404,6 @@ body.dark {
   </div>
 </div>
 
-<!-- ---------- CHATBOT LOGIC ---------- -->
 <script>
 const qs  = s => document.querySelector(s);
 const qsa = s => [...document.querySelectorAll(s)];
