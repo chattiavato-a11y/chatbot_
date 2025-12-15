@@ -5,28 +5,20 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>OPS AI Chatbot</title>
 
-<!-- ✅ CSP (meta) -->
-<!-- Notes:
-  - Enforces self-only loads; allows ONLY this exact inline script by SHA-256 hash and the listed nonce.
-  - 'connect-src' is restricted to your gateway.
-  - 'frame-ancestors' limits embedding to self.
-  - Real HSTS/TT enforcement should be HTTP headers; meta here is best-effort on static hosting.
--->
+<!-- Strict CSP: self-only; inline script via nonce; connect only to your gateway -->
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'self';
     base-uri 'self';
     frame-ancestors 'self';
     object-src 'none';
-    style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
+    style-src 'self' 'unsafe-inline';
     img-src 'self' data:;
-    font-src 'self' https://cdnjs.cloudflare.com data:;
+    font-src 'self' data:;
     frame-src 'self';
     connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev;
     form-action 'self';
     worker-src 'self';
-    script-src 'self'
-      'sha256-0FKQdhfEQr1z39I1RfslN+3RtRYpEcxlgQ2wn3MF7lI='
-      'nonce-ops-inline-2025';
+    script-src 'self' 'nonce-ops-inline-asset';
     upgrade-insecure-requests;">
 
 <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains; preload">
@@ -35,14 +27,7 @@
 <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
 <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
 
-<!-- ✅ FontAwesome (SRI) -->
-<link rel="stylesheet"
-  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
-  integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw=="
-  crossorigin="anonymous" referrerpolicy="no-referrer" />
-
 <style>
-/* ---------- COLOR SYSTEM ---------- */
 :root {
   --clr-primary:#00c4ff;
   --clr-accent:#ff3bdb;
@@ -52,149 +37,94 @@
   --clr-tx-dark:#f0f0f0;
 }
 body {
-  margin:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  height:100vh;
-  font-family:'Segoe UI',Arial,sans-serif;
-  background:var(--clr-bg);
-  color:var(--clr-tx);
-  transition:background .3s,color .3s;
+  margin:0; display:flex; align-items:center; justify-content:center;
+  height:100vh; font-family:'Segoe UI',Arial,sans-serif;
+  background:var(--clr-bg); color:var(--clr-tx); transition:background .3s,color .3s;
 }
-body.dark {
-  --clr-bg:var(--clr-bg-dark);
-  --clr-tx:var(--clr-tx-dark);
-}
+body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 
-/* ---------- CHATBOT ---------- */
 #chatbot-container {
-  width:300px;
-  height:540px;
-  background:#251541;
-  border:2px solid var(--clr-accent);
-  border-radius:18px;
-  box-shadow:0 8px 32px #0006;
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
+  width:300px; height:540px; background:#251541;
+  border:2px solid var(--clr-accent); border-radius:18px; box-shadow:0 8px 32px #0006;
+  display:flex; flex-direction:column; overflow:hidden;
 }
 #chatbot-header {
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:.5rem;
+  display:flex; justify-content:center; align-items:center; gap:.5rem;
   background:linear-gradient(135deg,var(--clr-primary) 0%,var(--clr-accent) 100%);
-  color:#fff;
-  font-weight:600;
-  font-size:1.1rem;
-  padding:.75rem 1rem;
+  color:#fff; font-weight:600; font-size:1.1rem; padding:.75rem 1rem;
 }
-.ctrl-group {
-  display:flex;
-  align-items:center;
-  gap:.35rem;
-  flex-wrap:wrap;
-}
+.ctrl-group { display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; }
 .ctrl {
-  cursor:pointer;
-  font-size:.75rem;
-  font-weight:600;
-  user-select:none;
-  opacity:.9;
-  color:#fff;
-  background:#321b53;
-  border:1px solid #fff3;
-  border-radius:6px;
-  padding:.25rem .55rem;
+  cursor:pointer; font-size:.75rem; font-weight:600; user-select:none; opacity:.9; color:#fff;
+  background:#321b53; border:1px solid #fff3; border-radius:6px; padding:.25rem .55rem;
   transition:background .2s, color .2s, opacity .2s, box-shadow .2s;
 }
 .ctrl:hover { opacity:1; background:#3d2264; }
-.ctrl.active {
-  background:#fff; color:#321b53; opacity:1; box-shadow:0 0 0 1px #fff4;
-}
+.ctrl.active { background:#fff; color:#321b53; opacity:1; box-shadow:0 0 0 1px #fff4; }
+
+.icon { width:1em; height:1em; display:inline-block; vertical-align:-0.15em; fill:currentColor; }
+
 #chat-log {
-  flex:1; overflow-y:auto; padding:1rem;
-  background:#1b0e2d; color:#eee; font-size:.94rem;
+  flex:1; overflow-y:auto; padding:1rem; background:#1b0e2d; color:#eee; font-size:.94rem;
 }
 .chat-msg { margin:.5rem 0; max-width:90%; }
-.user {
-  margin-left:auto; background:var(--clr-primary); color:#000;
-  padding:.5rem .7rem; border-radius:14px 14px 0 14px;
-}
-.bot {
-  margin-right:auto; background:#321b53; color:#fff;
-  padding:.5rem .7rem; border-radius:14px 14px 14px 0;
-}
-#chatbot-form-container {
-  background:#220f3a; border-top:1px solid var(--clr-accent);
-  padding:.55rem .7rem .75rem; color:#fff;
-}
+.user { margin-left:auto; background:var(--clr-primary); color:#000; padding:.5rem .7rem; border-radius:14px 14px 0 14px; }
+.bot  { margin-right:auto; background:#321b53; color:#fff; padding:.5rem .7rem; border-radius:14px 14px 14px 0; }
+
+#chatbot-form-container { background:#220f3a; border-top:1px solid var(--clr-accent); padding:.55rem .7rem .75rem; color:#fff; }
 #control-row { display:flex; justify-content:flex-start; margin-bottom:.55rem; }
 #chatbot-input-row { display:flex; gap:.6rem; }
+
 #listenCtrl {
   background:#ffb703; border:none; color:#1b0e2d; font-weight:700;
-  padding:.45rem .65rem; border-radius:8px; cursor:pointer;
-  display:flex; align-items:center; justify-content:center;
+  padding:.45rem .65rem; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center;
   transition:transform .2s, box-shadow .2s;
 }
 #listenCtrl .btn-label { margin-left:.35rem; font-weight:700; }
 #listenCtrl.active { box-shadow:0 0 0 2px #fff3; transform:scale(1.02); }
-#listenCtrl i { pointer-events:none; }
-#chatbot-input {
-  flex:1; background:transparent; border:none; color:#fff;
-  font-size:.95rem; padding:.55rem .6rem;
-}
+
+#chatbot-input { flex:1; background:transparent; border:none; color:#fff; font-size:.95rem; padding:.55rem .6rem; }
 #chatbot-input::placeholder { color:#bfbfbf; }
+
 #chatbot-send {
-  display:flex; align-items:center; gap:6px; background:var(--clr-accent);
-  border:none; color:#fff; font-weight:600; padding:.5rem .9rem;
-  border-radius:8px; cursor:pointer; transition:.3s;
+  display:flex; align-items:center; gap:6px; background:var(--clr-accent); border:none; color:#fff;
+  font-weight:600; padding:.5rem .9rem; border-radius:8px; cursor:pointer; transition:.3s;
 }
-#chatbot-send i { transition:transform .3s; }
-#chatbot-send:hover i { transform:rotate(-45deg); }
+#chatbot-send .icon { transition:transform .3s; }
+#chatbot-send:hover .icon { transform:rotate(-45deg); }
 
 #tnc-row { display:flex; justify-content:flex-end; margin-top:.4rem; }
 #tnc-trigger {
-  background:transparent; color:#fff; border:1px solid #ffffff40;
-  border-radius:8px; padding:.35rem .7rem; font-weight:600; cursor:pointer;
-  transition:background .2s, color .2s, border-color .2s;
+  background:transparent; color:#fff; border:1px solid #ffffff40; border-radius:8px; padding:.35rem .7rem;
+  font-weight:600; cursor:pointer; transition:background .2s, color .2s, border-color .2s;
 }
-#tnc-trigger:hover, #tnc-trigger:focus-visible {
-  background:#ffffff12; border-color:#ffffff70;
-}
+#tnc-trigger:hover, #tnc-trigger:focus-visible { background:#ffffff12; border-color:#ffffff70; }
+
 #tnc-modal {
   position:fixed; inset:0; display:none; align-items:center; justify-content:center;
   background:rgba(0,0,0,0.75); backdrop-filter:blur(2px); z-index:2000;
 }
 #tnc-modal.active { display:flex; }
 #tnc-dialog {
-  background:#f8f8ff; color:#1b0e2d; width:92%; max-width:520px;
-  border-radius:16px; padding:1.4rem 1.2rem 1.2rem;
+  background:#f8f8ff; color:#1b0e2d; width:92%; max-width:520px; border-radius:16px; padding:1.4rem 1.2rem 1.2rem;
   box-shadow:0 12px 36px rgba(0,0,0,0.35); border:2px solid var(--clr-primary);
 }
 #tnc-dialog h3 { margin-top:0; margin-bottom:.6rem; color:#1b0e2d; }
 #tnc-dialog p { margin:.35rem 0; line-height:1.5; }
+
 #consent-banner {
-  background:#0d0b1e; color:#f5f7fb; border:2px solid var(--clr-primary);
-  border-radius:14px; padding:1rem 1.25rem; margin:0 0 1rem; box-shadow:0 10px 25px #0005;
+  background:#0d0b1e; color:#f5f7fb; border:2px solid var(--clr-primary); border-radius:14px; padding:1rem 1.25rem;
+  margin:0 0 1rem; box-shadow:0 10px 25px #0005;
 }
 #consent-banner a { color:var(--clr-primary); font-weight:600; }
-#consent-banner .consent-row {
-  display:flex; align-items:center; gap:.65rem; margin-top:.75rem; flex-wrap:wrap;
-}
+#consent-banner .consent-row { display:flex; align-items:center; gap:.65rem; margin-top:.75rem; flex-wrap:wrap; }
 #consentToggle { width:18px; height:18px; }
 #consent-status { font-size:.95rem; }
-#tnc-close {
-  display:inline-flex; align-items:center; gap:.25rem; margin-top:1rem;
-  background:var(--clr-primary); color:#0d0b1e; border:none; border-radius:10px;
-  padding:.45rem .8rem; font-weight:700; cursor:pointer;
-  box-shadow:0 4px 12px rgba(0,0,0,0.25);
-}
-#tnc-close i { font-size:.9rem; }
 
-@media (max-width:480px) {
-  #chatbot-container { height:75vh; width:90%; }
+#tnc-close {
+  display:inline-flex; align-items:center; gap:.25rem; margin-top:1rem; background:#var(--clr-primary); color:#0d0b1e;
+  border:none; border-radius:10px; padding:.45rem .8rem; font-weight:700; cursor:pointer;
+  box-shadow:0 4px 12px rgba(0,0,0,0.25);
 }
 </style>
 </head>
@@ -215,14 +145,22 @@ body.dark {
       <button type="button" id="speechToggle" class="ctrl" data-en="Speech" data-es="Voz">Speech</button>
       <button id="listenCtrl" type="button" aria-label="Start voice input"
         data-en-label="Start voice input" data-es-label="Comenzar voz">
-        <i class="fas fa-microphone"></i>
+        <!-- Mic SVG -->
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zM11 19h2v3h-2z"/>
+        </svg>
         <span class="btn-label" data-en="Speak" data-es="Hablar">Speak</span>
       </button>
     </div>
     <form id="chatbot-input-row" autocomplete="off">
       <input id="chatbot-input" type="text" placeholder="Type your message..." required maxlength="256"
         data-en-ph="Type your message..." data-es-ph="Escriba su mensaje...">
-      <button id="chatbot-send" type="submit" aria-label="Send"><i class="fas fa-paper-plane"></i></button>
+      <button id="chatbot-send" type="submit" aria-label="Send">
+        <!-- Paper plane SVG -->
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M2 21l20-9L2 3v7l14 2L2 14v7z"/>
+        </svg>
+      </button>
     </form>
     <div id="tnc-row">
       <button id="tnc-trigger" type="button" aria-haspopup="dialog" aria-controls="tnc-modal"
@@ -258,467 +196,319 @@ body.dark {
         <span id="consent-status"></span>
       </div>
     </div>
-    <button id="tnc-close" type="button" aria-label="Close terms dialog">
-      <i class="fas fa-check"></i> Close
-    </button>
+    <button id="tnc-close" type="button" aria-label="Close terms dialog">Close</button>
   </div>
 </div>
 
-<!-- Inline script: hash must match CSP above; nonce also listed for redundancy -->
-<script nonce="ops-inline-2025">
-const qs  = s => document.querySelector(s);
-const qsa = s => [...document.querySelectorAll(s)];
+<!-- Inline script; the nonce must match the CSP above -->
+<script nonce="ops-inline-asset">
+(() => {
+  const qs  = s => document.querySelector(s);
+  const qsa = s => [...document.querySelectorAll(s)];
 
-/* ===== Fixed asset ID: repo → gateway (ONLY) ===== */
-const ASSET_ID = "CAFF600A21B457E5D909FD887AF48018B3CBFDDF6F9746E56238B23AF061F9E2";
+  /* ===== Fixed asset ID header ===== */
+  const ASSET_ID = "CAFF600A21B457E5D909FD887AF48018B3CBFDDF6F9746E56238B23AF061F9E2";
 
-/* ===== Expected origin (GitHub Pages) ===== */
-const EXPECTED_ORIGIN = "https://chattiavato-a11y.github.io";
+  /* ===== HARD LOCK: exact origin + exact path prefix ===== */
+  const EXPECTED_ORIGIN = "https://chattiavato-a11y.github.io";   // scheme + host only
+  const ALLOWED_PATH_PREFIX = "/ops-online-support/";             // required path prefix
+  const atExpectedOrigin = (self.origin === EXPECTED_ORIGIN);
+  const atExpectedPath   = (self.location.pathname.startsWith(ALLOWED_PATH_PREFIX));
+  const fullyAuthorized  = atExpectedOrigin && atExpectedPath;
 
-/* ===== Backend endpoint: repo → gateway ===== */
-const API_URL = new URL("https://ops-gateway.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat");
+  /* ===== Gateway endpoint ===== */
+  const API_URL = new URL("https://ops-gateway.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat");
 
-/* ===== Language / UI wiring ===== */
-const langCtrl     = qs('#langCtrl');
-const transNodes   = qsa('[data-en]');
-const phNodes      = qsa('[data-en-ph]');
-const ariaNodes    = qsa('[data-en-label]');
+  /* ===== UI refs ===== */
+  const langCtrl     = qs('#langCtrl');
+  const transNodes   = qsa('[data-en]');
+  const phNodes      = qsa('[data-en-ph]');
+  const ariaNodes    = qsa('[data-en-label]');
 
-const themeCtrl     = qs('#themeCtrl');
-const speechToggle  = qs('#speechToggle');
-const listenCtrl    = qs('#listenCtrl');
+  const themeCtrl     = qs('#themeCtrl');
+  const speechToggle  = qs('#speechToggle');
+  const listenCtrl    = qs('#listenCtrl');
 
-const log   = qs('#chat-log');
-const form  = qs('#chatbot-input-row');
-const input = qs('#chatbot-input');
+  const log   = qs('#chat-log');
+  const form  = qs('#chatbot-input-row');
+  const input = qs('#chatbot-input');
 
-const consentToggle = qs('#consentToggle');
-const consentStatus = qs('#consent-status');
-const sendBtn       = qs('#chatbot-send');
+  const consentToggle = qs('#consentToggle');
+  const consentStatus = qs('#consent-status');
+  const sendBtn       = qs('#chatbot-send');
 
-const tncTrigger = qs('#tnc-trigger');
-const tncModal   = qs('#tnc-modal');
-const tncClose   = qs('#tnc-close');
+  const tncTrigger = qs('#tnc-trigger');
+  const tncModal   = qs('#tnc-modal');
+  const tncClose   = qs('#tnc-close');
 
-const CONSENT_KEY = 'opsChatConsent_v1';
-let consentGranted = localStorage.getItem(CONSENT_KEY) === 'true';
+  const CONSENT_KEY = 'opsChatConsent_v1';
+  let consentGranted = localStorage.getItem(CONSENT_KEY) === 'true';
 
-let currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
+  let currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
 
-const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
-const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const recognition = Recognition ? new Recognition() : null;
+  const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = Recognition ? new Recognition() : null;
 
-let listening = false;
-let speechEnabled = false;
+  let listening = false;
+  let speechEnabled = false;
 
-/* ===== UI + Security Helpers ===== */
-
-function normalizeUserText(s) {
-  // Normalize whitespace and strip control chars (keeps accents)
-  let out = String(s || '');
-  out = out.replace(/[\u0000-\u001F\u007F]/g, ' ');
-  out = out.replace(/\s+/g, ' ').trim();
-  // limit length as final guard (input also has maxlength)
-  if (out.length > 256) out = out.slice(0, 256);
-  return out;
-}
-
-function looksSuspicious(s) {
-  const t = String(s || '').toLowerCase();
-  const bad = [
-    "<script", "</script", "javascript:",
-    "<img", "onerror", "onload",
-    "<iframe", "<object", "<embed",
-    "<svg", "<link", "<meta", "<style",
-    "document.cookie",
-    "onmouseover", "onmouseenter",
-    "<form", "<input", "<textarea"
-  ];
-  return bad.some(p => t.includes(p));
-}
-
-function requireConsentMessage() {
-  return currentLang === 'es'
-    ? 'Activa el consentimiento para usar voz o enviar mensajes.'
-    : 'Please enable consent to use voice or send messages.';
-}
-
-function addMsg(txt, cls) {
-  const div = document.createElement('div');
-  div.className = 'chat-msg ' + cls;
-  div.textContent = txt;
-  log.appendChild(div);
-  log.scrollTop = log.scrollHeight;
-  return div;
-}
-
-function updateSpeechToggleUI() {
-  speechToggle.classList.toggle('active', speechEnabled);
-  speechToggle.setAttribute('aria-pressed', speechEnabled ? 'true' : 'false');
-}
-
-function updateListenUI() {
-  listenCtrl.classList.toggle('active', listening);
-  listenCtrl.setAttribute('aria-pressed', listening ? 'true' : 'false');
-}
-
-function updateConsentUI() {
-  consentToggle.checked = consentGranted;
-
-  const consentNeeded = !consentGranted;
-  speechToggle.disabled = consentNeeded;
-  listenCtrl.disabled = consentNeeded;
-  sendBtn.disabled = consentNeeded;
-  input.disabled = consentNeeded;
-
-  const statusText = consentGranted
-    ? (currentLang === 'es'
-      ? 'Consentimiento activo: puedes usar voz y enviar mensajes.'
-      : 'Consent granted: voice and messages are enabled.')
-    : (currentLang === 'es'
-      ? 'Activa el consentimiento para habilitar voz y envíos.'
-      : 'Turn on consent to enable voice and sending.');
-
-  consentStatus.textContent = statusText;
-  consentStatus.setAttribute('aria-live', 'polite');
-}
-
-function setConsent(granted) {
-  consentGranted = !!granted;
-  localStorage.setItem(CONSENT_KEY, consentGranted ? 'true' : 'false');
-  updateConsentUI();
-}
-
-function openTncDialog() {
-  if (!tncModal) return;
-  tncModal.classList.add('active');
-  tncModal.setAttribute('aria-hidden', 'false');
-  tncClose?.focus();
-}
-
-function closeTncDialog() {
-  if (!tncModal) return;
-  tncModal.classList.remove('active');
-  tncModal.setAttribute('aria-hidden', 'true');
-  tncTrigger?.focus();
-}
-
-/* ===== Trusted Types (no-op policy; helps if TT enforced by headers) ===== */
-try {
-  if (window.trustedTypes && !window.trustedTypes.getPolicy('opsPolicy')) {
-    window.trustedTypes.createPolicy('opsPolicy', {
-      createHTML: s => s,
-      createScript: s => s,
-      createScriptURL: s => s
-    });
+  /* ===== Security helpers ===== */
+  function normalizeUserText(s) {
+    let out = String(s || '');
+    out = out.replace(/[\u0000-\u001F\u007F]/g, ' ');
+    out = out.replace(/\s+/g, ' ').trim();
+    if (out.length > 256) out = out.slice(0, 256);
+    return out;
   }
-} catch { /* ignore */ }
-
-/* ===== Origin lock (repo must run ONLY from official GH Pages origin) ===== */
-let originLocked = false;
-if (window.location.origin !== EXPECTED_ORIGIN) {
-  originLocked = true;
-  addMsg(
-    "OPS assistant only works from " + EXPECTED_ORIGIN + " for security reasons.",
-    "bot"
-  );
-}
-
-/* ===== Speech synthesis ===== */
-
-function getVoiceForLang(langCode) {
-  if (!synth) return null;
-  const voices = synth.getVoices();
-  const want = langCode === 'es'
-    ? ['es-', 'es_']
-    : ['en-', 'en_'];
-
-  // Prefer local voices and common high-quality ones when available
-  const preferred = voices
-    .filter(v => want.some(p => (v.lang || '').toLowerCase().startsWith(p)))
-    .sort((a, b) => {
-      const aScore = (a.localService ? 2 : 0) + (/google|microsoft|natural/i.test(a.name) ? 1 : 0);
-      const bScore = (b.localService ? 2 : 0) + (/google|microsoft|natural/i.test(b.name) ? 1 : 0);
-      return bScore - aScore;
-    });
-
-  return preferred[0] || null;
-}
-
-function speak(text) {
-  if (!synth || !speechEnabled) return;
-  const clean = normalizeUserText(text);
-  if (!clean) return;
-
-  synth.cancel();
-
-  const utter = new SpeechSynthesisUtterance(clean);
-  utter.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
-
-  const voice = getVoiceForLang(currentLang);
-  if (voice) utter.voice = voice;
-
-  // Slight smoothing for English (often sounds robotic)
-  if (currentLang === 'en') {
-    utter.rate = 1.03;
-    utter.pitch = 1.02;
-  } else {
-    utter.rate = 1.0;
-    utter.pitch = 1.0;
+  function looksSuspicious(s) {
+    const t = String(s || '').toLowerCase();
+    const bad = [
+      "<script", "</script", "javascript:",
+      "<img", "onerror", "onload",
+      "<iframe", "<object", "<embed",
+      "<svg", "<link", "<meta", "<style",
+      "document.cookie",
+      "onmouseover", "onmouseenter",
+      "<form", "<input", "<textarea"
+    ];
+    return bad.some(p => t.includes(p));
+  }
+  function requireConsentMessage() {
+    return currentLang === 'es'
+      ? 'Activa el consentimiento para usar voz o enviar mensajes.'
+      : 'Please enable consent to use voice or send messages.';
+  }
+  function addMsg(txt, cls) {
+    const div = document.createElement('div');
+    div.className = 'chat-msg ' + cls;
+    div.textContent = txt;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+    return div;
   }
 
-  synth.speak(utter);
-}
-
-if (synth) {
-  synth.onvoiceschanged = () => getVoiceForLang(currentLang);
-}
-
-/* ===== Speech recognition (dictation) ===== */
-
-if (recognition) {
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
-
-  recognition.onresult = event => {
-    const transcript = event.results?.[0]?.[0]?.transcript || '';
-    const cleaned = normalizeUserText(transcript);
-    if (cleaned) {
-      input.value = cleaned;   // Dictation into the input box
-      input.focus();
-    }
-  };
-
-  recognition.onerror = () => {
-    listening = false;
-    updateListenUI();
-  };
-
-  recognition.onend = () => {
-    listening = false;
-    updateListenUI();
-  };
-}
-
-function startListening() {
-  if (!recognition) return;
-  recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
-  listening = true;
-  updateListenUI();
-  recognition.start();
-}
-
-/* ===== Language toggle ===== */
-
-function setLanguage(lang) {
-  const toES = lang === 'es';
-  currentLang = toES ? 'es' : 'en';
-  document.documentElement.lang = currentLang;
-
-  langCtrl.textContent = toES ? 'ES' : 'EN';
-  langCtrl.setAttribute('aria-pressed', toES ? 'true' : 'false');
-  langCtrl.classList.toggle('active', toES);
-
-  transNodes.forEach(node => {
-    node.textContent = toES ? node.dataset.es : node.dataset.en;
-  });
-
-  phNodes.forEach(node => {
-    node.placeholder = toES ? node.dataset.esPh : node.dataset.enPh;
-  });
-
-  ariaNodes.forEach(node => {
-    node.setAttribute('aria-label', toES ? node.dataset.esLabel : node.dataset.enLabel);
-  });
-
-  if (recognition) recognition.lang = toES ? 'es-ES' : 'en-US';
-
-  updateConsentUI();
-}
-
-langCtrl.addEventListener('click', () => {
-  setLanguage(currentLang === 'es' ? 'en' : 'es');
-});
-
-/* ===== Consent + Terms modal ===== */
-
-consentToggle.addEventListener('change', () => setConsent(consentToggle.checked));
-
-if (tncTrigger && tncModal && tncClose) {
-  tncTrigger.addEventListener('click', openTncDialog);
-  tncClose.addEventListener('click', closeTncDialog);
-  tncModal.addEventListener('click', e => {
-    if (e.target === tncModal) closeTncDialog();
-  });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && tncModal.classList.contains('active')) {
-      closeTncDialog();
-    }
-  });
-}
-
-/* ===== Theme toggle ===== */
-
-themeCtrl.onclick = () => {
-  const dark = themeCtrl.textContent === 'Dark';
-  document.body.classList.toggle('dark', dark);
-  themeCtrl.textContent = dark ? 'Light' : 'Dark';
-};
-
-/* ===== Speech toggle ===== */
-
-speechToggle.onclick = () => {
-  if (!consentGranted) {
-    addMsg(requireConsentMessage(), 'bot');
-    return;
-  }
-  if (!synth) {
-    addMsg(currentLang === 'es'
-      ? 'La síntesis de voz no está disponible.'
-      : 'Speech synthesis is not available.', 'bot');
-    return;
-  }
-  speechEnabled = !speechEnabled;
-  updateSpeechToggleUI();
-};
-
-/* ===== Listen (dictation) toggle ===== */
-
-listenCtrl.onclick = () => {
-  if (!consentGranted) {
-    addMsg(requireConsentMessage(), 'bot');
-    return;
-  }
-  if (!recognition) {
-    addMsg(currentLang === 'es'
-      ? 'Entrada por voz no disponible en este navegador.'
-      : 'Voice input is not available in this browser.', 'bot');
-    return;
-  }
-
-  if (listening) {
-    recognition.stop();
-    return;
-  }
-
-  startListening();
-};
-
-/* ===== Init ===== */
-
-setLanguage(currentLang);
-updateSpeechToggleUI();
-updateListenUI();
-updateConsentUI();
-
-/* ===== Submit: repo → gateway (asset id + JSON) ===== */
-
-form.onsubmit = async e => {
-  e.preventDefault();
-
-  const raw = input.value;
-  const msg = normalizeUserText(raw);
-  if (!msg) return;
-
-  if (!consentGranted) {
-    addMsg(requireConsentMessage(), 'bot');
-    return;
-  }
-
-  // If origin is not the official one, do not talk to gateway
-  if (originLocked) {
+  /* ===== Show lock message if not fully authorized ===== */
+  if (!fullyAuthorized) {
     addMsg(
-      currentLang === 'es'
-        ? 'Por seguridad, el asistente solo está disponible desde la página oficial.'
-        : 'For security, the assistant is only available from the official site.',
+      (currentLang === 'es')
+        ? 'Bloqueado: solo se permite desde https://chattiavato-a11y.github.io/ops-online-support/.'
+        : 'Blocked: only allowed from https://chattiavato-a11y.github.io/ops-online-support/.',
       'bot'
     );
-    return;
   }
 
-  // Local (client-side) anti-injection check (gateway will re-check)
-  if (looksSuspicious(msg)) {
-    const warn = currentLang === 'es'
-      ? 'Mensaje bloqueado por seguridad. Por favor escribe sin etiquetas o scripts.'
-      : 'Message blocked for security. Please write without tags or scripts.';
-    addMsg(warn, 'bot');
-    speak(warn);
-    return;
+  /* ===== Consent + UI state ===== */
+  function updateSpeechToggleUI() {
+    speechToggle.classList.toggle('active', speechEnabled);
+    speechToggle.setAttribute('aria-pressed', speechEnabled ? 'true' : 'false');
+  }
+  function updateListenUI() {
+    listenCtrl.classList.toggle('active', listening);
+    listenCtrl.setAttribute('aria-pressed', listening ? 'true' : 'false');
+  }
+  function updateConsentUI() {
+    consentToggle.checked = consentGranted;
+    const consentNeeded = !consentGranted;
+
+    // hard block input/send when not fully authorized
+    const blocked = consentNeeded || !fullyAuthorized;
+
+    speechToggle.disabled = blocked;
+    listenCtrl.disabled   = blocked;
+    sendBtn.disabled      = blocked;
+    input.disabled        = blocked;
+
+    const statusText = consentGranted
+      ? (currentLang === 'es'
+        ? 'Consentimiento activo: puedes usar voz y enviar mensajes.'
+        : 'Consent granted: voice and messages are enabled.')
+      : (currentLang === 'es'
+        ? 'Activa el consentimiento para habilitar voz y envíos.'
+        : 'Turn on consent to enable voice and sending.');
+
+    consentStatus.textContent = statusText;
+    consentStatus.setAttribute('aria-live', 'polite');
+  }
+  function setConsent(granted) {
+    consentGranted = !!granted;
+    localStorage.setItem(CONSENT_KEY, consentGranted ? 'true' : 'false');
+    updateConsentUI();
   }
 
-  const lang = currentLang;
+  /* ===== T&C dialog ===== */
+  function openTncDialog(){ tncModal?.classList.add('active'); tncModal?.setAttribute('aria-hidden','false'); tncClose?.focus(); }
+  function closeTncDialog(){ tncModal?.classList.remove('active'); tncModal?.setAttribute('aria-hidden','true'); tncTrigger?.focus(); }
 
-  // user bubble
-  addMsg(msg, 'user');
-  input.value = '';
+  consentToggle.addEventListener('change', () => setConsent(consentToggle.checked));
+  tncTrigger.addEventListener('click', openTncDialog);
+  tncClose.addEventListener('click', closeTncDialog);
+  tncModal.addEventListener('click', e => { if (e.target === tncModal) closeTncDialog(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && tncModal.classList.contains('active')) closeTncDialog(); });
 
-  // temporary bot bubble
-  const botDiv = addMsg('…', 'bot');
+  /* ===== Language, theme, speech, listen ===== */
+  function setLanguage(lang) {
+    const toES = lang === 'es';
+    currentLang = toES ? 'es' : 'en';
+    document.documentElement.lang = currentLang;
 
-  try {
-    const ctrl = new AbortController();
-    const to = setTimeout(() => ctrl.abort(), 15000); // 15s client timeout
+    langCtrl.textContent = toES ? 'ES' : 'EN';
+    langCtrl.setAttribute('aria-pressed', toES ? 'true' : 'false');
+    langCtrl.classList.toggle('active', toES);
 
-    const res = await fetch(API_URL.href, {
-      method: 'POST',
-      mode: 'cors',
-      cache: 'no-store',
-      credentials: 'omit',
-      redirect: 'error',
-      referrerPolicy: 'no-referrer',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Ops-Asset-Id': ASSET_ID
-      },
-      body: JSON.stringify({ message: msg, lang, v: 1 }),
-      signal: ctrl.signal
-    });
-    clearTimeout(to);
+    transNodes.forEach(node => { node.textContent = toES ? node.dataset.es : node.dataset.en; });
+    phNodes.forEach(node => { node.placeholder = toES ? node.dataset.esPh : node.dataset.enPh; });
+    ariaNodes.forEach(node => { node.setAttribute('aria-label', toES ? node.dataset.esLabel : node.dataset.enLabel); });
 
-    const responseText = await res.text();
-    let data = null;
-    try { data = JSON.parse(responseText); } catch {}
+    if (recognition) recognition.lang = toES ? 'es-ES' : 'en-US';
+    updateConsentUI();
+  }
+  langCtrl.addEventListener('click', () => setLanguage(currentLang === 'es' ? 'en' : 'es'));
 
-    if (!res.ok) {
-      const fallback = (lang === 'es') ? 'Error del gateway de OPS.' : 'OPS gateway error.';
-      const errorMsg = (data && (data.error || data.public_error)) ? (data.error || data.public_error) : (responseText || fallback);
-      botDiv.textContent = errorMsg;
-      speak(errorMsg);
+  themeCtrl.onclick = () => {
+    const dark = themeCtrl.textContent === 'Dark';
+    document.body.classList.toggle('dark', dark);
+    themeCtrl.textContent = dark ? 'Light' : 'Dark';
+  };
+
+  function getVoiceForLang(langCode) {
+    if (!synth) return null;
+    const voices = synth.getVoices();
+    const want = langCode === 'es' ? ['es-', 'es_'] : ['en-', 'en_'];
+    const preferred = voices
+      .filter(v => want.some(p => (v.lang || '').toLowerCase().startsWith(p)))
+      .sort((a,b)=>((b.localService?2:0)+(/google|microsoft|natural/i.test(b.name)?1:0))-((a.localService?2:0)+(/google|microsoft|natural/i.test(a.name)?1:0)));
+    return preferred[0] || null;
+  }
+  function speak(text) {
+    if (!synth || !speechEnabled) return;
+    const clean = normalizeUserText(text);
+    if (!clean) return;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
+    const v = getVoiceForLang(currentLang); if (v) u.voice = v;
+    if (currentLang === 'en') { u.rate = 1.03; u.pitch = 1.02; }
+    synth.speak(u);
+  }
+  if (synth) synth.onvoiceschanged = () => getVoiceForLang(currentLang);
+
+  if (recognition) {
+    recognition.continuous = false; recognition.interimResults = false;
+    recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
+    recognition.onresult = e => {
+      const transcript = e.results?.[0]?.[0]?.transcript || '';
+      const cleaned = normalizeUserText(transcript);
+      if (cleaned) { input.value = cleaned; input.focus(); }
+    };
+    recognition.onerror = () => { listening = false; updateListenUI(); };
+    recognition.onend   = () => { listening = false; updateListenUI(); };
+  }
+  function startListening(){ if (!recognition) return; recognition.lang = currentLang==='es'?'es-ES':'en-US'; listening=true; updateListenUI(); recognition.start(); }
+
+  speechToggle.onclick = () => {
+    if (!consentGranted) { addMsg(requireConsentMessage(),'bot'); return; }
+    if (!synth) { addMsg(currentLang==='es'?'La síntesis de voz no está disponible.':'Speech synthesis is not available.','bot'); return; }
+    speechEnabled = !speechEnabled; updateSpeechToggleUI();
+  };
+  listenCtrl.onclick = () => {
+    if (!consentGranted) { addMsg(requireConsentMessage(),'bot'); return; }
+    if (!recognition) { addMsg(currentLang==='es'?'Entrada por voz no disponible en este navegador.' : 'Voice input is not available in this browser.','bot'); return; }
+    if (listening) { recognition.stop(); return; }
+    startListening();
+  };
+
+  /* ===== Init ===== */
+  setLanguage(currentLang);
+  updateSpeechToggleUI();
+  updateListenUI();
+  updateConsentUI();
+
+  /* ===== Submit: ONLY if fully authorized (origin + path) ===== */
+  form.onsubmit = async e => {
+    e.preventDefault();
+
+    const raw = input.value;
+    const msg = normalizeUserText(raw);
+    if (!msg) return;
+
+    if (!consentGranted) {
+      addMsg(requireConsentMessage(), 'bot');
       return;
     }
 
-    if (!data || typeof data !== 'object') {
-      const fallback = (lang === 'es')
-        ? 'Error: respuesta no válida del gateway.'
-        : 'Error: invalid response from gateway.';
-      botDiv.textContent = fallback;
-      speak(fallback);
+    if (!fullyAuthorized) {
+      addMsg(
+        (currentLang === 'es')
+          ? 'Por seguridad, los mensajes solo se envían desde la ruta autorizada.'
+          : 'For security, messages are only sent from the authorized route.',
+        'bot'
+      );
       return;
     }
 
-    if (data.error || data.public_error) {
-      const errMsg = data.error || data.public_error;
-      botDiv.textContent = errMsg;
-      speak(errMsg);
-      return;
+    if (looksSuspicious(msg)) {
+      const warn = currentLang === 'es'
+        ? 'Mensaje bloqueado por seguridad. Por favor escribe sin etiquetas o scripts.'
+        : 'Message blocked for security. Please write without tags or scripts.';
+      addMsg(warn, 'bot'); speak(warn); return;
     }
 
-    const reply = (typeof data.reply === 'string' && data.reply.trim())
-      ? data.reply.trim()
-      : (lang === 'es' ? 'Sin respuesta.' : 'No reply.');
+    // user bubble
+    addMsg(msg, 'user');
+    input.value = '';
 
-    botDiv.textContent = reply;
-    speak(reply);
-  } catch (err) {
-    const fallback = (lang === 'es')
-      ? 'Error: no puedo conectar con el asistente OPS.'
-      : 'Error: can’t reach OPS assistant.';
-    botDiv.textContent = fallback;
-    speak(fallback);
-  }
-};
+    // temp bot bubble
+    const botDiv = addMsg('…', 'bot');
+
+    try {
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 15000);
+
+      const res = await fetch(API_URL.href, {
+        method: 'POST',
+        mode: 'cors',
+        cache: 'no-store',
+        credentials: 'omit',
+        redirect: 'error',
+        referrerPolicy: 'no-referrer',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Ops-Asset-Id': ASSET_ID
+        },
+        body: JSON.stringify({ message: msg, lang: currentLang, v: 1 }),
+        signal: ctrl.signal
+      });
+      clearTimeout(to);
+
+      const text = await res.text();
+      let data = null; try { data = JSON.parse(text); } catch {}
+
+      if (!res.ok) {
+        const fallback = currentLang==='es' ? 'Error del gateway de OPS.' : 'OPS gateway error.';
+        const errMsg = (data && (data.error || data.public_error)) ? (data.error || data.public_error) : (text || fallback);
+        botDiv.textContent = errMsg; speak(errMsg); return;
+      }
+      if (!data || typeof data !== 'object') {
+        const fallback = currentLang==='es' ? 'Error: respuesta no válida del gateway.' : 'Error: invalid response from gateway.';
+        botDiv.textContent = fallback; speak(fallback); return;
+      }
+      if (data.error || data.public_error) {
+        const err = data.error || data.public_error; botDiv.textContent = err; speak(err); return;
+      }
+
+      const reply = (typeof data.reply === 'string' && data.reply.trim())
+        ? data.reply.trim()
+        : (currentLang==='es' ? 'Sin respuesta.' : 'No reply.');
+      botDiv.textContent = reply;
+      speak(reply);
+    } catch {
+      const fallback = currentLang==='es' ? 'Error: no puedo conectar con el asistente OPS.' : 'Error: can’t reach OPS assistant.';
+      botDiv.textContent = fallback; speak(fallback);
+    }
+  };
+})();
 </script>
 </body>
 </html>
+
