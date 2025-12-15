@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>OPS AI Chatbot</title>
+<title>OPS Online Support</title>
 
 <!-- Strict CSP: self-only; inline script via nonce; connect only to your gateway -->
 <meta http-equiv="Content-Security-Policy"
@@ -132,7 +132,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 
 <div id="chatbot-container" role="dialog" aria-modal="true">
   <div id="chatbot-header">
-    <span id="title" data-en="OPS AI Chatbot" data-es="Chatbot OPS AI">OPS AI Chatbot</span>
+    <span id="title" data-en="OPS Online Support" data-es="Soporte en línea OPS">OPS Online Support</span>
   </div>
 
   <div id="chat-log" aria-live="polite"></div>
@@ -216,7 +216,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const atExpectedPath   = (self.location.pathname.startsWith(ALLOWED_PATH_PREFIX));
   const fullyAuthorized  = atExpectedOrigin && atExpectedPath;
 
-  /* ===== Gateway endpoint ===== */
+  /* ===== Gateway endpoint (ops-gateway) ===== */
   const API_URL = new URL("https://ops-gateway.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat");
 
   /* ===== UI refs ===== */
@@ -511,4 +511,5 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 </script>
 </body>
 </html>
+
 
