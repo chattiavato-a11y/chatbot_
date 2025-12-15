@@ -71,6 +71,7 @@ body {
   color:var(--clr-tx);
   transition:background .3s,color .3s;
 }
+body.awaiting-consent #chatbot-container { display:none; }
 body.dark {
   --clr-bg:var(--clr-bg-dark);
   --clr-tx:var(--clr-tx-dark);
@@ -286,14 +287,23 @@ body.dark {
 }
 #consent-banner .consent-row {
   display:flex;
-  align-items:center;
-  gap:.65rem;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:.55rem;
   margin-top:.75rem;
-  flex-wrap:wrap;
 }
-#consentToggle {
-  width:18px;
-  height:18px;
+#consent-message {
+  margin:0;
+}
+#consent-accept-inline {
+  background:#00c4ff;
+  color:#0d0b1e;
+  border:none;
+  border-radius:10px;
+  padding:.45rem .8rem;
+  font-weight:700;
+  cursor:pointer;
+  box-shadow:0 6px 18px rgba(0,0,0,0.2);
 }
 #consent-status {
   font-size:.95rem;
@@ -314,6 +324,59 @@ body.dark {
 }
 #tnc-close i { font-size:.9rem; }
 
+/* ---------- GENERIC CONSENT ---------- */
+#consent-modal {
+  position:fixed;
+  inset:0;
+  background:rgba(12,10,26,0.65);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:2000;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .2s ease;
+}
+#consent-modal.active {
+  opacity:1;
+  pointer-events:auto;
+}
+#consent-card {
+  background:#fff;
+  color:#1b0e2d;
+  border-radius:16px;
+  padding:1.2rem 1.25rem 1.35rem;
+  box-shadow:0 14px 40px rgba(0,0,0,0.35);
+  width:min(360px,92vw);
+  text-align:center;
+}
+#consent-card h2 {
+  margin:0 0 .7rem;
+  font-size:1.1rem;
+  color:#1b0e2d;
+}
+#consent-card p {
+  margin:.35rem 0 .9rem;
+  font-size:.95rem;
+  line-height:1.4;
+}
+#consent-accept {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:.45rem;
+  background:linear-gradient(135deg,var(--clr-primary),var(--clr-accent));
+  color:#0d0b1e;
+  border:none;
+  border-radius:12px;
+  padding:.55rem 1rem;
+  font-weight:800;
+  cursor:pointer;
+  box-shadow:0 8px 20px rgba(0,0,0,0.25);
+  width:100%;
+}
+#consent-accept i { font-size:.95rem; }
+
 @media (max-width:480px) {
   #chatbot-container {
     height:75vh;
@@ -322,7 +385,21 @@ body.dark {
 }
 </style>
 </head>
-<body>
+<body class="awaiting-consent">
+
+<!-- ---------- GENERIC CONSENT POPUP ---------- -->
+<div id="consent-modal" role="dialog" aria-modal="true" aria-labelledby="consent-title">
+  <div id="consent-card">
+    <h2 id="consent-title">Consent Needed</h2>
+    <p id="consent-copy">
+      When using Chatbot, End User allows us to use the interaction between the Chatbot and the End User for training purposes, no Personal Identifiable Information is collected.
+    </p>
+    <button id="consent-accept" type="button" aria-label="Accept and continue">
+      <i class="fas fa-check"></i>
+      Accept &amp; Continue
+    </button>
+  </div>
+</div>
 
 <!-- ---------- CHATBOT HTML ---------- -->
 <div id="chatbot-container" role="dialog" aria-modal="true">
@@ -402,10 +479,12 @@ body.dark {
         Grant consent to enable voice controls and sending messages to the assistant.
       </p>
       <div class="consent-row">
-        <label for="consentToggle" data-en="I consent to send my messages for processing." data-es="Consiento enviar mis mensajes para su procesamiento.">
-          I consent to send my messages for processing.
-        </label>
-        <input type="checkbox" id="consentToggle" aria-describedby="consent-status">
+        <p id="consent-message" data-en="When using the chatbot, you allow us to use these interactions for training; no personal identifiable information is collected." data-es="Al usar el chatbot, permites que usemos las interacciones para entrenamiento; no se recopila información personal identificable.">
+          When using the chatbot, you allow us to use these interactions for training; no personal identifiable information is collected.
+        </p>
+        <button id="consent-accept-inline" type="button" aria-describedby="consent-status">
+          Accept &amp; Continue
+        </button>
         <span id="consent-status"></span>
       </div>
     </div>
@@ -438,12 +517,15 @@ const listenCtrl   = qs('#listenCtrl');
 const log   = qs('#chat-log');
 const form  = qs('#chatbot-input-row');
 const input = qs('#chatbot-input');
-const consentToggle = qs('#consentToggle');
+const chatbotContainer = qs('#chatbot-container');
 const consentStatus = qs('#consent-status');
 const sendBtn = qs('#chatbot-send');
 const tncTrigger = qs('#tnc-trigger');
 const tncModal = qs('#tnc-modal');
 const tncClose = qs('#tnc-close');
+const consentModal = qs('#consent-modal');
+const consentAccept = qs('#consent-accept');
+const consentAcceptInline = qs('#consent-accept-inline');
 
 const CONSENT_KEY = 'opsChatConsent';
 let consentGranted = localStorage.getItem(CONSENT_KEY) === 'true';
@@ -478,12 +560,17 @@ function updateSpeechToggleUI() {
 }
 
 function updateConsentUI() {
-  consentToggle.checked = consentGranted;
   const consentNeeded = !consentGranted;
   speechToggle.disabled = consentNeeded;
   listenCtrl.disabled = consentNeeded;
   sendBtn.disabled = consentNeeded;
   input.disabled = consentNeeded;
+  chatbotContainer?.classList.toggle('locked', consentNeeded);
+
+  if (consentModal) {
+    consentModal.classList.toggle('active', consentNeeded);
+  }
+  document.body.classList.toggle('awaiting-consent', consentNeeded);
 
   const statusText = consentGranted
     ? (currentLang === 'es'
@@ -601,8 +688,8 @@ langCtrl.addEventListener('click', () => {
   const nextLang = currentLang === 'es' ? 'en' : 'es';
   setLanguage(nextLang);
 });
-
-consentToggle.addEventListener('change', () => setConsent(consentToggle.checked));
+consentAccept?.addEventListener('click', () => setConsent(true));
+consentAcceptInline?.addEventListener('click', () => setConsent(true));
 
 if (tncTrigger && tncModal && tncClose) {
   tncTrigger.addEventListener('click', openTncDialog);
