@@ -6,23 +6,21 @@
 <title>OPS AI Chatbot</title>
 
 <!-- ✅ CSP updated:
-     - adds frame-ancestors
-     - allows ONLY this inline script via the hash you saw in DevTools
+     - adds frame-ancestors (note: meta version is a warning; real enforcement requires HTTP header)
+     - allows ONLY this inline script via the hash below
      - keeps connect-src to your gateway
 -->
 <meta http-equiv="Content-Security-Policy"
-  content="
-    default-src 'self';
+  content="default-src 'self';
     base-uri 'self';
     object-src 'none';
     frame-ancestors 'self';
-    script-src 'self' 'sha256-fEOI7jZMAUjadRoW9wN5xG3hWF8Bj0rPY5yUUIgjvfI=';
+    script-src 'self' 'sha256-PNRT7X5j6A2nsUN5thtpONlowxYq4Whijr4FaSiL6Y0=';
     style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
     connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev;
     img-src 'self' data:;
     font-src 'self' https://cdnjs.cloudflare.com data:;
-    frame-src 'self';
-  ">
+    frame-src 'self';">
 
 <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains; preload">
 <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
@@ -30,19 +28,6 @@
   content="camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=()">
 <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
 <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
-
-<!-- NOTE:
-  - ✅ Removed X-Frame-Options meta (browsers ignore it unless it's an HTTP header)
--->
-
-<!-- Deployment guidance: set equivalent HTTP response headers for CSP, HSTS,
-     Referrer-Policy, Permissions-Policy, Cross-Origin-Opener-Policy, and
-     Cross-Origin-Embedder-Policy on the hosting platform.
-
-     If you want clickjacking protection at the server level, set:
-       X-Frame-Options: SAMEORIGIN
-     as an HTTP header (not a meta tag).
--->
 
 <!-- ✅ FontAwesome SRI fixed to match DevTools computed SHA-512 -->
 <link rel="stylesheet"
@@ -401,7 +386,6 @@ body.dark {
   </div>
 </div>
 
-<!-- ---------- CHATBOT HTML ---------- -->
 <div id="chatbot-container" role="dialog" aria-modal="true">
   <div id="chatbot-header">
     <span id="title"
@@ -495,7 +479,6 @@ body.dark {
   </div>
 </div>
 
-<!-- ---------- CHATBOT LOGIC ---------- -->
 <script>
 const qs  = s => document.querySelector(s);
 const qsa = s => [...document.querySelectorAll(s)];
@@ -506,28 +489,32 @@ const ASSET_ID = "CAFF600A21B457E5D909FD887AF48018B3CBFDDF6F9746E56238B23AF061F9
 /* ===== Expected origin (GitHub Pages) ===== */
 const EXPECTED_ORIGIN = "https://chattiavato-a11y.github.io";
 
+/* ===== Backend endpoint: repo → gateway ===== */
+const API_URL = new URL("https://ops-gateway.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat");
+
 /* ===== Language / UI wiring ===== */
 const langCtrl     = qs('#langCtrl');
 const transNodes   = qsa('[data-en]');
 const phNodes      = qsa('[data-en-ph]');
 const ariaNodes    = qsa('[data-en-label]');
 
-const speechToggle = qs('#speechToggle');
-const listenCtrl   = qs('#listenCtrl');
+const themeCtrl     = qs('#themeCtrl');
+const speechToggle  = qs('#speechToggle');
+const listenCtrl    = qs('#listenCtrl');
+
 const log   = qs('#chat-log');
 const form  = qs('#chatbot-input-row');
 const input = qs('#chatbot-input');
-const chatbotContainer = qs('#chatbot-container');
-const consentStatus = qs('#consent-status');
-const sendBtn = qs('#chatbot-send');
-const tncTrigger = qs('#tnc-trigger');
-const tncModal = qs('#tnc-modal');
-const tncClose = qs('#tnc-close');
-const consentModal = qs('#consent-modal');
-const consentAccept = qs('#consent-accept');
-const consentAcceptInline = qs('#consent-accept-inline');
 
-const CONSENT_KEY = 'opsChatConsent';
+const consentToggle = qs('#consentToggle');
+const consentStatus = qs('#consent-status');
+const sendBtn       = qs('#chatbot-send');
+
+const tncTrigger = qs('#tnc-trigger');
+const tncModal   = qs('#tnc-modal');
+const tncClose   = qs('#tnc-close');
+
+const CONSENT_KEY = 'opsChatConsent_v1';
 let consentGranted = localStorage.getItem(CONSENT_KEY) === 'true';
 
 let currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
@@ -535,23 +522,47 @@ let currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
 const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const recognition = Recognition ? new Recognition() : null;
+
 let listening = false;
 let speechEnabled = false;
 
-// Security: if someone opens this file from a different origin, show a clear message
-let originLocked = false;
-if (window.location.origin !== EXPECTED_ORIGIN) {
-  originLocked = true;
-  addMsg(
-    "OPS assistant only works from " + EXPECTED_ORIGIN + "/ops-online-support/ for security reasons.",
-    "bot"
-  );
+/* ===== UI + Security Helpers ===== */
+
+function normalizeUserText(s) {
+  // Normalize whitespace and strip control chars (keeps accents)
+  let out = String(s || '');
+  out = out.replace(/[\u0000-\u001F\u007F]/g, ' ');
+  out = out.replace(/\s+/g, ' ').trim();
+  return out;
 }
 
-if (recognition) {
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
+function looksSuspicious(s) {
+  const t = String(s || '').toLowerCase();
+  const bad = [
+    "<script", "</script", "javascript:",
+    "<img", "onerror", "onload",
+    "<iframe", "<object", "<embed",
+    "<svg", "<link", "<meta", "<style",
+    "document.cookie",
+    "onmouseover", "onmouseenter",
+    "<form", "<input", "<textarea"
+  ];
+  return bad.some(p => t.includes(p));
+}
+
+function requireConsentMessage() {
+  return currentLang === 'es'
+    ? 'Activa el consentimiento para usar voz o enviar mensajes.'
+    : 'Please enable consent to use voice or send messages.';
+}
+
+function addMsg(txt, cls) {
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + cls;
+  div.textContent = txt;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
 }
 
 function updateSpeechToggleUI() {
@@ -559,7 +570,13 @@ function updateSpeechToggleUI() {
   speechToggle.setAttribute('aria-pressed', speechEnabled ? 'true' : 'false');
 }
 
+function updateListenUI() {
+  listenCtrl.classList.toggle('active', listening);
+  listenCtrl.setAttribute('aria-pressed', listening ? 'true' : 'false');
+}
+
 function updateConsentUI() {
+  consentToggle.checked = consentGranted;
   const consentNeeded = !consentGranted;
   speechToggle.disabled = consentNeeded;
   listenCtrl.disabled = consentNeeded;
@@ -585,8 +602,8 @@ function updateConsentUI() {
 }
 
 function setConsent(granted) {
-  consentGranted = granted;
-  localStorage.setItem(CONSENT_KEY, granted ? 'true' : 'false');
+  consentGranted = !!granted;
+  localStorage.setItem(CONSENT_KEY, consentGranted ? 'true' : 'false');
   updateConsentUI();
 }
 
@@ -604,43 +621,78 @@ function closeTncDialog() {
   tncTrigger?.focus();
 }
 
-function updateListenUI() {
-  listenCtrl.classList.toggle('active', listening);
-  listenCtrl.setAttribute('aria-pressed', listening ? 'true' : 'false');
+/* ===== Origin lock (repo must run ONLY from official GH Pages origin) ===== */
+let originLocked = false;
+if (window.location.origin !== EXPECTED_ORIGIN) {
+  originLocked = true;
+  addMsg(
+    "OPS assistant only works from " + EXPECTED_ORIGIN + "/ops-online-support/ for security reasons.",
+    "bot"
+  );
 }
+
+/* ===== Speech synthesis ===== */
 
 function getVoiceForLang(langCode) {
   if (!synth) return null;
   const voices = synth.getVoices();
-  const match = voices.find(v => v.lang.toLowerCase().startsWith(langCode));
-  return match || voices.find(v => v.lang.toLowerCase().includes(langCode)) || null;
+  const want = langCode === 'es'
+    ? ['es-', 'es_']
+    : ['en-', 'en_'];
+
+  // Prefer local voices and common high-quality ones when available
+  const preferred = voices
+    .filter(v => want.some(p => (v.lang || '').toLowerCase().startsWith(p)))
+    .sort((a, b) => {
+      const aScore = (a.localService ? 2 : 0) + (/google|microsoft|natural/i.test(a.name) ? 1 : 0);
+      const bScore = (b.localService ? 2 : 0) + (/google|microsoft|natural/i.test(b.name) ? 1 : 0);
+      return bScore - aScore;
+    });
+
+  return preferred[0] || null;
 }
 
 function speak(text) {
   if (!synth || !speechEnabled) return;
+  const clean = normalizeUserText(text);
+  if (!clean) return;
+
   synth.cancel();
-  const utter = new SpeechSynthesisUtterance(text);
-  const langCode = currentLang === 'es' ? 'es-ES' : 'en-US';
-  utter.lang = langCode;
+
+  const utter = new SpeechSynthesisUtterance(clean);
+  utter.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
+
   const voice = getVoiceForLang(currentLang);
   if (voice) utter.voice = voice;
+
+  // Slight smoothing for English (often sounds robotic)
+  if (currentLang === 'en') {
+    utter.rate = 1.03;
+    utter.pitch = 1.02;
+  } else {
+    utter.rate = 1.0;
+    utter.pitch = 1.0;
+  }
+
   synth.speak(utter);
 }
 
-function startListening() {
-  if (!recognition) return;
-  recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
-  listening = true;
-  updateListenUI();
-  recognition.start();
+if (synth) {
+  synth.onvoiceschanged = () => getVoiceForLang(currentLang);
 }
 
+/* ===== Speech recognition (dictation) ===== */
+
 if (recognition) {
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
+
   recognition.onresult = event => {
-    const transcript = event.results[0][0].transcript.trim();
-    if (transcript) {
-      // Dictation into the input box
-      input.value = transcript;
+    const transcript = event.results?.[0]?.[0]?.transcript || '';
+    const cleaned = normalizeUserText(transcript);
+    if (cleaned) {
+      input.value = cleaned;   // Dictation into the input box
       input.focus();
     }
   };
@@ -655,6 +707,16 @@ if (recognition) {
     updateListenUI();
   };
 }
+
+function startListening() {
+  if (!recognition) return;
+  recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
+  listening = true;
+  updateListenUI();
+  recognition.start();
+}
+
+/* ===== Language toggle ===== */
 
 function setLanguage(lang) {
   const toES = lang === 'es';
@@ -677,19 +739,18 @@ function setLanguage(lang) {
     node.setAttribute('aria-label', toES ? node.dataset.esLabel : node.dataset.enLabel);
   });
 
-  if (recognition) {
-    recognition.lang = toES ? 'es-ES' : 'en-US';
-  }
+  if (recognition) recognition.lang = toES ? 'es-ES' : 'en-US';
 
   updateConsentUI();
 }
 
 langCtrl.addEventListener('click', () => {
-  const nextLang = currentLang === 'es' ? 'en' : 'es';
-  setLanguage(nextLang);
+  setLanguage(currentLang === 'es' ? 'en' : 'es');
 });
-consentAccept?.addEventListener('click', () => setConsent(true));
-consentAcceptInline?.addEventListener('click', () => setConsent(true));
+
+/* ===== Consent + Terms modal ===== */
+
+consentToggle.addEventListener('change', () => setConsent(consentToggle.checked));
 
 if (tncTrigger && tncModal && tncClose) {
   tncTrigger.addEventListener('click', openTncDialog);
@@ -704,28 +765,15 @@ if (tncTrigger && tncModal && tncClose) {
   });
 }
 
-function requireConsentMessage() {
-  return currentLang === 'es'
-    ? 'Activa el consentimiento para usar voz o enviar mensajes.'
-    : 'Please enable consent to use voice or send messages.';
-}
-
-setLanguage(document.documentElement.lang === 'es' ? 'es' : 'en');
-updateSpeechToggleUI();
-updateListenUI();
-updateConsentUI();
-
-if (synth) {
-  synth.onvoiceschanged = () => getVoiceForLang(currentLang);
-}
-
 /* ===== Theme toggle ===== */
-const themeCtrl = qs('#themeCtrl');
+
 themeCtrl.onclick = () => {
   const dark = themeCtrl.textContent === 'Dark';
   document.body.classList.toggle('dark', dark);
   themeCtrl.textContent = dark ? 'Light' : 'Dark';
 };
+
+/* ===== Speech toggle ===== */
 
 speechToggle.onclick = () => {
   if (!consentGranted) {
@@ -741,6 +789,8 @@ speechToggle.onclick = () => {
   speechEnabled = !speechEnabled;
   updateSpeechToggleUI();
 };
+
+/* ===== Listen (dictation) toggle ===== */
 
 listenCtrl.onclick = () => {
   if (!consentGranted) {
@@ -762,24 +812,20 @@ listenCtrl.onclick = () => {
   startListening();
 };
 
-/* ===== Backend endpoint: repo → gateway ===== */
-const API_URL = new URL(
-  "https://ops-gateway.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat"
-);
+/* ===== Init ===== */
 
-function addMsg(txt, cls) {
-  const div = document.createElement('div');
-  div.className = 'chat-msg ' + cls;
-  div.textContent = txt;
-  log.appendChild(div);
-  log.scrollTop = log.scrollHeight;
-  return div;
-}
+setLanguage(currentLang);
+updateSpeechToggleUI();
+updateListenUI();
+updateConsentUI();
+
+/* ===== Submit: repo → gateway (asset id + JSON) ===== */
 
 form.onsubmit = async e => {
   e.preventDefault();
 
-  const msg = input.value.trim();
+  const raw = input.value;
+  const msg = normalizeUserText(raw);
   if (!msg) return;
 
   if (!consentGranted) {
@@ -798,7 +844,17 @@ form.onsubmit = async e => {
     return;
   }
 
-  const lang = (document.documentElement.lang === 'es') ? 'es' : 'en';
+  // Local (client-side) anti-injection check (gateway will re-check)
+  if (looksSuspicious(msg)) {
+    const warn = currentLang === 'es'
+      ? 'Mensaje bloqueado por seguridad. Por favor escribe sin etiquetas o scripts.'
+      : 'Message blocked for security. Please write without tags or scripts.';
+    addMsg(warn, 'bot');
+    speak(warn);
+    return;
+  }
+
+  const lang = currentLang;
 
   // user bubble
   addMsg(msg, 'user');
@@ -812,7 +868,6 @@ form.onsubmit = async e => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Asset ID from repo to gateway (ONLY)
         'X-Ops-Asset-Id': ASSET_ID
       },
       body: JSON.stringify({ message: msg, lang })
@@ -820,26 +875,17 @@ form.onsubmit = async e => {
 
     const responseText = await res.text();
     let data = null;
-    try {
-      data = JSON.parse(responseText);
-    } catch (err) {
-      // Not JSON; we'll handle below
-    }
+    try { data = JSON.parse(responseText); } catch {}
 
     if (!res.ok) {
-      const fallback = (lang === 'es')
-        ? 'Error del gateway de OPS.'
-        : 'OPS gateway error.';
-      const errorMsg = (data && data.error)
-        ? data.error
-        : (responseText || fallback);
-
-      botDiv.textContent = `${errorMsg}`;
+      const fallback = (lang === 'es') ? 'Error del gateway de OPS.' : 'OPS gateway error.';
+      const errorMsg = (data && (data.error || data.public_error)) ? (data.error || data.public_error) : (responseText || fallback);
+      botDiv.textContent = errorMsg;
       speak(errorMsg);
       return;
     }
 
-    if (!data) {
+    if (!data || typeof data !== 'object') {
       const fallback = (lang === 'es')
         ? 'Error: respuesta no válida del gateway.'
         : 'Error: invalid response from gateway.';
@@ -848,14 +894,15 @@ form.onsubmit = async e => {
       return;
     }
 
-    if (data.error) {
-      botDiv.textContent = data.error;
-      speak(data.error);
+    if (data.error || data.public_error) {
+      const errMsg = data.error || data.public_error;
+      botDiv.textContent = errMsg;
+      speak(errMsg);
       return;
     }
 
-    const reply = data.reply
-      ? data.reply
+    const reply = (typeof data.reply === 'string' && data.reply.trim())
+      ? data.reply.trim()
       : (lang === 'es' ? 'Sin respuesta.' : 'No reply.');
 
     botDiv.textContent = reply;
