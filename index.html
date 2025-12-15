@@ -172,41 +172,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
         </svg>
       </button>
     </form>
-    <div id="tnc-row">
-      <button id="tnc-trigger" type="button" aria-haspopup="dialog" aria-controls="tnc-modal"
-        data-en="Consent Notice" data-es="Aviso de consentimiento">Consent Notice</button>
-    </div>
-  </div>
-</div>
-
-<div id="tnc-modal" role="dialog" aria-modal="true" aria-labelledby="tnc-title" aria-hidden="true">
-  <div id="tnc-dialog">
-    <h3 id="tnc-title" data-en="Consent Notice &amp; Terms" data-es="Aviso de consentimiento y términos">
-      Consent Notice &amp; Terms
-    </h3>
-    <div id="consent-banner" role="region" aria-live="polite">
-      <p data-en="We process your chat and optional voice input to respond. Audio stays in your browser; typed messages are sent to our service. Please review our"
-         data-es="Procesamos tu chat y la entrada de voz opcional para responder. El audio permanece en tu navegador; los mensajes escritos se envían a nuestro servicio. Revisa nuestra">
-        We process your chat and optional voice input to respond. Audio stays in your browser; typed messages are sent to our service. Please review our
-        <a href="#" target="_blank" rel="noreferrer noopener">Privacy Policy</a> &amp;
-        <a href="#" target="_blank" rel="noreferrer noopener">Terms of Service</a>
-        before proceeding.
-      </p>
-      <p data-en="Grant consent to enable voice controls and sending messages to the assistant."
-         data-es="Otorga consentimiento para activar los controles de voz y el envío de mensajes al asistente.">
-        Grant consent to enable voice controls and sending messages to the assistant.
-      </p>
-      <div class="consent-row">
-        <label for="consentToggle"
-          data-en="I consent to send my messages for processing."
-          data-es="Consiento enviar mis mensajes para su procesamiento.">
-          I consent to send my messages for processing.
-        </label>
-        <input type="checkbox" id="consentToggle" aria-describedby="consent-status">
-        <span id="consent-status"></span>
-      </div>
-    </div>
-    <button id="tnc-close" type="button" aria-label="Close terms dialog">Close</button>
   </div>
 </div>
 
@@ -245,16 +210,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const form  = qs('#chatbot-input-row');
   const input = qs('#chatbot-input');
 
-  const consentToggle = qs('#consentToggle');
-  const consentStatus = qs('#consent-status');
   const sendBtn       = qs('#chatbot-send');
-
-  const tncTrigger = qs('#tnc-trigger');
-  const tncModal   = qs('#tnc-modal');
-  const tncClose   = qs('#tnc-close');
-
-  const CONSENT_KEY = 'opsChatConsent_v1';
-  let consentGranted = localStorage.getItem(CONSENT_KEY) === 'true';
 
   let currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
 
@@ -296,11 +252,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       "<form", "<input", "<textarea"
     ];
     return bad.some(p => t.includes(p));
-  }
-  function requireConsentMessage() {
-    return currentLang === 'es'
-      ? 'Activa el consentimiento para usar voz o enviar mensajes.'
-      : 'Please enable consent to use voice or send messages.';
   }
   function addMsg(txt, cls) {
     const div = document.createElement('div');
@@ -399,11 +350,15 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   function openTncDialog(){ tncModal?.classList.add('active'); tncModal?.setAttribute('aria-hidden','false'); tncClose?.focus(); }
   function closeTncDialog(){ tncModal?.classList.remove('active'); tncModal?.setAttribute('aria-hidden','true'); tncTrigger?.focus(); }
 
-  consentToggle.addEventListener('change', () => setConsent(consentToggle.checked));
-  tncTrigger.addEventListener('click', openTncDialog);
-  tncClose.addEventListener('click', closeTncDialog);
-  tncModal.addEventListener('click', e => { if (e.target === tncModal) closeTncDialog(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && tncModal.classList.contains('active')) closeTncDialog(); });
+    const parts = [];
+    if (speechSupported && !speechEnabled) {
+      parts.push(currentLang === 'es' ? 'Lectura por voz apagada.' : 'Speech output off.');
+    }
+    if (recognitionSupported && listening) {
+      parts.push(currentLang === 'es' ? 'Escuchando…' : 'Listening…');
+    }
+    setVoiceStatus(parts.join(' '));
+  }
 
   /* ===== Language, theme, speech, listen ===== */
   function setLanguage(lang) {
@@ -486,13 +441,11 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   }
 
   speechToggle.onclick = () => {
-    if (!consentGranted) { addMsg(requireConsentMessage(),'bot'); return; }
     if (!synth) { addMsg(currentLang==='es'?'La síntesis de voz no está disponible.':'Speech synthesis is not available.','bot'); return; }
     speechEnabled = !speechEnabled; updateSpeechToggleUI();
     updateVoiceStatus();
   };
   listenCtrl.onclick = () => {
-    if (!consentGranted) { addMsg(requireConsentMessage(),'bot'); return; }
     if (!recognition) { addMsg(currentLang==='es'?'Entrada por voz no disponible en este navegador.' : 'Voice input is not available in this browser.','bot'); return; }
     if (listening) { recognition.stop(); return; }
     startListening();
@@ -503,7 +456,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   setLanguage(currentLang);
   updateSpeechToggleUI();
   updateListenUI();
-  updateConsentUI();
 
   /* ===== Submit: ONLY if fully authorized (origin + path) ===== */
   form.onsubmit = async e => {
@@ -512,11 +464,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     const raw = input.value;
     const msg = normalizeUserText(raw);
     if (!msg) return;
-
-    if (!consentGranted) {
-      addMsg(requireConsentMessage(), 'bot');
-      return;
-    }
 
     if (!fullyAuthorized) {
       addMsg(
