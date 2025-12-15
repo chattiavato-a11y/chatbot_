@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>OPS Online Support</title>
 
-<!-- Strict CSP: self-only; inline script via nonce; connect only to your gateway -->
+<!-- Strict CSP: self-only; inline script via nonce; connect only to your gateway.
+     NOTE: The `frame-ancestors` directive must be delivered via an HTTP response header.
+     It is intentionally omitted here to avoid browser warnings; configure it server-side. -->
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'self';
     base-uri 'self';
-    frame-ancestors 'self';
     object-src 'none';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data:;
@@ -93,12 +94,20 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 #chatbot-send .icon { transition:transform .3s; }
 #chatbot-send:hover .icon { transform:rotate(-45deg); }
 
-#tnc-row { display:flex; justify-content:flex-end; margin-top:.4rem; }
-#tnc-trigger {
+  #tnc-row { display:flex; justify-content:flex-end; margin-top:.4rem; }
+  #tnc-trigger {
   background:transparent; color:#fff; border:1px solid #ffffff40; border-radius:8px; padding:.35rem .7rem;
-  font-weight:600; cursor:pointer; transition:background .2s, color .2s, border-color .2s;
-}
-#tnc-trigger:hover, #tnc-trigger:focus-visible { background:#ffffff12; border-color:#ffffff70; }
+    font-weight:600; cursor:pointer; transition:background .2s, color .2s, border-color .2s;
+  }
+  #tnc-trigger:hover, #tnc-trigger:focus-visible { background:#ffffff12; border-color:#ffffff70; }
+
+  #voice-status {
+    margin:0.25rem 0 0.35rem;
+    font-size:.83rem;
+    color:#f5f7fb;
+    opacity:.9;
+    min-height:1.2em;
+  }
 
 #tnc-modal {
   position:fixed; inset:0; display:none; align-items:center; justify-content:center;
@@ -152,6 +161,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
         <span class="btn-label" data-en="Speak" data-es="Hablar">Speak</span>
       </button>
     </div>
+    <div id="voice-status" role="status" aria-live="polite"></div>
     <form id="chatbot-input-row" autocomplete="off">
       <input id="chatbot-input" type="text" placeholder="Type your message..." required maxlength="256"
         data-en-ph="Type your message..." data-es-ph="Escriba su mensaje...">
@@ -229,6 +239,8 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const speechToggle  = qs('#speechToggle');
   const listenCtrl    = qs('#listenCtrl');
 
+  const voiceStatus   = qs('#voice-status');
+
   const log   = qs('#chat-log');
   const form  = qs('#chatbot-input-row');
   const input = qs('#chatbot-input');
@@ -249,6 +261,8 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const recognition = Recognition ? new Recognition() : null;
+  const speechSupported = !!synth;
+  const recognitionSupported = !!recognition;
 
   let listening = false;
   let speechEnabled = false;
@@ -259,6 +273,15 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     out = out.replace(/[\u0000-\u001F\u007F]/g, ' ');
     out = out.replace(/\s+/g, ' ').trim();
     if (out.length > 256) out = out.slice(0, 256);
+    return out;
+  }
+  function cleanForSpeech(s) {
+    let out = String(s || '');
+    out = out.replace(/`{3}[\s\S]*?`{3}/g, ' ');     // remove code blocks
+    out = out.replace(/`([^`]+)`/g, '$1');             // inline code
+    out = out.replace(/[*_~]+/g, '');                  // emphasis markers
+    out = out.replace(/^-\s+/gm, '');                 // list dashes
+    out = out.replace(/\s+/g, ' ').trim();
     return out;
   }
   function looksSuspicious(s) {
@@ -287,6 +310,10 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     log.scrollTop = log.scrollHeight;
     return div;
   }
+  function setVoiceStatus(enText, esText) {
+    if (!voiceStatus) return;
+    voiceStatus.textContent = (currentLang === 'es') ? (esText || enText) : enText;
+  }
 
   /* ===== Show lock message if not fully authorized ===== */
   if (!fullyAuthorized) {
@@ -307,6 +334,37 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     listenCtrl.classList.toggle('active', listening);
     listenCtrl.setAttribute('aria-pressed', listening ? 'true' : 'false');
   }
+  function updateVoiceStatus() {
+    if (!consentGranted) {
+      setVoiceStatus('Enable consent to use voice.', 'Activa el consentimiento para usar voz.');
+      return;
+    }
+    if (!fullyAuthorized) {
+      setVoiceStatus('Voice is locked to the authorized site path.', 'La voz está restringida a la ruta autorizada.');
+      return;
+    }
+    if (!speechSupported && !recognitionSupported) {
+      setVoiceStatus('Voice features are not supported in this browser.', 'Las funciones de voz no son compatibles con este navegador.');
+      return;
+    }
+
+    const parts = [];
+    if (speechSupported) {
+      parts.push(
+        speechEnabled
+          ? (currentLang === 'es' ? 'Lectura por voz activada.' : 'Speech output on.')
+          : (currentLang === 'es' ? 'Lectura por voz apagada.' : 'Speech output off.')
+      );
+    }
+    if (recognitionSupported) {
+      parts.push(
+        listening
+          ? (currentLang === 'es' ? 'Escuchando…' : 'Listening…')
+          : (currentLang === 'es' ? 'Micrófono listo.' : 'Microphone ready.')
+      );
+    }
+    setVoiceStatus(parts.join(' '));
+  }
   function updateConsentUI() {
     consentToggle.checked = consentGranted;
     const consentNeeded = !consentGranted;
@@ -314,8 +372,8 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     // hard block input/send when not fully authorized
     const blocked = consentNeeded || !fullyAuthorized;
 
-    speechToggle.disabled = blocked;
-    listenCtrl.disabled   = blocked;
+    speechToggle.disabled = blocked || !speechSupported;
+    listenCtrl.disabled   = blocked || !recognitionSupported;
     sendBtn.disabled      = blocked;
     input.disabled        = blocked;
 
@@ -329,6 +387,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 
     consentStatus.textContent = statusText;
     consentStatus.setAttribute('aria-live', 'polite');
+    updateVoiceStatus();
   }
   function setConsent(granted) {
     consentGranted = !!granted;
@@ -362,6 +421,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 
     if (recognition) recognition.lang = toES ? 'es-ES' : 'en-US';
     updateConsentUI();
+    updateVoiceStatus();
   }
   langCtrl.addEventListener('click', () => setLanguage(currentLang === 'es' ? 'en' : 'es'));
 
@@ -382,7 +442,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   }
   function speak(text) {
     if (!synth || !speechEnabled) return;
-    const clean = normalizeUserText(text);
+    const clean = cleanForSpeech(normalizeUserText(text));
     if (!clean) return;
     synth.cancel();
     const u = new SpeechSynthesisUtterance(clean);
@@ -390,32 +450,53 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     const v = getVoiceForLang(currentLang); if (v) u.voice = v;
     if (currentLang === 'en') { u.rate = 1.03; u.pitch = 1.02; }
     synth.speak(u);
+    setVoiceStatus(
+      'Speaking response…',
+      'Hablando la respuesta…'
+    );
+    u.onend = () => updateVoiceStatus();
   }
   if (synth) synth.onvoiceschanged = () => getVoiceForLang(currentLang);
 
   if (recognition) {
     recognition.continuous = false; recognition.interimResults = false;
     recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
+    recognition.onstart = () => { listening = true; updateListenUI(); updateVoiceStatus(); };
     recognition.onresult = e => {
       const transcript = e.results?.[0]?.[0]?.transcript || '';
       const cleaned = normalizeUserText(transcript);
-      if (cleaned) { input.value = cleaned; input.focus(); }
+      if (cleaned) {
+        input.value = cleaned;
+        input.focus();
+        if (consentGranted && fullyAuthorized) {
+          form.requestSubmit();
+        }
+      }
     };
-    recognition.onerror = () => { listening = false; updateListenUI(); };
-    recognition.onend   = () => { listening = false; updateListenUI(); };
+    recognition.onerror = () => { listening = false; updateListenUI(); updateVoiceStatus(); };
+    recognition.onend   = () => { listening = false; updateListenUI(); updateVoiceStatus(); };
   }
-  function startListening(){ if (!recognition) return; recognition.lang = currentLang==='es'?'es-ES':'en-US'; listening=true; updateListenUI(); recognition.start(); }
+  function startListening(){
+    if (!recognition) return;
+    recognition.lang = currentLang==='es'?'es-ES':'en-US';
+    listening=true;
+    updateListenUI();
+    setVoiceStatus('Listening…', 'Escuchando…');
+    recognition.start();
+  }
 
   speechToggle.onclick = () => {
     if (!consentGranted) { addMsg(requireConsentMessage(),'bot'); return; }
     if (!synth) { addMsg(currentLang==='es'?'La síntesis de voz no está disponible.':'Speech synthesis is not available.','bot'); return; }
     speechEnabled = !speechEnabled; updateSpeechToggleUI();
+    updateVoiceStatus();
   };
   listenCtrl.onclick = () => {
     if (!consentGranted) { addMsg(requireConsentMessage(),'bot'); return; }
     if (!recognition) { addMsg(currentLang==='es'?'Entrada por voz no disponible en este navegador.' : 'Voice input is not available in this browser.','bot'); return; }
     if (listening) { recognition.stop(); return; }
     startListening();
+    updateVoiceStatus();
   };
 
   /* ===== Init ===== */
