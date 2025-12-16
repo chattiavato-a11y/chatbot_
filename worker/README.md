@@ -5,11 +5,11 @@ This Worker fronts the OPS assistant and lives at `ops-gateway.grabem-holdem-nut
 ## Behavior
 
 * Only responds on `POST /api/ops-online-chat` (other methods → `405`, other paths → `404`); `/ping` returns plain “ok”.
-* CORS is locked to `https://chattiavato-a11y.github.io`; preflight uses `OPTIONS` with `204` and minimal exposed headers.
+* CORS is locked to `https://chattiavato-a11y.github.io`; preflight uses `OPTIONS` with `204`.
 * Requires `X-Ops-Asset-Id` to match configured allow-list and `Origin` to match the allowed origin; otherwise `401/403`.
 * Validates JSON `{ message, lang, v }`, trims/normalizes message to 256 chars, blocks suspicious content and oversize bodies (4 KB).
 * Optionally runs an AI guard via `MY_BRAIN` (`@cf/meta/llama-guard-3-8b`); blocks if marked unsafe.
-* Forwards to the assistant service binding `BRAIN` with `X-Ops-Hand-Shake` for mutual trust; returns JSON from the brain or structured gateway errors (with `public_error`/code on config issues).
+* Forwards to the assistant service binding `BRAIN` with `X-Ops-Hand-Shake` for mutual trust; returns JSON from the brain or structured gateway errors.
 
 ## Configuration
 
