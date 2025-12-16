@@ -94,13 +94,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 #chatbot-send .icon { transition:transform .3s; }
 #chatbot-send:hover .icon { transform:rotate(-45deg); }
 
-  #tnc-row { display:flex; justify-content:flex-end; margin-top:.4rem; }
-  #tnc-trigger {
-  background:transparent; color:#fff; border:1px solid #ffffff40; border-radius:8px; padding:.35rem .7rem;
-    font-weight:600; cursor:pointer; transition:background .2s, color .2s, border-color .2s;
-  }
-  #tnc-trigger:hover, #tnc-trigger:focus-visible { background:#ffffff12; border-color:#ffffff70; }
-
   #voice-status {
     margin:0.25rem 0 0.35rem;
     font-size:.83rem;
@@ -109,32 +102,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     min-height:1.2em;
   }
 
-#tnc-modal {
-  position:fixed; inset:0; display:none; align-items:center; justify-content:center;
-  background:rgba(0,0,0,0.75); backdrop-filter:blur(2px); z-index:2000;
-}
-#tnc-modal.active { display:flex; }
-#tnc-dialog {
-  background:#f8f8ff; color:#1b0e2d; width:92%; max-width:520px; border-radius:16px; padding:1.4rem 1.2rem 1.2rem;
-  box-shadow:0 12px 36px rgba(0,0,0,0.35); border:2px solid var(--clr-primary);
-}
-#tnc-dialog h3 { margin-top:0; margin-bottom:.6rem; color:#1b0e2d; }
-#tnc-dialog p { margin:.35rem 0; line-height:1.5; }
-
-#consent-banner {
-  background:#0d0b1e; color:#f5f7fb; border:2px solid var(--clr-primary); border-radius:14px; padding:1rem 1.25rem;
-  margin:0 0 1rem; box-shadow:0 10px 25px #0005;
-}
-#consent-banner a { color:var(--clr-primary); font-weight:600; }
-#consent-banner .consent-row { display:flex; align-items:center; gap:.65rem; margin-top:.75rem; flex-wrap:wrap; }
-#consentToggle { width:18px; height:18px; }
-#consent-status { font-size:.95rem; }
-
-#tnc-close {
-  display:inline-flex; align-items:center; gap:.25rem; margin-top:1rem; background:#var(--clr-primary); color:#0d0b1e;
-  border:none; border-radius:10px; padding:.45rem .8rem; font-weight:700; cursor:pointer;
-  box-shadow:0 4px 12px rgba(0,0,0,0.25);
-}
 </style>
 </head>
 <body>
@@ -210,8 +177,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const form  = qs('#chatbot-input-row');
   const input = qs('#chatbot-input');
 
-  const sendBtn       = qs('#chatbot-send');
-
   let currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
 
   const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
@@ -276,7 +241,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     );
   }
 
-  /* ===== Consent + UI state ===== */
+  /* ===== Voice UI state ===== */
   function updateSpeechToggleUI() {
     speechToggle.classList.toggle('active', speechEnabled);
     speechToggle.setAttribute('aria-pressed', speechEnabled ? 'true' : 'false');
@@ -286,10 +251,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     listenCtrl.setAttribute('aria-pressed', listening ? 'true' : 'false');
   }
   function updateVoiceStatus() {
-    if (!consentGranted) {
-      setVoiceStatus('Enable consent to use voice.', 'Activa el consentimiento para usar voz.');
-      return;
-    }
     if (!fullyAuthorized) {
       setVoiceStatus('Voice is locked to the authorized site path.', 'La voz está restringida a la ruta autorizada.');
       return;
@@ -300,62 +261,15 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     }
 
     const parts = [];
-    if (speechSupported) {
+    if (speechSupported && speechEnabled) {
       parts.push(
-        speechEnabled
-          ? (currentLang === 'es' ? 'Lectura por voz activada.' : 'Speech output on.')
-          : (currentLang === 'es' ? 'Lectura por voz apagada.' : 'Speech output off.')
+        currentLang === 'es' ? 'Lectura por voz activada.' : 'Speech output on.'
       );
-    }
-    if (recognitionSupported) {
-      parts.push(
-        listening
-          ? (currentLang === 'es' ? 'Escuchando…' : 'Listening…')
-          : (currentLang === 'es' ? 'Micrófono listo.' : 'Microphone ready.')
-      );
-    }
-    setVoiceStatus(parts.join(' '));
-  }
-  function updateConsentUI() {
-    consentToggle.checked = consentGranted;
-    const consentNeeded = !consentGranted;
-
-    // hard block input/send when not fully authorized
-    const blocked = consentNeeded || !fullyAuthorized;
-
-    speechToggle.disabled = blocked || !speechSupported;
-    listenCtrl.disabled   = blocked || !recognitionSupported;
-    sendBtn.disabled      = blocked;
-    input.disabled        = blocked;
-
-    const statusText = consentGranted
-      ? (currentLang === 'es'
-        ? 'Consentimiento activo: puedes usar voz y enviar mensajes.'
-        : 'Consent granted: voice and messages are enabled.')
-      : (currentLang === 'es'
-        ? 'Activa el consentimiento para habilitar voz y envíos.'
-        : 'Turn on consent to enable voice and sending.');
-
-    consentStatus.textContent = statusText;
-    consentStatus.setAttribute('aria-live', 'polite');
-    updateVoiceStatus();
-  }
-  function setConsent(granted) {
-    consentGranted = !!granted;
-    localStorage.setItem(CONSENT_KEY, consentGranted ? 'true' : 'false');
-    updateConsentUI();
-  }
-
-  /* ===== T&C dialog ===== */
-  function openTncDialog(){ tncModal?.classList.add('active'); tncModal?.setAttribute('aria-hidden','false'); tncClose?.focus(); }
-  function closeTncDialog(){ tncModal?.classList.remove('active'); tncModal?.setAttribute('aria-hidden','true'); tncTrigger?.focus(); }
-
-    const parts = [];
-    if (speechSupported && !speechEnabled) {
-      parts.push(currentLang === 'es' ? 'Lectura por voz apagada.' : 'Speech output off.');
     }
     if (recognitionSupported && listening) {
-      parts.push(currentLang === 'es' ? 'Escuchando…' : 'Listening…');
+      parts.push(
+        currentLang === 'es' ? 'Escuchando…' : 'Listening…'
+      );
     }
     setVoiceStatus(parts.join(' '));
   }
@@ -375,7 +289,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     ariaNodes.forEach(node => { node.setAttribute('aria-label', toES ? node.dataset.esLabel : node.dataset.enLabel); });
 
     if (recognition) recognition.lang = toES ? 'es-ES' : 'en-US';
-    updateConsentUI();
     updateVoiceStatus();
   }
   langCtrl.addEventListener('click', () => setLanguage(currentLang === 'es' ? 'en' : 'es'));
@@ -423,7 +336,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       if (cleaned) {
         input.value = cleaned;
         input.focus();
-        if (consentGranted && fullyAuthorized) {
+        if (fullyAuthorized) {
           form.requestSubmit();
         }
       }
@@ -456,6 +369,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   setLanguage(currentLang);
   updateSpeechToggleUI();
   updateListenUI();
+  updateVoiceStatus();
 
   /* ===== Submit: ONLY if fully authorized (origin + path) ===== */
   form.onsubmit = async e => {
@@ -539,5 +453,3 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 </script>
 </body>
 </html>
-
-
