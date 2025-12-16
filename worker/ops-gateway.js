@@ -51,6 +51,10 @@ function json(origin, status, obj) {
   });
 }
 
+function localizedError(lang, enText, esText) {
+  return lang === 'es' ? esText : enText;
+}
+
 function text(status, msg) {
   return new Response(msg, {
     status,
@@ -172,29 +176,44 @@ export default {
     const v = versionRaw;
 
     if (!message) {
-      return json(origin, 400, { error: 'No message provided.' });
+      return json(origin, 400, {
+        error: localizedError(lang, 'No message provided.', 'No se proporcionó ningún mensaje.'),
+        lang
+      });
     }
 
     // 4) Sanitization (gateway-level)
     if (looksSuspicious(bodyText) || looksSuspicious(message)) {
-      return json(origin, 400, { error: 'Request blocked by OPS security gateway.' });
+      return json(origin, 400, {
+        error: localizedError(lang, 'Request blocked by OPS security gateway.', 'Solicitud bloqueada por el gateway de seguridad OPS.'),
+        lang
+      });
     }
 
     // 4b) Optional AI guard (if MY_BRAIN binding exists)
     const guard = await aiGuardIfAvailable(env, message);
     if (!guard.ok) {
-      return json(origin, 400, { error: 'Request blocked by OPS safety gateway.' });
+      return json(origin, 400, {
+        error: localizedError(lang, 'Request blocked by OPS safety gateway.', 'Solicitud bloqueada por el gateway de seguridad OPS.'),
+        lang
+      });
     }
 
     // 5) Gateway -> Brain secret handshake
     const handShake = env.HAND_SHAKE || '';
     if (!handShake) {
-      return json(origin, 500, { error: 'Gateway config error (missing HAND_SHAKE).' });
+      return json(origin, 500, {
+        error: localizedError(lang, 'Gateway config error (missing HAND_SHAKE).', 'Error de configuración del gateway (falta HAND_SHAKE).'),
+        lang
+      });
     }
 
     // 6) Must have service binding to brain
     if (!env.BRAIN || typeof env.BRAIN.fetch !== 'function') {
-      return json(origin, 500, { error: 'Gateway config error (missing BRAIN binding).' });
+      return json(origin, 500, {
+        error: localizedError(lang, 'Gateway config error (missing BRAIN binding).', 'Error de configuración del gateway (falta la vinculación BRAIN).'),
+        lang
+      });
     }
 
     // 7) Forward to brain (service binding)
@@ -210,7 +229,10 @@ export default {
       });
     } catch (err) {
       console.error('Gateway -> Brain error:', err);
-      return json(origin, 502, { error: 'Gateway could not reach brain.' });
+      return json(origin, 502, {
+        error: localizedError(lang, 'Gateway could not reach brain.', 'El gateway no pudo conectarse con el cerebro.'),
+        lang
+      });
     }
 
     const responseText = await brainRes.text();
@@ -224,9 +246,12 @@ export default {
     }
 
     if (!out || typeof out !== 'object') {
-      return json(origin, 502, { error: 'Brain returned invalid JSON.' });
+      return json(origin, 502, {
+        error: localizedError(lang, 'Brain returned invalid JSON.', 'El cerebro devolvió JSON no válido.'),
+        lang
+      });
     }
 
-    return json(origin, brainRes.status, out);
+    return json(origin, brainRes.status, { ...out, lang });
   }
 };
