@@ -261,18 +261,14 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     }
 
     const parts = [];
-    if (speechSupported) {
+    if (speechSupported && speechEnabled) {
       parts.push(
-        speechEnabled
-          ? (currentLang === 'es' ? 'Lectura por voz activada.' : 'Speech output on.')
-          : (currentLang === 'es' ? 'Lectura por voz apagada.' : 'Speech output off.')
+        currentLang === 'es' ? 'Lectura por voz activada.' : 'Speech output on.'
       );
     }
-    if (recognitionSupported) {
+    if (recognitionSupported && listening) {
       parts.push(
-        listening
-          ? (currentLang === 'es' ? 'Escuchando…' : 'Listening…')
-          : (currentLang === 'es' ? 'Micrófono listo.' : 'Microphone ready.')
+        currentLang === 'es' ? 'Escuchando…' : 'Listening…'
       );
     }
     setVoiceStatus(parts.join(' '));

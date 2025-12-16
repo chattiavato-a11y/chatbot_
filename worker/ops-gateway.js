@@ -18,8 +18,7 @@ const MAX_MSG_CHARS = 256;
 
 function securityHeaders() {
   return {
-    // Explicitly disallow any script execution (avoids unsafe-eval prompts)
-    'Content-Security-Policy': "default-src 'none'; script-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none';",
+    'Content-Security-Policy': "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none';",
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer',
     'Cross-Origin-Resource-Policy': 'cross-origin',
@@ -37,7 +36,6 @@ function corsHeaders(origin) {
     headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
     headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Ops-Asset-Id';
     headers['Access-Control-Max-Age'] = '600';
-    headers['Access-Control-Expose-Headers'] = 'Content-Type';
   }
   return headers;
 }
@@ -112,11 +110,11 @@ export default {
     const pathname = url.pathname;
     const origin = request.headers.get('Origin') || '';
 
-  if (pathname === '/ping') {
-    return text(200, 'ops-gateway: ok');
-  }
+    if (pathname === '/ping') {
+      return text(200, 'ops-gateway: ok');
+    }
 
-  // CORS preflight
+    // CORS preflight
     if (pathname === '/api/ops-online-chat' && request.method === 'OPTIONS') {
       if (origin && origin !== ALLOWED_ORIGIN) {
         return json(origin, 403, { error: 'Origin not allowed.' });
@@ -142,16 +140,12 @@ export default {
     }
 
     // 2) Verify repo Asset ID (public)
-    const allowedAssets = (env.OPS_ASSET_IDS || env.ASSET_ID || '')
-      .toString()
-      .split(',')
-      .map((v) => v.trim().toLowerCase())
-      .filter(Boolean);
+    const allowedAssets = (env.OPS_ASSET_IDS || env.ASSET_ID || '').toString().split(',').map((v) => v.trim()).filter(Boolean);
     if (!allowedAssets.length) {
       return json(origin, 500, { error: 'Gateway config error (missing OPS_ASSET_IDS/ASSET_ID).' });
     }
 
-    const clientAssetId = (request.headers.get('X-Ops-Asset-Id') || '').trim().toLowerCase();
+    const clientAssetId = request.headers.get('X-Ops-Asset-Id') || '';
     if (!clientAssetId || !allowedAssets.some((v) => v === clientAssetId)) {
       return json(origin, 401, { error: 'Unauthorized client.' });
     }
