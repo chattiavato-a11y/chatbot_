@@ -177,7 +177,24 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const form  = qs('#chatbot-input-row');
   const input = qs('#chatbot-input');
 
-  let currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
+  /* ===== Language + theme preferences (persisted) ===== */
+  const PREF_KEY = 'ops-chat-preferences';
+  function loadPrefs() {
+    try {
+      const raw = localStorage.getItem(PREF_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }
+  function savePrefs(next) {
+    try { localStorage.setItem(PREF_KEY, JSON.stringify(next || {})); } catch {}
+  }
+  const prefs = loadPrefs();
+
+  let currentLang = (prefs.lang === 'es') ? 'es' : 'en';
+  if (!prefs.lang) currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
+  let currentTheme = prefs.theme === 'dark' ? 'dark' : 'light';
 
   const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -275,6 +292,10 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   }
 
   /* ===== Language, theme, speech, listen ===== */
+  function persistPrefs() {
+    savePrefs({ lang: currentLang, theme: currentTheme });
+  }
+
   function setLanguage(lang) {
     const toES = lang === 'es';
     currentLang = toES ? 'es' : 'en';
@@ -289,15 +310,19 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     ariaNodes.forEach(node => { node.setAttribute('aria-label', toES ? node.dataset.esLabel : node.dataset.enLabel); });
 
     if (recognition) recognition.lang = toES ? 'es-ES' : 'en-US';
+    persistPrefs();
     updateVoiceStatus();
   }
   langCtrl.addEventListener('click', () => setLanguage(currentLang === 'es' ? 'en' : 'es'));
 
-  themeCtrl.onclick = () => {
-    const dark = themeCtrl.textContent === 'Dark';
-    document.body.classList.toggle('dark', dark);
-    themeCtrl.textContent = dark ? 'Light' : 'Dark';
-  };
+  function setTheme(mode) {
+    currentTheme = mode === 'dark' ? 'dark' : 'light';
+    document.body.classList.toggle('dark', currentTheme === 'dark');
+    themeCtrl.textContent = currentTheme === 'dark' ? 'Light' : 'Dark';
+    themeCtrl.setAttribute('aria-pressed', currentTheme === 'dark' ? 'true' : 'false');
+    persistPrefs();
+  }
+  themeCtrl.onclick = () => setTheme(currentTheme === 'dark' ? 'light' : 'dark');
 
   function getVoiceForLang(langCode) {
     if (!synth) return null;
@@ -367,6 +392,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 
   /* ===== Init ===== */
   setLanguage(currentLang);
+  setTheme(currentTheme);
   updateSpeechToggleUI();
   updateListenUI();
   updateVoiceStatus();
