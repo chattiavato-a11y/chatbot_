@@ -22,6 +22,14 @@ Set these environment variables when deploying:
 | Service binding `BRAIN` | Must point to `ops-online-assistant` (production). |
 | (Optional) Binding `MY_BRAIN` | Workers AI binding for `@cf/meta/llama-guard-3-8b` safety guard. |
 
+## Assistant template (brain)
+
+`assistant-template.js` contains a Cloudflare Workers AI starter for the `ops-online-assistant` brain:
+
+* Chat completions use `@cf/meta/llama-3.3-70b-instruct-fp8-fast`.
+* Speech-to-text runs through `@cf/openai/whisper` on `POST /api/transcribe` (base64 audio input).
+* The same handshake header (`X-Ops-Hand-Shake`) protects both chat and transcription endpoints.
+
 ## Smoke test
 
 Once deployed, validate with:
