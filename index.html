@@ -333,15 +333,16 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       .sort((a,b)=>((b.localService?2:0)+(/google|microsoft|natural/i.test(b.name)?1:0))-((a.localService?2:0)+(/google|microsoft|natural/i.test(a.name)?1:0)));
     return preferred[0] || null;
   }
-  function speak(text) {
+  function speak(text, langOverride) {
     if (!synth || !speechEnabled) return;
     const clean = cleanForSpeech(normalizeUserText(text));
     if (!clean) return;
+    const langForReply = langOverride === 'es' ? 'es' : (langOverride === 'en' ? 'en' : currentLang);
     synth.cancel();
     const u = new SpeechSynthesisUtterance(clean);
-    u.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
-    const v = getVoiceForLang(currentLang); if (v) u.voice = v;
-    if (currentLang === 'en') { u.rate = 1.03; u.pitch = 1.02; }
+    u.lang = langForReply === 'es' ? 'es-ES' : 'en-US';
+    const v = getVoiceForLang(langForReply); if (v) u.voice = v;
+    if (langForReply === 'en') { u.rate = 1.03; u.pitch = 1.02; }
     synth.speak(u);
     setVoiceStatus(
       'Speaking response…',
@@ -401,13 +402,15 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   form.onsubmit = async e => {
     e.preventDefault();
 
+    const requestLang = currentLang;
+
     const raw = input.value;
     const msg = normalizeUserText(raw);
     if (!msg) return;
 
     if (!fullyAuthorized) {
       addMsg(
-        (currentLang === 'es')
+        (requestLang === 'es')
           ? 'Por seguridad, los mensajes solo se envían desde la ruta autorizada.'
           : 'For security, messages are only sent from the authorized route.',
         'bot'
@@ -416,10 +419,10 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     }
 
     if (looksSuspicious(msg)) {
-      const warn = currentLang === 'es'
+      const warn = requestLang === 'es'
         ? 'Mensaje bloqueado por seguridad. Por favor escribe sin etiquetas o scripts.'
         : 'Message blocked for security. Please write without tags or scripts.';
-      addMsg(warn, 'bot'); speak(warn); return;
+      addMsg(warn, 'bot'); speak(warn, requestLang); return;
     }
 
     // user bubble
@@ -444,7 +447,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
           'Content-Type': 'application/json',
           'X-Ops-Asset-Id': ASSET_ID
         },
-        body: JSON.stringify({ message: msg, lang: currentLang, v: 1 }),
+        body: JSON.stringify({ message: msg, lang: requestLang, v: 1 }),
         signal: ctrl.signal
       });
       clearTimeout(to);
@@ -453,26 +456,27 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       let data = null; try { data = JSON.parse(text); } catch {}
 
       if (!res.ok) {
-        const fallback = currentLang==='es' ? 'Error del gateway de OPS.' : 'OPS gateway error.';
+        const fallback = requestLang==='es' ? 'Error del gateway de OPS.' : 'OPS gateway error.';
         const errMsg = (data && (data.error || data.public_error)) ? (data.error || data.public_error) : (text || fallback);
-        botDiv.textContent = errMsg; speak(errMsg); return;
+        botDiv.textContent = errMsg; speak(errMsg, requestLang); return;
       }
       if (!data || typeof data !== 'object') {
-        const fallback = currentLang==='es' ? 'Error: respuesta no válida del gateway.' : 'Error: invalid response from gateway.';
-        botDiv.textContent = fallback; speak(fallback); return;
+        const fallback = requestLang==='es' ? 'Error: respuesta no válida del gateway.' : 'Error: invalid response from gateway.';
+        botDiv.textContent = fallback; speak(fallback, requestLang); return;
       }
       if (data.error || data.public_error) {
-        const err = data.error || data.public_error; botDiv.textContent = err; speak(err); return;
+        const err = data.error || data.public_error; botDiv.textContent = err; speak(err, requestLang); return;
       }
 
+      const replyLang = data.lang === 'es' ? 'es' : requestLang;
       const reply = (typeof data.reply === 'string' && data.reply.trim())
         ? data.reply.trim()
-        : (currentLang==='es' ? 'Sin respuesta.' : 'No reply.');
+        : (requestLang==='es' ? 'Sin respuesta.' : 'No reply.');
       botDiv.textContent = reply;
-      speak(reply);
+      speak(reply, replyLang);
     } catch {
-      const fallback = currentLang==='es' ? 'Error: no puedo conectar con el asistente OPS.' : 'Error: can’t reach OPS assistant.';
-      botDiv.textContent = fallback; speak(fallback);
+      const fallback = requestLang==='es' ? 'Error: no puedo conectar con el asistente OPS.' : 'Error: can’t reach OPS assistant.';
+      botDiv.textContent = fallback; speak(fallback, requestLang);
     }
   };
 })();
