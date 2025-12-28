@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="referrer" content="no-referrer" />
+
+  <!-- CSP (strict, no third-party libs). Replace CHAT_API_ORIGIN if you use a Worker chat endpoint. -->
+  <!-- NOTE: Best practice is to set CSP as an HTTP header too (see section 2). -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    base-uri 'none';
+    object-src 'none';
+    frame-ancestors 'none';
+    form-action 'self';
+    img-src 'self' data:;
+    font-src 'self' data:;
+    style-src 'self' 'nonce-OPS_NONCE_9f3a7d2c';
+    script-src 'self' 'nonce-OPS_NONCE_9f3a7d2c';
+    connect-src 'self';
+    upgrade-insecure-requests;
+    block-all-mixed-content;
+  " />
+
+  <title>Gabriel Anangono — Resume</title>
+
+  <style nonce="OPS_NONCE_9f3a7d2c">
+    :root{
+      /* Spring/Summer palette (no orange/yellow) */
+      --bg0:#050814;
+      --bg1:#07122a;
+      --ink:#e9eefc;
+      --muted:#b9c6ea;
+      --glass: rgba(255,255,255,.08);
+      --glass2: rgba(255,255,255,.12);
+      --stroke: rgba(255,255,255,.18);
+
+      --teal:#14b8a6;
+      --sky:#0ea5e9;
+      --mint:#22c55e;
+      --violet:#a855f7;
+      --pink:#ec4899;
+
+      --shadow: 0 18px 60px rgba(0,0,0,.55);
+      --radius: 22px;
+      --radius2: 16px;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      color:var(--ink);
+      background: radial-gradient(1200px 700px at 20% 10%, rgba(14,165,233,.18), transparent 55%),
+                  radial-gradient(1100px 800px at 85% 20%, rgba(168,85,247,.16), transparent 55%),
+                  radial-gradient(900px 700px at 20% 80%, rgba(34,197,94,.14), transparent 55%),
+                  radial-gradient(1000px 700px at 90% 80%, rgba(20,184,166,.14), transparent 55%),
+                  linear-gradient(180deg, var(--bg0), var(--bg1));
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      overflow-x:hidden;
+    }
+
+    /* Dynamic background layer */
+    .bg{
+      position:fixed; inset:0;
+      z-index:-2;
+      pointer-events:none;
+    }
+    canvas#bgCanvas{
+      width:100%;
+      height:100%;
+      display:block;
+      filter: blur(0px);
+      opacity:.9;
+    }
+    .bg::before, .bg::after{
+      content:"";
+      position:absolute;
+      width:70vmax;
+      height:70vmax;
+      border-radius: 999px;
+      filter: blur(38px);
+      opacity:.32;
+      z-index:-1;
+      mix-blend-mode: screen;
+      animation: floaty 18s ease-in-out infinite;
+      background: radial-gradient(circle at 30% 30%, rgba(20,184,166,.55), transparent 55%),
+                  radial-gradient(circle at 70% 40%, rgba(14,165,233,.55), transparent 55%),
+                  radial-gradient(circle at 50% 70%, rgba(168,85,247,.45), transparent 55%);
+    }
+    .bg::before{ left:-18vmax; top:-22vmax; }
+    .bg::after{
+      right:-20vmax; bottom:-24vmax;
+      animation-duration: 22s;
+      background: radial-gradient(circle at 30% 30%, rgba(34,197,94,.55), transparent 55%),
+                  radial-gradient(circle at 70% 40%, rgba(236,72,153,.40), transparent 55%),
+                  radial-gradient(circle at 50% 70%, rgba(14,165,233,.50), transparent 55%);
+    }
+    @keyframes floaty{
+      0%,100%{ transform: translate3d(0,0,0) scale(1); }
+      50%{ transform: translate3d(4vmax,3vmax,0) scale(1.05); }
+    }
+
+    /* Top bar */
+    .topbar{
+      position:sticky;
+      top:0;
+      z-index:5;
+      padding: 18px clamp(14px, 3vw, 34px);
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:16px;
+      background: linear-gradient(180deg, rgba(5,8,20,.88), rgba(5,8,20,.62), transparent);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .brand{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width: 240px;
+    }
+    .name{
+      font-size: clamp(20px, 2.2vw, 26px);
+      letter-spacing:.2px;
+      font-weight: 760;
+      line-height:1.05;
+      margin-left:0;
+    }
+    .tagline{
+      color: var(--muted);
+      font-size: 13.5px;
+      letter-spacing:.2px;
+      max-width: 62ch;
+    }
+
+    .top-actions{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .pill{
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 10px 12px;
+      font-weight: 650;
+      font-size: 13px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      user-select:none;
+      transition: transform .12s ease, background .12s ease, border-color .12s ease;
+    }
+    .pill:hover{ transform: translateY(-1px); background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.24); }
+    .pill:active{ transform: translateY(0px) scale(.99); }
+    .pill.primary{
+      border-color: rgba(14,165,233,.45);
+      background: rgba(14,165,233,.12);
+    }
+
+    /* Layout */
+    main{
+      padding: 22px clamp(14px, 3vw, 34px) 88px;
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+    .row{
+      display:grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 18px;
+    }
+    @media (max-width: 980px){
+      .row{ grid-template-columns: 1fr; }
+    }
+
+    .glass{
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+    .card{
+      padding: 18px 18px;
+    }
+
+    h1,h2,h3{ margin: 0 0 10px 0; letter-spacing:.2px; }
+    h1{ font-size: clamp(22px, 2.4vw, 30px); }
+    h2{ font-size: 16px; color: var(--ink); }
+    h3{ font-size: 14px; color: var(--muted); font-weight: 700; }
+
+    .lead{
+      margin: 10px 0 0 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14.2px;
+      max-width: 78ch;
+    }
+
+    .chips{
+      margin-top: 14px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+    .chip{
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 12.5px;
+      color: var(--ink);
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .dot{
+      width:8px; height:8px; border-radius:999px;
+      background: var(--sky);
+      box-shadow: 0 0 0 5px rgba(14,165,233,.10);
+    }
+
+    .section{
+      margin-top: 18px;
+    }
+    .section-head{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom: 10px;
+    }
+    .hint{
+      color: var(--muted);
+      font-size: 12.6px;
+      line-height: 1.25;
+      margin: 0;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    @media (max-width: 780px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    .exp-card{
+      padding: 14px;
+      border-radius: var(--radius2);
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      cursor:pointer;
+      transition: transform .14s ease, border-color .14s ease, background .14s ease;
+      min-height: 114px;
+      display:flex;
+      flex-direction:column;
+      gap: 8px;
+    }
+    .exp-card:hover{
+      transform: translateY(-2px);
+      border-color: rgba(255,255,255,.22);
+      background: rgba(255,255,255,.07);
+    }
+    .exp-top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .exp-role{
+      font-weight: 780;
+      font-size: 13.8px;
+      margin: 0;
+    }
+    .exp-meta{
+      font-size: 12.2px;
+      color: var(--muted);
+      margin: 0;
+      line-height: 1.25;
+    }
+    .badge{
+      font-size: 11px;
+      font-weight: 760;
+      padding: 6px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.05);
+      color: var(--ink);
+      white-space:nowrap;
+    }
+
+    .two-col{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 560px){
+      .two-col{ grid-template-columns: 1fr; }
+    }
+    .list{
+      margin: 10px 0 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 13.2px;
+    }
+    .list li{ margin: 6px 0; }
+
+    /* Right-margin FABs */
+    .fabs{
+      position:fixed;
+      right: 14px;
+      top: 96px;
+      z-index: 7;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    @media (max-width: 600px){
+      .fabs{ top: unset; bottom: 86px; }
+    }
+    .fab{
+      width: 46px;
+      height: 46px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.08);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 12px 30px rgba(0,0,0,.35);
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      transition: transform .12s ease, background .12s ease, border-color .12s ease;
+      color: var(--ink);
+    }
+    .fab:hover{ transform: translateY(-2px); background: rgba(255,255,255,.10); border-color: rgba(255,255,255,.26); }
+    .fab:active{ transform: translateY(0px) scale(.99); }
+    .fab svg{ width: 20px; height: 20px; }
+
+    /* Bottom quick reference */
+    .quickref{
+      position:fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 6;
+      padding: 10px 12px 14px;
+      background: linear-gradient(180deg, transparent, rgba(5,8,20,.62), rgba(5,8,20,.88));
+      backdrop-filter: blur(10px);
+      border-top: 1px solid rgba(255,255,255,.06);
+      display:flex;
+      justify-content:center;
+    }
+    .quickref .wrap{
+      width:min(1120px, 100%);
+      display:flex;
+      gap: 10px;
+      justify-content:space-between;
+      align-items:center;
+      padding: 0 6px;
+    }
+    .qr-left{
+      color: var(--muted);
+      font-size: 12.6px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .qr-right{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+      align-items:center;
+    }
+    .qr-btn{
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 8px 10px;
+      font-weight: 720;
+      font-size: 12px;
+      cursor:pointer;
+      transition: transform .12s ease, background .12s ease, border-color .12s ease;
+    }
+    .qr-btn:hover{ transform: translateY(-1px); background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.24); }
+    .qr-btn.active{ border-color: rgba(20,184,166,.45); background: rgba(20,184,166,.12); }
+
+    /* Modal (glassmorphic popups) */
+    .overlay{
+      position:fixed;
+      inset:0;
+      background: rgba(0,0,0,.48);
+      display:none;
+      z-index: 20;
+      padding: 18px;
+    }
+    .overlay.open{ display:flex; }
+    .modal{
+      margin:auto;
+      width:min(820px, 100%);
+      border-radius: var(--radius);
+      border: 1px solid rgba(255,255,255,.16);
+      background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.08));
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+      padding: 16px 16px;
+      position:relative;
+    }
+    .modal .x{
+      position:absolute;
+      top: 10px;
+      right: 10px;
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.06);
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      color: var(--ink);
+    }
+    .modal .x:hover{ background: rgba(255,255,255,.10); }
+    .modal p{ color: var(--muted); line-height:1.6; font-size: 13.6px; margin: 8px 0; }
+    .kv{
+      display:grid;
+      grid-template-columns: 140px 1fr;
+      gap: 8px 12px;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.14);
+    }
+    .k{ color: rgba(233,238,252,.86); font-weight: 760; font-size: 12.6px; }
+    .v{ color: var(--muted); font-size: 12.8px; }
+
+    /* Chat drawer */
+    .chat{
+      position: fixed;
+      top: 0;
+      right: -420px;
+      width: min(420px, 92vw);
+      height: 100%;
+      z-index: 30;
+      border-left: 1px solid rgba(255,255,255,.14);
+      background: linear-gradient(180deg, rgba(7,18,42,.92), rgba(5,8,20,.92));
+      backdrop-filter: blur(14px);
+      box-shadow: -20px 0 70px rgba(0,0,0,.55);
+      display:flex;
+      flex-direction:column;
+      transition: right .18s ease;
+    }
+    .chat.open{ right: 0; }
+    .chat-head{
+      padding: 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .chat-title{ font-weight: 820; letter-spacing:.2px; }
+    .chat-body{
+      padding: 12px 12px;
+      overflow:auto;
+      flex:1;
+    }
+    .msg{
+      margin: 10px 0;
+      display:flex;
+    }
+    .bubble{
+      max-width: 88%;
+      padding: 10px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: var(--ink);
+      line-height: 1.45;
+      font-size: 13.4px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .msg.me{ justify-content:flex-end; }
+    .msg.me .bubble{
+      border-color: rgba(14,165,233,.22);
+      background: rgba(14,165,233,.10);
+    }
+    .chat-foot{
+      padding: 12px;
+      border-top: 1px solid rgba(255,255,255,.08);
+      display:flex;
+      gap: 10px;
+    }
+    .in{
+      flex:1;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+      border-radius: 14px;
+      padding: 10px 12px;
+      color: var(--ink);
+      outline:none;
+    }
+    .send{
+      border: 1px solid rgba(20,184,166,.35);
+      background: rgba(20,184,166,.12);
+      color: var(--ink);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-weight: 780;
+      cursor:pointer;
+    }
+    .send:hover{ background: rgba(20,184,166,.18); }
+
+    /* Focus visibility */
+    :focus-visible{
+      outline: 2px solid rgba(14,165,233,.65);
+      outline-offset: 2px;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg" aria-hidden="true">
+    <canvas id="bgCanvas"></canvas>
+  </div>
+
+  <!-- Header: name left, EN + Chat top-right -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="name" id="profileName">Gabriel Anangono</div>
+      <div class="tagline" id="profileTagline"></div>
+    </div>
+
+    <div class="top-actions">
+      <button class="pill" id="langBtn" aria-label="Toggle language">EN</button>
+      <button class="pill primary" id="chatBtn" aria-label="Open chat">
+        <span aria-hidden="true">💬</span>
+        <span id="chatBtnLabel">Chat</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- FABs: right margin -->
+  <nav class="fabs" aria-label="Quick actions">
+    <button class="fab" id="fabLinkedIn" aria-label="Open LinkedIn" title="LinkedIn">
+      <!-- LinkedIn icon -->
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+        <path d="M4.98 3.5C4.98 4.88 3.87 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5ZM.5 8h4V24h-4V8Zm7.5 0h3.8v2.2h.05c.53-1 1.84-2.2 3.78-2.2 4.04 0 4.79 2.66 4.79 6.12V24h-4v-8.5c0-2.03-.04-4.64-2.83-4.64-2.83 0-3.26 2.21-3.26 4.5V24h-4V8Z"/>
+      </svg>
+    </button>
+
+    <button class="fab" id="fabContact" aria-label="Contact me" title="Contact me">
+      <!-- Phone -->
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+        <path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V21a1 1 0 0 1-1 1C10.07 22 2 13.93 2 3a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.24.2 2.45.57 3.57a1 1 0 0 1-.24 1.02l-2.2 2.2Z"/>
+      </svg>
+    </button>
+
+    <button class="fab" id="fabMessage" aria-label="Message me" title="Message me">
+      <!-- Mail -->
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+        <path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 4-8 5L4 8V6l8 5 8-5v2Z"/>
+      </svg>
+    </button>
+
+    <button class="fab" id="fabChat" aria-label="Chat" title="Chat">
+      <!-- Chat -->
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+        <path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2Z"/>
+      </svg>
+    </button>
+  </nav>
+
+  <main>
+    <section class="glass card">
+      <h1 id="headline"></h1>
+      <p class="lead" id="summary"></p>
+
+      <div class="chips" id="chips"></div>
+    </section>
+
+    <div class="row section">
+      <section class="glass card">
+        <div class="section-head">
+          <div>
+            <h2 id="experienceTitle"></h2>
+            <p class="hint" id="experienceHint"></p>
+          </div>
+          <span class="badge" id="filterBadge">All</span>
+        </div>
+        <div class="grid" id="expGrid" aria-label="Experience cards"></div>
+      </section>
+
+      <section class="glass card">
+        <div class="section-head">
+          <div>
+            <h2 id="skillsTitle"></h2>
+            <p class="hint" id="skillsHint"></p>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div>
+            <h3 id="eduTitle"></h3>
+            <ul class="list" id="eduList"></ul>
+          </div>
+          <div>
+            <h3 id="contEduTitle"></h3>
+            <ul class="list" id="contEduList"></ul>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3 id="appsTitle"></h3>
+          <ul class="list" id="appsList"></ul>
+        </div>
+
+        <div class="section">
+          <h3 id="langTitle"></h3>
+          <ul class="list" id="langList"></ul>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Bottom quick reference -->
+  <div class="quickref" role="navigation" aria-label="Experience quick filters">
+    <div class="wrap">
+      <div class="qr-left">
+        <span aria-hidden="true">⌁</span>
+        <span id="qrLabel">Quick reference:</span>
+      </div>
+      <div class="qr-right">
+        <button class="qr-btn active" data-filter="all">All</button>
+        <button class="qr-btn" data-filter="logistics">Logistics</button>
+        <button class="qr-btn" data-filter="it">IT</button>
+        <button class="qr-btn" data-filter="admin">Admin</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Glass modal -->
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal" role="document">
+      <button class="x" id="modalClose" aria-label="Close">✕</button>
+      <h2 id="modalTitle"></h2>
+      <p id="modalSubtitle"></p>
+      <div class="kv" id="modalKV"></div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- Chat drawer -->
+  <aside class="chat" id="chatDrawer" aria-label="Chat drawer" aria-hidden="true">
+    <div class="chat-head">
+      <div>
+        <div class="chat-title" id="chatTitle">Chat</div>
+        <div class="hint" id="chatSub">Ops-style chat UI — connect your Worker endpoint when ready.</div>
+      </div>
+      <button class="pill" id="chatClose" aria-label="Close chat">Close</button>
+    </div>
+    <div class="chat-body" id="chatBody" aria-live="polite"></div>
+    <div class="chat-foot">
+      <input class="in" id="chatInput" type="text" autocomplete="off" placeholder="Type your message…" />
+      <button class="send" id="chatSend">Send</button>
+    </div>
+  </aside>
+
+  <script nonce="OPS_NONCE_9f3a7d2c">
+    "use strict";
+
+    // ===========
+    // CONFIG
+    // ===========
+    const PROFILE = {
+      name: "Gabriel Anangono",
+      email: "gabrieloor.cv1@gmail.com",
+      phoneUS: "+1 201 350 7567",
+      phoneEC: "+593 95 874 1463",
+      // Put your real LinkedIn URL here (your resume references LinkedIn but doesn’t include the URL).
+      linkedInUrl: "https://www.linkedin.com/in/YOUR-LINKEDIN",
+      // If you deploy a Cloudflare Worker chat endpoint, put it here. If null, chat runs in demo mode.
+      chatApiUrl: null
+    };
+
+    // ===========
+    // CONTENT (EN / ES) — derived from your resumes
+    // ===========
+    const DATA = {
+      en: {
+        tagline: "Remote Assistant & Business Consultant — Bilingual (EN/ES) across NA, UK, LATAM.",
+        headline: "Remote Assistant & Business Consultant",
+        summary:
+          "Former small business owner with hands-on experience in talent acquisition, logistics, intermediate accounting, data analysis, and day-to-day operations. Focused on exceptional customer service in fast-paced B2B/B2C environments and operational efficiency.",
+        chips: [
+          { label: "Customer Service • NA / UK / LATAM", dot: "sky" },
+          { label: "Help Desk • Global Support", dot: "teal" },
+          { label: "Logistics • Ops Management", dot: "mint" },
+          { label: "Accounting • Intermediate", dot: "violet" },
+          { label: "Data Analysis • Reporting", dot: "pink" }
+        ],
+        experienceTitle: "Experience",
+        experienceHint: "Click a role for a glassmorphic detail popup (strictly based on your resume).",
+        skillsTitle: "Education & Skills",
+        skillsHint: "Continuing education + tools you listed.",
+        eduTitle: "Education",
+        contEduTitle: "Continuing Education",
+        appsTitle: "Applications",
+        langTitle: "Language",
+        qrLabel: "Quick reference:",
+        chatBtnLabel: "Chat",
+        chatTitle: "Chat",
+        chatSub: "Chat UI (connect to your Worker endpoint when ready).",
+        modalLabels: { role: "Role", company: "Company", location: "Location", dates: "Dates", focus: "Focus" },
+        filters: { all: "All", logistics: "Logistics", it: "IT", admin: "Admin" },
+        contactTitle: "Contact",
+        contactSubtitle: "Use the buttons below — no third-party trackers.",
+        messageTitle: "Message Me",
+        messageSubtitle: "This opens your email client (mailto) with a prepared message."
+      },
+      es: {
+        tagline: "Asistente remoto y consultor de negocios — Bilingüe (EN/ES) en NA, UK y LATAM.",
+        headline: "Asistente remoto y consultor de negocios",
+        summary:
+          "Ex propietario de pequeña empresa con experiencia práctica en adquisición de talento, logística, contabilidad intermedia, análisis de datos y operación diaria. Enfocado en servicio al cliente en entornos B2B/B2C dinámicos y eficiencia operativa.",
+        chips: [
+          { label: "Servicio al cliente • NA / UK / LATAM", dot: "sky" },
+          { label: "Mesa de ayuda • Soporte global", dot: "teal" },
+          { label: "Logística • Gestión operativa", dot: "mint" },
+          { label: "Contabilidad • Intermedia", dot: "violet" },
+          { label: "Análisis de datos • Reportes", dot: "pink" }
+        ],
+        experienceTitle: "Experiencia",
+        experienceHint: "Haz clic en un rol para ver detalles (basado únicamente en tu CV).",
+        skillsTitle: "Educación y habilidades",
+        skillsHint: "Educación continua + herramientas indicadas.",
+        eduTitle: "Educación",
+        contEduTitle: "Educación continua",
+        appsTitle: "Aplicaciones",
+        langTitle: "Idioma",
+        qrLabel: "Referencia rápida:",
+        chatBtnLabel: "Chat",
+        chatTitle: "Chat",
+        chatSub: "Interfaz de chat (conecta tu endpoint Worker cuando esté listo).",
+        modalLabels: { role: "Rol", company: "Empresa", location: "Ubicación", dates: "Fechas", focus: "Enfoque" },
+        filters: { all: "Todo", logistics: "Logística", it: "TI", admin: "Administración" },
+        contactTitle: "Contacto",
+        contactSubtitle: "Botones directos — sin rastreadores de terceros.",
+        messageTitle: "Envíame un mensaje",
+        messageSubtitle: "Abre tu correo (mailto) con un mensaje preparado."
+      }
+    };
+
+    // ===========
+    // EXPERIENCE (kept accurate to resume headings)
+    // ===========
+    const EXPERIENCE = [
+      {
+        id: "ops",
+        category: "admin",
+        role: { en: "Business Consultant, Independent Contractor", es: "Consultor de Negocios, Contratista Independiente" },
+        company: "Ops Online Support",
+        location: { en: "North Bergen, NJ – US", es: "North Bergen, NJ – US" },
+        dates: { en: "March 2021 — Present", es: "Marzo 2021 — Presente" },
+        focus: {
+          en: [
+            "Business consulting / remote support work (resume-listed).",
+            "Operational support mindset: goals, learning, sustainable practices."
+          ],
+          es: [
+            "Consultoría / soporte remoto (según CV).",
+            "Enfoque operativo: metas, aprendizaje y prácticas sostenibles."
+          ]
+        }
+      },
+      {
+        id: "ringcentral",
+        category: "it",
+        role: { en: "Bilingual Global Tech Support", es: "Técnico, Soporte Global Bilingüe" },
+        company: "Ring Central / Acquire BPO",
+        location: { en: "Mandaluyong, Philippines", es: "Mandaluyong, Filipinas" },
+        dates: { en: "November 2016 — July 2018", es: "Noviembre 2016 — Julio 2018" },
+        focus: {
+          en: [
+            "Global bilingual technical support (EN/ES).",
+            "Customer service in fast-paced environments."
+          ],
+          es: [
+            "Soporte técnico global bilingüe (EN/ES).",
+            "Servicio al cliente en entornos dinámicos."
+          ]
+        }
+      },
+      {
+        id: "hp",
+        category: "it",
+        role: { en: "Tech Consultant Level II", es: "Consultor Técnico Nivel II" },
+        company: "Hewlett Packard",
+        location: { en: "Taguig, Philippines", es: "Taguig, Filipinas" },
+        dates: { en: "September 2015 — March 2016", es: "Septiembre 2015 — Marzo 2016" },
+        focus: {
+          en: ["Level II technical consulting / support (resume-listed)."],
+          es: ["Consultoría / soporte técnico Nivel II (según CV)."]
+        }
+      },
+      {
+        id: "bosch",
+        category: "it",
+        role: { en: "Help Desk Global Technical Support", es: "Help Desk Global Technical Support" },
+        company: "Bosch Communication",
+        location: { en: "Taguig, Philippines", es: "Taguig, Filipinas" },
+        dates: { en: "February 2013 — July 2014", es: "Febrero 2013 — Julio 2014" },
+        focus: {
+          en: ["Global help desk support (resume-listed)."],
+          es: ["Soporte global de mesa de ayuda (según CV)."]
+        }
+      },
+      {
+        id: "orbis",
+        category: "admin",
+        role: { en: "Sales Team Supervisor", es: "Supervisor Equipo de Ventas" },
+        company: "Orbis Global Solutions",
+        location: { en: "Guayaquil, Ecuador", es: "Guayaquil, Ecuador" },
+        dates: { en: "February — June 2007", es: "Febrero — Junio 2007" },
+        focus: {
+          en: ["Sales team supervision and team dynamics (resume summary)."],
+          es: ["Supervisión de equipo de ventas y dinámica de equipo (resumen del CV)."]
+        }
+      },
+      {
+        id: "targetlog",
+        category: "logistics",
+        role: { en: "Logistics Operations Manager", es: "Manager de Operaciones Logistics" },
+        company: "Target Logistics",
+        location: { en: "Windsor, CT – US", es: "Windsor, CT – US" },
+        dates: { en: "April — October 2006", es: "Abril — Octubre 2006" },
+        focus: {
+          en: ["Operations management in logistics (resume-listed)."],
+          es: ["Gestión de operaciones en logística (según CV)."]
+        }
+      }
+    ];
+
+    const EDUCATION = {
+      en: [
+        "Business Administration — 2005–2006 (Somers, CT)",
+        "Medical Assistant — 2002–2003 (South Windsor, CT)"
+      ],
+      es: [
+        "Administración de Negocios — 2005–2006 (Somers, CT)",
+        "Asistente Médico — 2002–2003 (South Windsor, CT)"
+      ]
+    };
+
+    const CONT_EDU = {
+      en: ["Microsoft Business 365", "CyberSecurity", "Azure Fundamentals", "Cisco CCNA", "Power BI", "QuickBooks"],
+      es: ["Microsoft Business 365", "Cyber Seguridad", "Fundamentos de Azure", "Cisco CCNA", "Power BI", "QuickBooks", "Talent Acquisition"]
+    };
+
+    const APPS = {
+      en: ["Salesforce", "SAP", "Google Meet", "Google Voice", "Zoom"],
+      es: ["Salesforce", "SAP", "Google Meet", "Google Voice", "Zoom"]
+    };
+
+    const LANGUAGE = {
+      en: ["English (C2 Level — Speed Net test)", "Spanish (native / professional use)"],
+      es: ["Inglés (C2 — Speed Net test)", "Español (nativo / profesional)"]
+    };
+
+    // ===========
+    // STATE
+    // ===========
+    let LANG = "en";
+    let FILTER = "all";
+
+    // ===========
+    // HELPERS
+    // ===========
+    const $ = (id) => document.getElementById(id);
+
+    function safeText(s, max=500){
+      if (typeof s !== "string") return "";
+      // strip control chars except newline/tab
+      const cleaned = s.replace(/[^\x09\x0A\x0D\x20-\x7E\u00A0-\uFFFF]/g, "").trim();
+      return cleaned.slice(0, max);
+    }
+
+    function dotColor(name){
+      const map = { sky:"var(--sky)", teal:"var(--teal)", mint:"var(--mint)", violet:"var(--violet)", pink:"var(--pink)" };
+      return map[name] || "var(--sky)";
+    }
+
+    function setFilterBadge(){
+      const label = DATA[LANG].filters[FILTER] || DATA[LANG].filters.all;
+      $("filterBadge").textContent = label;
+    }
+
+    // ===========
+    // RENDER
+    // ===========
+    function render(){
+      const t = DATA[LANG];
+
+      $("profileName").textContent = PROFILE.name;
+      $("profileTagline").textContent = t.tagline;
+
+      $("headline").textContent = t.headline;
+      $("summary").textContent = t.summary;
+
+      $("experienceTitle").textContent = t.experienceTitle;
+      $("experienceHint").textContent = t.experienceHint;
+
+      $("skillsTitle").textContent = t.skillsTitle;
+      $("skillsHint").textContent = t.skillsHint;
+
+      $("eduTitle").textContent = t.eduTitle;
+      $("contEduTitle").textContent = t.contEduTitle;
+      $("appsTitle").textContent = t.appsTitle;
+      $("langTitle").textContent = t.langTitle;
+
+      $("qrLabel").textContent = t.qrLabel;
+
+      $("chatBtnLabel").textContent = t.chatBtnLabel;
+      $("chatTitle").textContent = t.chatTitle;
+      $("chatSub").textContent = t.chatSub;
+
+      // Language pill shows what you can switch to
+      $("langBtn").textContent = (LANG === "en") ? "ES" : "EN";
+
+      // Chips
+      const chips = $("chips");
+      chips.innerHTML = "";
+      for(const c of t.chips){
+        const el = document.createElement("div");
+        el.className = "chip";
+        const dot = document.createElement("span");
+        dot.className = "dot";
+        dot.style.background = dotColor(c.dot);
+        dot.style.boxShadow = `0 0 0 5px rgba(255,255,255,.00), 0 0 0 6px rgba(255,255,255,.00)`;
+        el.appendChild(dot);
+        const tx = document.createElement("span");
+        tx.textContent = c.label;
+        el.appendChild(tx);
+        chips.appendChild(el);
+      }
+
+      // Experience cards
+      const grid = $("expGrid");
+      grid.innerHTML = "";
+
+      const items = EXPERIENCE.filter(x => FILTER === "all" ? true : x.category === FILTER);
+      for(const x of items){
+        const card = document.createElement("div");
+        card.className = "exp-card";
+        card.setAttribute("role","button");
+        card.setAttribute("tabindex","0");
+
+        const top = document.createElement("div");
+        top.className = "exp-top";
+
+        const left = document.createElement("div");
+        const role = document.createElement("p");
+        role.className = "exp-role";
+        role.textContent = x.role[LANG];
+        const meta = document.createElement("p");
+        meta.className = "exp-meta";
+        meta.textContent = `${x.company} • ${x.location[LANG]}`;
+        left.appendChild(role);
+        left.appendChild(meta);
+
+        const badge = document.createElement("span");
+        badge.className = "badge";
+        badge.textContent = DATA[LANG].filters[x.category] || x.category;
+
+        top.appendChild(left);
+        top.appendChild(badge);
+
+        const dates = document.createElement("p");
+        dates.className = "exp-meta";
+        dates.textContent = x.dates[LANG];
+
+        card.appendChild(top);
+        card.appendChild(dates);
+
+        const open = () => openExperienceModal(x);
+        card.addEventListener("click", open);
+        card.addEventListener("keydown", (e)=>{ if(e.key==="Enter" || e.key===" "){ e.preventDefault(); open(); } });
+
+        grid.appendChild(card);
+      }
+
+      // Lists
+      fillList($("eduList"), EDUCATION[LANG]);
+      fillList($("contEduList"), CONT_EDU[LANG]);
+      fillList($("appsList"), APPS[LANG]);
+      fillList($("langList"), LANGUAGE[LANG]);
+
+      setFilterBadge();
+      updateQuickRefButtons();
+    }
+
+    function fillList(ul, items){
+      ul.innerHTML = "";
+      for(const s of items){
+        const li = document.createElement("li");
+        li.textContent = s;
+        ul.appendChild(li);
+      }
+    }
+
+    // ===========
+    // MODAL
+    // ===========
+    function openModal({title, subtitle, kvPairs=[], bodyLines=[]}){
+      const overlay = $("overlay");
+      overlay.classList.add("open");
+      overlay.setAttribute("aria-hidden","false");
+
+      $("modalTitle").textContent = title || "";
+      $("modalSubtitle").textContent = subtitle || "";
+
+      const kv = $("modalKV");
+      kv.innerHTML = "";
+      for(const [k,v] of kvPairs){
+        const ke = document.createElement("div");
+        ke.className = "k";
+        ke.textContent = k;
+        const ve = document.createElement("div");
+        ve.className = "v";
+        ve.textContent = v;
+        kv.appendChild(ke);
+        kv.appendChild(ve);
+      }
+
+      const body = $("modalBody");
+      body.innerHTML = "";
+      for(const line of bodyLines){
+        const p = document.createElement("p");
+        p.textContent = line;
+        body.appendChild(p);
+      }
+
+      // focus trap starter
+      $("modalClose").focus();
+    }
+
+    function closeModal(){
+      const overlay = $("overlay");
+      overlay.classList.remove("open");
+      overlay.setAttribute("aria-hidden","true");
+    }
+
+    function openExperienceModal(x){
+      const t = DATA[LANG];
+      const L = t.modalLabels;
+
+      openModal({
+        title: x.role[LANG],
+        subtitle: x.company,
+        kvPairs: [
+          [L.company, x.company],
+          [L.location, x.location[LANG]],
+          [L.dates, x.dates[LANG]],
+          [L.focus, (DATA[LANG].filters[x.category] || x.category)]
+        ],
+        bodyLines: x.focus[LANG]
+      });
+    }
+
+    function openContactModal(){
+      const t = DATA[LANG];
+      openModal({
+        title: t.contactTitle,
+        subtitle: t.contactSubtitle,
+        kvPairs: [
+          ["Email", PROFILE.email],
+          ["Phone (US VoIP)", PROFILE.phoneUS],
+          ["Phone (EC)", PROFILE.phoneEC],
+          ["LinkedIn", PROFILE.linkedInUrl]
+        ],
+        bodyLines: [
+          (LANG==="en")
+            ? "Tip: update the LinkedIn URL in the CONFIG at the top of the script."
+            : "Tip: actualiza tu URL de LinkedIn en la CONFIG al inicio del script."
+        ]
+      });
+    }
+
+    function openMessageModal(){
+      const t = DATA[LANG];
+      openModal({
+        title: t.messageTitle,
+        subtitle: t.messageSubtitle,
+        kvPairs: [
+          ["To", PROFILE.email],
+          ["Subject", (LANG==="en") ? "Hello Gabriel — Contact from your resume site" : "Hola Gabriel — Contacto desde tu sitio de CV"]
+        ],
+        bodyLines: [
+          (LANG==="en")
+            ? "Click OK below to open your email client with a prepared message."
+            : "Haz clic en OK para abrir tu correo con un mensaje preparado."
+        ]
+      });
+
+      // Add a simple OK button under modal body (no innerHTML injection from user input)
+      const body = $("modalBody");
+      const ok = document.createElement("button");
+      ok.className = "pill primary";
+      ok.style.marginTop = "10px";
+      ok.textContent = (LANG==="en") ? "OK — Compose Email" : "OK — Redactar correo";
+      ok.addEventListener("click", ()=>{
+        const subject = (LANG==="en") ? "Hello Gabriel — Contact from your resume site" : "Hola Gabriel — Contacto desde tu sitio de CV";
+        const bodyTxt = (LANG==="en")
+          ? "Hi Gabriel,\n\nI saw your resume site and would like to connect.\n\n—"
+          : "Hola Gabriel,\n\nVi tu sitio de CV y me gustaría conectar.\n\n—";
+        const url = `mailto:${encodeURIComponent(PROFILE.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyTxt)}`;
+        window.location.href = url;
+      });
+      body.appendChild(ok);
+    }
+
+    // ===========
+    // CHAT
+    // ===========
+    function openChat(){
+      const d = $("chatDrawer");
+      d.classList.add("open");
+      d.setAttribute("aria-hidden","false");
+      $("chatInput").focus();
+      // seed a greeting once
+      if ($("chatBody").childElementCount === 0){
+        addMsg("bot", (LANG==="en")
+          ? "Hi — I’m the chat panel. Connect me to your Cloudflare Worker endpoint in CONFIG (chatApiUrl) when ready."
+          : "Hola — soy el panel de chat. Conéctame a tu endpoint Worker en CONFIG (chatApiUrl) cuando estés listo."
+        );
+      }
+    }
+    function closeChat(){
+      const d = $("chatDrawer");
+      d.classList.remove("open");
+      d.setAttribute("aria-hidden","true");
+    }
+    function addMsg(who, text){
+      const wrap = document.createElement("div");
+      wrap.className = `msg ${who === "me" ? "me" : ""}`;
+      const b = document.createElement("div");
+      b.className = "bubble";
+      b.textContent = text;
+      wrap.appendChild(b);
+      $("chatBody").appendChild(wrap);
+      $("chatBody").scrollTop = $("chatBody").scrollHeight;
+    }
+
+    async function sendChat(){
+      const inp = $("chatInput");
+      const raw = inp.value;
+      const msg = safeText(raw, 500);
+      if (!msg) return;
+      inp.value = "";
+
+      addMsg("me", msg);
+
+      // Demo mode
+      if (!PROFILE.chatApiUrl){
+        const reply = (LANG==="en")
+          ? "Demo mode: set chatApiUrl in CONFIG to your Cloudflare Worker endpoint."
+          : "Modo demo: configura chatApiUrl en CONFIG con tu endpoint Worker.";
+        addMsg("bot", reply);
+        return;
+      }
+
+      try{
+        const ctrl = new AbortController();
+        const to = setTimeout(()=>ctrl.abort(), 12000);
+
+        const res = await fetch(PROFILE.chatApiUrl, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ lang: LANG, message: msg }),
+          signal: ctrl.signal
+        });
+
+        clearTimeout(to);
+
+        if (!res.ok){
+          addMsg("bot", `Error: ${res.status}`);
+          return;
+        }
+        const data = await res.json();
+        const out = safeText(String(data.reply || ""), 1600) || "(empty reply)";
+        addMsg("bot", out);
+      } catch(e){
+        addMsg("bot", (LANG==="en") ? "Network error or timeout." : "Error de red o tiempo de espera.");
+      }
+    }
+
+    // ===========
+    // QUICK FILTERS
+    // ===========
+    function setFilter(next){
+      FILTER = next;
+      render();
+    }
+
+    function updateQuickRefButtons(){
+      document.querySelectorAll(".qr-btn").forEach(btn=>{
+        const f = btn.getAttribute("data-filter");
+        btn.classList.toggle("active", f === FILTER);
+        // localize labels
+        const map = DATA[LANG].filters;
+        if (map && map[f]) btn.textContent = map[f];
+      });
+    }
+
+    // ===========
+    // BACKGROUND CANVAS (soft motion, spring/summer)
+    // ===========
+    function startBackground(){
+      const canvas = $("bgCanvas");
+      const ctx = canvas.getContext("2d", { alpha: true });
+
+      function resize(){
+        const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+        canvas.width = Math.floor(canvas.clientWidth * dpr);
+        canvas.height = Math.floor(canvas.clientHeight * dpr);
+        ctx.setTransform(dpr,0,0,dpr,0,0);
+      }
+
+      const colors = [
+        [20,184,166],  // teal
+        [14,165,233],  // sky
+        [34,197,94],   // mint
+        [168,85,247],  // violet
+        [236,72,153]   // pink
+      ];
+
+      let pts = [];
+      function init(){
+        pts = [];
+        const n = 26;
+        for (let i=0;i<n;i++){
+          pts.push({
+            x: Math.random()*window.innerWidth,
+            y: Math.random()*window.innerHeight,
+            vx: (Math.random()-.5)*0.35,
+            vy: (Math.random()-.5)*0.35,
+            c: colors[i % colors.length],
+            r: 70 + Math.random()*120
+          });
+        }
+      }
+
+      function step(){
+        ctx.clearRect(0,0,canvas.clientWidth,canvas.clientHeight);
+
+        // very subtle haze
+        ctx.globalCompositeOperation = "lighter";
+        for (const p of pts){
+          p.x += p.vx; p.y += p.vy;
+          if (p.x < -200) p.x = window.innerWidth+200;
+          if (p.x > window.innerWidth+200) p.x = -200;
+          if (p.y < -200) p.y = window.innerHeight+200;
+          if (p.y > window.innerHeight+200) p.y = -200;
+
+          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+          g.addColorStop(0, `rgba(${p.c[0]},${p.c[1]},${p.c[2]},0.10)`);
+          g.addColorStop(1, `rgba(${p.c[0]},${p.c[1]},${p.c[2]},0.0)`);
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = "source-over";
+
+        requestAnimationFrame(step);
+      }
+
+      window.addEventListener("resize", ()=>{ resize(); init(); }, { passive:true });
+      resize(); init(); step();
+    }
+
+    // ===========
+    // EVENTS
+    // ===========
+    function wire(){
+      // language toggle
+      $("langBtn").addEventListener("click", ()=>{
+        LANG = (LANG === "en") ? "es" : "en";
+        render();
+      });
+
+      // modal close
+      $("modalClose").addEventListener("click", closeModal);
+      $("overlay").addEventListener("click", (e)=>{
+        if (e.target === $("overlay")) closeModal();
+      });
+      window.addEventListener("keydown", (e)=>{
+        if (e.key === "Escape"){
+          closeModal();
+          closeChat();
+        }
+      });
+
+      // FAB actions
+      $("fabLinkedIn").addEventListener("click", ()=>{
+        // Avoid window.opener risk
+        const a = document.createElement("a");
+        a.href = PROFILE.linkedInUrl;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.click();
+      });
+
+      $("fabContact").addEventListener("click", openContactModal);
+      $("fabMessage").addEventListener("click", openMessageModal);
+
+      // Chat (top-right + FAB)
+      $("chatBtn").addEventListener("click", openChat);
+      $("fabChat").addEventListener("click", openChat);
+      $("chatClose").addEventListener("click", closeChat);
+
+      $("chatSend").addEventListener("click", sendChat);
+      $("chatInput").addEventListener("keydown", (e)=>{
+        if (e.key === "Enter") sendChat();
+      });
+
+      // quick filters
+      document.querySelectorAll(".qr-btn").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const f = btn.getAttribute("data-filter");
+          setFilter(f);
+        });
+      });
+    }
+
+    // ===========
+    // BOOT
+    // ===========
+    (function boot(){
+      // Hard bind profile values
+      $("profileName").textContent = PROFILE.name;
+      render();
+      wire();
+      startBackground();
+    })();
+  </script>
+</body>
+</html>
