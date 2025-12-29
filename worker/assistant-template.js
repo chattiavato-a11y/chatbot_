@@ -8,12 +8,23 @@
 const CHAT_MODEL_ID = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const WHISPER_MODEL_ID = '@cf/openai/whisper';
 
-const SYSTEM_PROMPT = `
+const SYSTEM_PROMPT_EN = `
 You are OPS Online Assistant, the friendly and professional helper for the OPS Remote Professional Network.
 I’m here to assist you with everything related to OPS services, our business operations, contact center solutions, IT support, and professionals-on-demand.
 always answer in short, clear sentences and small paragraphs so the information is easy to read and pleasant to listen to with text-to-speech.
 use simple plain text without bullet lists, bold, headings, emojis, or extra symbols.
 `.trim();
+
+const SYSTEM_PROMPT_ES = `
+Eres OPS Online Assistant, un asistente amable y profesional para la Red de Profesionales Remotos de OPS.
+Te ayudo con todo lo relacionado con los servicios de OPS, nuestras operaciones de negocio, soluciones de contact center, soporte de TI y profesionales bajo demanda.
+responde siempre en español con frases cortas y párrafos pequeños para que sean fáciles de leer y agradables de escuchar con texto a voz.
+usa texto simple sin listas con viñetas, negritas, encabezados, emojis ni símbolos extra.
+`.trim();
+
+function systemPromptForLang(lang) {
+  return lang === 'es' ? SYSTEM_PROMPT_ES : SYSTEM_PROMPT_EN;
+}
 
 // Allow Ops Online Assistant UI / gateway to call this Worker
 const ALLOWED_ORIGIN = '*';
@@ -84,9 +95,10 @@ async function handleChatRequest(request, env) {
     const body = await request.json().catch(() => ({}));
     const messagesIn = body.messages || [];
     const messages = Array.isArray(messagesIn) ? [...messagesIn] : [];
+    const requestLang = body.lang === 'es' ? 'es' : 'en';
 
     if (!messages.some((msg) => msg.role === 'system')) {
-      messages.unshift({ role: 'system', content: SYSTEM_PROMPT });
+      messages.unshift({ role: 'system', content: systemPromptForLang(requestLang) });
     }
 
     const response = await env.AI.run(
@@ -136,11 +148,12 @@ async function handleOpsOnlineChat(request, env) {
       );
     }
 
+    const lang = payload.lang === 'es' ? 'es' : 'en';
     const message = typeof payload.message === 'string' ? payload.message : '';
     const history = Array.isArray(payload.history) ? payload.history : [];
 
     const messages = [];
-    messages.push({ role: 'system', content: SYSTEM_PROMPT });
+    messages.push({ role: 'system', content: systemPromptForLang(lang) });
 
     for (const item of history) {
       if (!item || !item.content) continue;
@@ -169,9 +182,11 @@ async function handleOpsOnlineChat(request, env) {
     const replyText =
       aiResult && aiResult.response
         ? aiResult.response
-        : 'I’m not sure how to answer that yet.';
+        : lang === 'es'
+          ? 'Aún no tengo una respuesta para eso.'
+          : 'I’m not sure how to answer that yet.';
 
-    return new Response(JSON.stringify({ reply: replyText }), {
+    return new Response(JSON.stringify({ reply: replyText, lang }), {
       status: 200,
       headers: { ...corsHeaders(), 'content-type': 'application/json' }
     });
