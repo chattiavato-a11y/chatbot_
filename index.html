@@ -105,23 +105,15 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 #turnstile-container { display:flex; justify-content:flex-end; }
 #chatbot-send { align-self:flex-end; }
 
-/* Honeypots: visually hidden but still in DOM flow for bot traps (NOT display:none) */
-.hp-trap {
+/* Honeypot: hidden visually but NOT display:none */
+.hp-wrap {
   position: absolute !important;
   left: -9999px !important;
   top: auto !important;
   width: 1px !important;
   height: 1px !important;
   overflow: hidden !important;
-  opacity: 0.01 !important;
-  pointer-events: none !important;
-}
-.hp-trap input {
-  width: 1px !important;
-  height: 1px !important;
-  border: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
+  white-space: nowrap !important;
 }
 </style>
 
@@ -157,15 +149,16 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       <input id="chatbot-input" type="text" placeholder="Type your message..." required maxlength="256"
         data-en-ph="Type your message..." data-es-ph="Escriba su mensaje...">
 
-      <!-- Honeypot fields (must remain empty for real users) -->
-      <div class="hp-trap" aria-hidden="true">
-        <label>email <input id="hp_email" name="hp_email" type="text" tabindex="-1" autocomplete="off"></label>
-        <label>website <input id="hp_website" name="hp_website" type="text" tabindex="-1" autocomplete="off"></label>
+      <!-- Honeypots (bots fill these; humans never see them) -->
+      <div class="hp-wrap" aria-hidden="true">
+        <label>Email <input type="text" name="hp_email" autocomplete="off" tabindex="-1"></label>
+        <label>Website <input type="text" name="hp_website" autocomplete="off" tabindex="-1"></label>
       </div>
 
       <div id="turnstile-container">
         <div id="turnstile-widget" class="cf-turnstile" data-sitekey="0x4AAAAAACCemZgiIexxcpTR"
-          data-callback="opsTurnstileCallback" data-expired-callback="opsTurnstileExpired"
+          data-callback="opsTurnstileCallback"
+          data-expired-callback="opsTurnstileExpired"
           data-error-callback="opsTurnstileErrored"></div>
       </div>
 
@@ -178,7 +171,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   </div>
 </div>
 
-<!-- Inline script; the nonce must match the CSP above -->
 <script nonce="ops-inline-asset">
 (() => {
   const qs  = s => document.querySelector(s);
@@ -194,7 +186,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const atExpectedPath   = (self.location.pathname.startsWith(ALLOWED_PATH_PREFIX));
   const fullyAuthorized  = atExpectedOrigin && atExpectedPath;
 
-  /* ===== Gateway endpoint (ops-gateway) ===== */
+  /* ===== Gateway endpoint ===== */
   const API_URL = new URL("https://ops-gateway.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat");
 
   /* ===== UI refs ===== */
@@ -212,11 +204,10 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const log   = qs('#chat-log');
   const form  = qs('#chatbot-input-row');
   const input = qs('#chatbot-input');
-
   const turnstileWidget = qs('#turnstile-widget');
 
-  const hpEmail = qs('#hp_email');
-  const hpWebsite = qs('#hp_website');
+  const hpEmailEl = form.querySelector('input[name="hp_email"]');
+  const hpWebEl   = form.querySelector('input[name="hp_website"]');
 
   let turnstileToken = '';
 
@@ -231,17 +222,11 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     if (window.turnstile && typeof window.turnstile.getResponse === 'function') {
       try {
         const resp = window.turnstile.getResponse(turnstileWidget);
-        if (resp) {
-          turnstileToken = resp;
-          return resp;
-        }
+        if (resp) { turnstileToken = resp; return resp; }
       } catch {}
       try {
         const resp = window.turnstile.getResponse();
-        if (resp) {
-          turnstileToken = resp;
-          return resp;
-        }
+        if (resp) { turnstileToken = resp; return resp; }
       } catch {}
     }
     return '';
@@ -255,15 +240,10 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     }
   }
 
-  /* ===== Language + theme preferences (persisted) ===== */
+  /* ===== Preferences ===== */
   const PREF_KEY = 'ops-chat-preferences';
   function loadPrefs() {
-    try {
-      const raw = localStorage.getItem(PREF_KEY);
-      return raw ? JSON.parse(raw) : {};
-    } catch {
-      return {};
-    }
+    try { return JSON.parse(localStorage.getItem(PREF_KEY) || "{}"); } catch { return {}; }
   }
   function savePrefs(next) {
     try { localStorage.setItem(PREF_KEY, JSON.stringify(next || {})); } catch {}
@@ -326,7 +306,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     voiceStatus.textContent = (currentLang === 'es') ? (esText || enText) : enText;
   }
 
-  /* ===== Show lock message if not fully authorized ===== */
   if (!fullyAuthorized) {
     addMsg(
       (currentLang === 'es')
@@ -336,7 +315,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     );
   }
 
-  /* ===== Voice UI state ===== */
   function updateSpeechToggleUI() {
     speechToggle.classList.toggle('active', speechEnabled);
     speechToggle.setAttribute('aria-pressed', speechEnabled ? 'true' : 'false');
@@ -354,19 +332,14 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       setVoiceStatus('Voice features are not supported in this browser.', 'Las funciones de voz no son compatibles con este navegador.');
       return;
     }
+
     const parts = [];
-    if (speechSupported && speechEnabled) {
-      parts.push(currentLang === 'es' ? 'Lectura por voz activada.' : 'Speech output on.');
-    }
-    if (recognitionSupported && listening) {
-      parts.push(currentLang === 'es' ? 'Escuchando…' : 'Listening…');
-    }
+    if (speechSupported && speechEnabled) parts.push(currentLang === 'es' ? 'Lectura por voz activada.' : 'Speech output on.');
+    if (recognitionSupported && listening) parts.push(currentLang === 'es' ? 'Escuchando…' : 'Listening…');
     setVoiceStatus(parts.join(' '));
   }
 
-  function persistPrefs() {
-    savePrefs({ lang: currentLang, theme: currentTheme });
-  }
+  function persistPrefs() { savePrefs({ lang: currentLang, theme: currentTheme }); }
 
   function setLanguage(lang) {
     const toES = lang === 'es';
@@ -416,7 +389,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     const v = getVoiceForLang(langForReply); if (v) u.voice = v;
     if (langForReply === 'en') { u.rate = 1.03; u.pitch = 1.02; }
     synth.speak(u);
-    setVoiceStatus('Speaking response…','Hablando la respuesta…');
+    setVoiceStatus('Speaking response…', 'Hablando la respuesta…');
     u.onend = () => updateVoiceStatus();
   }
   if (synth) synth.onvoiceschanged = () => getVoiceForLang(currentLang);
@@ -458,14 +431,12 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     updateVoiceStatus();
   };
 
-  /* ===== Init ===== */
   setLanguage(currentLang);
   setTheme(currentTheme);
   updateSpeechToggleUI();
   updateListenUI();
   updateVoiceStatus();
 
-  /* ===== Submit: ONLY if fully authorized (origin + path) ===== */
   form.onsubmit = async e => {
     e.preventDefault();
 
@@ -500,11 +471,9 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       addMsg(warn, 'bot'); speak(warn, requestLang); return;
     }
 
-    // user bubble
     addMsg(msg, 'user');
     input.value = '';
 
-    // temp bot bubble
     const botDiv = addMsg('…', 'bot');
 
     try {
@@ -527,8 +496,8 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
           lang: requestLang,
           v: 1,
           turnstileToken: activeTurnstileToken,
-          hp_email: hpEmail ? String(hpEmail.value || '') : '',
-          hp_website: hpWebsite ? String(hpWebsite.value || '') : ''
+          hp_email: (hpEmailEl?.value || '').slice(0, 200),
+          hp_website: (hpWebEl?.value || '').slice(0, 200)
         }),
         signal: ctrl.signal
       });
