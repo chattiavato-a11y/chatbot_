@@ -15,11 +15,11 @@
     style-src 'self' 'unsafe-inline';
     img-src 'self' data:;
     font-src 'self' data:;
-    frame-src 'self';
-    connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev;
+    frame-src 'self' https://challenges.cloudflare.com;
+    connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev https://challenges.cloudflare.com;
     form-action 'self';
     worker-src 'self';
-    script-src 'self' 'nonce-ops-inline-asset';
+    script-src 'self' https://challenges.cloudflare.com 'nonce-ops-inline-asset';
     upgrade-insecure-requests;">
 
 <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains; preload">
@@ -74,7 +74,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 
 #chatbot-form-container { background:#220f3a; border-top:1px solid var(--clr-accent); padding:.55rem .7rem .75rem; color:#fff; }
 #control-row { display:flex; justify-content:flex-start; margin-bottom:.55rem; }
-#chatbot-input-row { display:flex; gap:.6rem; }
+#chatbot-input-row { display:flex; flex-direction:column; gap:.6rem; }
 
 #listenCtrl {
   background:#ffb703; border:none; color:#1b0e2d; font-weight:700;
@@ -102,7 +102,11 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     min-height:1.2em;
   }
 
+  #turnstile-container { display:flex; justify-content:flex-end; }
+  #chatbot-send { align-self:flex-end; }
+
 </style>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>
 </head>
 <body>
 
@@ -132,6 +136,11 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     <form id="chatbot-input-row" autocomplete="off">
       <input id="chatbot-input" type="text" placeholder="Type your message..." required maxlength="256"
         data-en-ph="Type your message..." data-es-ph="Escriba su mensaje...">
+      <div id="turnstile-container">
+        <div id="turnstile-widget" class="cf-turnstile" data-sitekey="0x4AAAAAACCemZgiIexxcpTR"
+          data-callback="opsTurnstileCallback" data-expired-callback="opsTurnstileExpired"
+          data-error-callback="opsTurnstileErrored"></div>
+      </div>
       <button id="chatbot-send" type="submit" aria-label="Send">
         <!-- Paper plane SVG -->
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -176,6 +185,44 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const log   = qs('#chat-log');
   const form  = qs('#chatbot-input-row');
   const input = qs('#chatbot-input');
+  const turnstileWidget = qs('#turnstile-widget');
+
+  let turnstileToken = '';
+
+  window.opsTurnstileCallback = (token) => {
+    turnstileToken = typeof token === 'string' ? token : '';
+  };
+  window.opsTurnstileExpired = () => { turnstileToken = ''; };
+  window.opsTurnstileErrored = () => { turnstileToken = ''; };
+
+  function getTurnstileToken() {
+    if (turnstileToken) return turnstileToken;
+    if (window.turnstile && typeof window.turnstile.getResponse === 'function') {
+      try {
+        const resp = window.turnstile.getResponse(turnstileWidget);
+        if (resp) {
+          turnstileToken = resp;
+          return resp;
+        }
+      } catch {}
+      try {
+        const resp = window.turnstile.getResponse();
+        if (resp) {
+          turnstileToken = resp;
+          return resp;
+        }
+      } catch {}
+    }
+    return '';
+  }
+
+  function resetTurnstile() {
+    turnstileToken = '';
+    if (window.turnstile && typeof window.turnstile.reset === 'function') {
+      try { window.turnstile.reset(turnstileWidget); return; } catch {}
+      try { window.turnstile.reset(); } catch {}
+    }
+  }
 
   /* ===== Language + theme preferences (persisted) ===== */
   const PREF_KEY = 'ops-chat-preferences';
@@ -425,6 +472,14 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       addMsg(warn, 'bot'); speak(warn, requestLang); return;
     }
 
+    const activeTurnstileToken = getTurnstileToken();
+    if (!activeTurnstileToken) {
+      const warn = requestLang === 'es'
+        ? 'Completa la verificación de seguridad para continuar.'
+        : 'Please complete the security check to continue.';
+      addMsg(warn, 'bot'); speak(warn, requestLang); return;
+    }
+
     // user bubble
     addMsg(msg, 'user');
     input.value = '';
@@ -447,7 +502,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
           'Content-Type': 'application/json',
           'X-Ops-Asset-Id': ASSET_ID
         },
-        body: JSON.stringify({ message: msg, lang: requestLang, v: 1 }),
+        body: JSON.stringify({ message: msg, lang: requestLang, v: 1, turnstileToken: activeTurnstileToken }),
         signal: ctrl.signal
       });
       clearTimeout(to);
@@ -477,6 +532,8 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     } catch {
       const fallback = requestLang==='es' ? 'Error: no puedo conectar con el asistente OPS.' : 'Error: can’t reach OPS assistant.';
       botDiv.textContent = fallback; speak(fallback, requestLang);
+    } finally {
+      resetTurnstile();
     }
   };
 })();

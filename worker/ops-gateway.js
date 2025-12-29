@@ -13,8 +13,10 @@
  */
 
 const ALLOWED_ORIGIN = 'https://chattiavato-a11y.github.io';
-const MAX_BODY_BYTES = 3096;
+const MAX_BODY_BYTES = 2048;
 const MAX_MSG_CHARS = 256;
+const REPO_URL = 'https://github.com/chattiavato-a11y/ops-online-support';
+const BRAIN_URL = 'https://ops-online-assistant.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat';
 
 function securityHeaders() {
   return {
@@ -111,20 +113,18 @@ async function aiGuardIfAvailable(env, textToCheck) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const rawPath = url.pathname || '/';
-    const pathname =
-      rawPath !== '/' && rawPath.endsWith('/') ? rawPath.replace(/\/+$/, '') : rawPath;
+    const pathname = url.pathname || '/';
     const isChatPath = pathname === '/api/ops-online-chat';
     const isRoot = pathname === '/';
     const origin = request.headers.get('Origin') || '';
-    const isOpsChatPath = pathname === '/api/ops-online-chat';
-    const isTranscribePath = pathname === '/api/transcribe';
+    const clientIp = request.headers.get('CF-Connecting-IP') || '';
 
     if (pathname === '/ping' || isRoot) {
       return json(origin, 200, {
         ok: true,
         service: 'ops-gateway',
-        usage: 'POST /api/ops-online-chat with X-Ops-Asset-Id header'
+        usage: 'POST /api/ops-online-chat with X-Ops-Asset-Id header',
+        repo: REPO_URL
       });
     }
 
@@ -180,13 +180,57 @@ export default {
       payload = {};
     }
 
-    const msgRaw = typeof payload.message === 'string' ? payload.message : '';
     const langRaw = typeof payload.lang === 'string' ? payload.lang : 'en';
+    const lang = langRaw === 'es' ? 'es' : 'en';
+    const msgRaw = typeof payload.message === 'string' ? payload.message : '';
     const versionRaw = Number.isInteger(payload.v) ? payload.v : 1;
+    const turnstileToken = typeof payload.turnstileToken === 'string' ? payload.turnstileToken : '';
+    const turnstileSecret = (env.TURNSTILE_SECRET || '').toString();
 
     const message = normalizeUserText(msgRaw);
-    const lang = langRaw === 'es' ? 'es' : 'en';
     const v = versionRaw;
+
+    if (!turnstileSecret) {
+      return json(origin, 500, {
+        error: localizedError(lang, 'Gateway config error (missing TURNSTILE_SECRET).', 'Error de configuración del gateway (falta TURNSTILE_SECRET).'),
+        lang
+      });
+    }
+
+    if (!turnstileToken) {
+      return json(origin, 400, {
+        error: localizedError(lang, 'Turnstile verification failed.', 'La verificación de Turnstile falló.'),
+        lang
+      });
+    }
+
+    let turnstileResult;
+    try {
+      const verificationRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          secret: turnstileSecret,
+          response: turnstileToken,
+          remoteip: clientIp
+        })
+      });
+      turnstileResult = await verificationRes.json();
+    } catch (err) {
+      console.error('Turnstile verification error:', err);
+      return json(origin, 502, {
+        error: localizedError(lang, 'Turnstile verification failed.', 'La verificación de Turnstile falló.'),
+        lang
+      });
+    }
+
+    if (!turnstileResult?.success) {
+      console.warn('Turnstile verification rejected', turnstileResult?.['error-codes'] || 'unknown');
+      return json(origin, 403, {
+        error: localizedError(lang, 'Turnstile verification failed.', 'La verificación de Turnstile falló.'),
+        lang
+      });
+    }
 
     if (!message) {
       return json(origin, 400, {
@@ -232,7 +276,7 @@ export default {
     // 7) Forward to brain (service binding)
     let brainRes;
     try {
-      brainRes = await env.BRAIN.fetch('https://ops-online-assistant.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat', {
+      brainRes = await env.BRAIN.fetch(BRAIN_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
