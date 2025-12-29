@@ -258,7 +258,21 @@ async function handleWhisperTranscription(request, env) {
       aiResult?.response ||
       '';
 
-    return new Response(JSON.stringify({ transcript: transcript || '' }), {
+    const responsePayload = {
+      transcript: transcript || ''
+    };
+
+    if (aiResult?.text !== undefined) {
+      responsePayload.text = aiResult.text;
+    }
+    if (aiResult?.word_count !== undefined) {
+      responsePayload.word_count = aiResult.word_count;
+    }
+    if (aiResult?.vtt !== undefined) {
+      responsePayload.vtt = aiResult.vtt;
+    }
+
+    return new Response(JSON.stringify(responsePayload), {
       status: 200,
       headers: { ...corsHeaders(), 'content-type': 'application/json' }
     });
