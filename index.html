@@ -102,15 +102,14 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 #turnstile-container { display:flex; justify-content:flex-end; }
 #chatbot-send { align-self:flex-end; }
 
-/* Honeypot: hidden but NOT display:none */
+/* honeypot fields: hidden but NOT display:none */
 .hp-wrap {
-  position: absolute !important;
-  left: -9999px !important;
-  top: auto !important;
-  width: 1px !important;
-  height: 1px !important;
-  overflow: hidden !important;
-  white-space: nowrap !important;
+  position:absolute!important;
+  left:-9999px!important;
+  width:1px!important;
+  height:1px!important;
+  overflow:hidden!important;
+  white-space:nowrap!important;
 }
 </style>
 
@@ -131,7 +130,6 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
         aria-label="Toggle language" data-en-label="Toggle language" data-es-label="Cambiar idioma">EN</button>
       <button type="button" id="themeCtrl" class="ctrl">Dark</button>
       <button type="button" id="speechToggle" class="ctrl" data-en="Speech" data-es="Voz">Speech</button>
-
       <button id="listenCtrl" type="button" aria-label="Start voice input"
         data-en-label="Start voice input" data-es-label="Comenzar voz">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -149,14 +147,13 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 
       <!-- Honeypots -->
       <div class="hp-wrap" aria-hidden="true">
-        <label>Email <input type="text" name="hp_email" autocomplete="off" tabindex="-1"></label>
-        <label>Website <input type="text" name="hp_website" autocomplete="off" tabindex="-1"></label>
+        <label>email <input id="hp_email" name="hp_email" type="text" autocomplete="off"></label>
+        <label>website <input id="hp_website" name="hp_website" type="text" autocomplete="off"></label>
       </div>
 
       <div id="turnstile-container">
         <div id="turnstile-widget" class="cf-turnstile" data-sitekey="0x4AAAAAACCemZgiIexxcpTR"
-          data-callback="opsTurnstileCallback"
-          data-expired-callback="opsTurnstileExpired"
+          data-callback="opsTurnstileCallback" data-expired-callback="opsTurnstileExpired"
           data-error-callback="opsTurnstileErrored"></div>
       </div>
 
@@ -194,13 +191,14 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const listenCtrl    = qs('#listenCtrl');
 
   const voiceStatus   = qs('#voice-status');
+
   const log   = qs('#chat-log');
   const form  = qs('#chatbot-input-row');
   const input = qs('#chatbot-input');
   const turnstileWidget = qs('#turnstile-widget');
 
-  const hpEmailEl = form.querySelector('input[name="hp_email"]');
-  const hpWebEl   = form.querySelector('input[name="hp_website"]');
+  const hpEmailEl = qs('#hp_email');
+  const hpWebEl   = qs('#hp_website');
 
   let turnstileToken = '';
 
@@ -302,6 +300,15 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     );
   }
 
+  function updateSpeechToggleUI() {
+    speechToggle.classList.toggle('active', speechEnabled);
+    speechToggle.setAttribute('aria-pressed', speechEnabled ? 'true' : 'false');
+  }
+  function updateListenUI() {
+    listenCtrl.classList.toggle('active', listening);
+    listenCtrl.setAttribute('aria-pressed', listening ? 'true' : 'false');
+  }
+
   function persistPrefs() { savePrefs({ lang: currentLang, theme: currentTheme }); }
 
   function setLanguage(lang) {
@@ -345,25 +352,20 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     if (!synth || !speechEnabled) return;
     const clean = cleanForSpeech(normalizeUserText(text));
     if (!clean) return;
-
     const langForReply = langOverride === 'es' ? 'es' : (langOverride === 'en' ? 'en' : currentLang);
     synth.cancel();
-
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = langForReply === 'es' ? 'es-ES' : 'en-US';
     const v = getVoiceForLang(langForReply); if (v) u.voice = v;
     if (langForReply === 'en') { u.rate = 1.03; u.pitch = 1.02; }
-
     synth.speak(u);
-    setVoiceStatus('Speaking response…', 'Hablando la respuesta…');
-    u.onend = () => setVoiceStatus('', '');
   }
+  if (synth) synth.onvoiceschanged = () => getVoiceForLang(currentLang);
 
   if (recognition) {
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = false; recognition.interimResults = false;
     recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
-    recognition.onstart = () => { listening = true; };
+    recognition.onstart = () => { listening = true; updateListenUI(); };
     recognition.onresult = e => {
       const transcript = e.results?.[0]?.[0]?.transcript || '';
       const cleaned = normalizeUserText(transcript);
@@ -373,31 +375,41 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
         if (fullyAuthorized) form.requestSubmit();
       }
     };
-    recognition.onerror = () => { listening = false; };
-    recognition.onend   = () => { listening = false; };
+    recognition.onerror = () => { listening = false; updateListenUI(); };
+    recognition.onend   = () => { listening = false; updateListenUI(); };
+  }
+
+  function startListening(){
+    if (!recognition) return;
+    recognition.lang = currentLang==='es'?'es-ES':'en-US';
+    listening=true;
+    updateListenUI();
+    setVoiceStatus('Listening…', 'Escuchando…');
+    recognition.start();
   }
 
   speechToggle.onclick = () => {
     if (!synth) { addMsg(currentLang==='es'?'La síntesis de voz no está disponible.':'Speech synthesis is not available.','bot'); return; }
-    speechEnabled = !speechEnabled;
+    speechEnabled = !speechEnabled; updateSpeechToggleUI();
   };
 
   listenCtrl.onclick = () => {
     if (!recognition) { addMsg(currentLang==='es'?'Entrada por voz no disponible en este navegador.' : 'Voice input is not available in this browser.','bot'); return; }
     if (listening) { recognition.stop(); return; }
-    recognition.lang = currentLang==='es'?'es-ES':'en-US';
-    recognition.start();
+    startListening();
   };
 
   setLanguage(currentLang);
   setTheme(currentTheme);
+  updateSpeechToggleUI();
+  updateListenUI();
 
   form.onsubmit = async e => {
     e.preventDefault();
 
     const requestLang = currentLang;
-
-    const msg = normalizeUserText(input.value);
+    const raw = input.value;
+    const msg = normalizeUserText(raw);
     if (!msg) return;
 
     if (!fullyAuthorized) {
@@ -425,6 +437,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       addMsg(warn, 'bot'); speak(warn, requestLang); return;
     }
 
+    // user bubble
     addMsg(msg, 'user');
     input.value = '';
 
@@ -464,36 +477,27 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       if (!res.ok) {
         const fallback = requestLang==='es' ? 'Error del gateway de OPS.' : 'OPS gateway error.';
         const errMsg = (data && (data.error || data.public_error)) ? (data.error || data.public_error) : (text || fallback);
-        botDiv.textContent = errMsg;
-        speak(errMsg, requestLang);
-        return;
+        botDiv.textContent = errMsg; speak(errMsg, requestLang); return;
       }
 
       if (!data || typeof data !== 'object') {
         const fallback = requestLang==='es' ? 'Error: respuesta no válida del gateway.' : 'Error: invalid response from gateway.';
-        botDiv.textContent = fallback;
-        speak(fallback, requestLang);
-        return;
+        botDiv.textContent = fallback; speak(fallback, requestLang); return;
       }
 
       if (data.error || data.public_error) {
-        const err = data.error || data.public_error;
-        botDiv.textContent = err;
-        speak(err, requestLang);
-        return;
+        const err = data.error || data.public_error; botDiv.textContent = err; speak(err, requestLang); return;
       }
 
       const replyLang = data.lang === 'es' ? 'es' : requestLang;
       const reply = (typeof data.reply === 'string' && data.reply.trim())
         ? data.reply.trim()
         : (requestLang==='es' ? 'Sin respuesta.' : 'No reply.');
-
       botDiv.textContent = reply;
       speak(reply, replyLang);
     } catch {
       const fallback = requestLang==='es' ? 'Error: no puedo conectar con el asistente OPS.' : 'Error: can’t reach OPS assistant.';
-      botDiv.textContent = fallback;
-      speak(fallback, requestLang);
+      botDiv.textContent = fallback; speak(fallback, requestLang);
     } finally {
       resetTurnstile();
     }
@@ -502,4 +506,3 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 </script>
 </body>
 </html>
-
