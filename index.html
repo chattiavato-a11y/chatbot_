@@ -234,8 +234,10 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   function savePrefs(next) { try { localStorage.setItem(PREF_KEY, JSON.stringify(next || {})); } catch {} }
   const prefs = loadPrefs();
 
-  let currentLang = (prefs.lang === 'es') ? 'es' : 'en';
-  if (!prefs.lang) currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
+  const normalizeLang = (value) => (String(value || '').toLowerCase() === 'es' ? 'es' : 'en');
+
+  let currentLang = normalizeLang(prefs.lang);
+  if (!prefs.lang) currentLang = normalizeLang(document.documentElement.lang === 'es' ? 'es' : 'en');
   let currentTheme = prefs.theme === 'dark' ? 'dark' : 'light';
 
   const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
@@ -312,7 +314,8 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   function persistPrefs() { savePrefs({ lang: currentLang, theme: currentTheme }); }
 
   function setLanguage(lang) {
-    const toES = lang === 'es';
+    const normalized = normalizeLang(lang);
+    const toES = normalized === 'es';
     currentLang = toES ? 'es' : 'en';
     document.documentElement.lang = currentLang;
 
@@ -407,7 +410,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   form.onsubmit = async e => {
     e.preventDefault();
 
-    const requestLang = currentLang;
+    const requestLang = normalizeLang(currentLang);
     const raw = input.value;
     const msg = normalizeUserText(raw);
     if (!msg) return;

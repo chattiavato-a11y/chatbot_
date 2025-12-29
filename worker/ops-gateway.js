@@ -264,7 +264,7 @@ export default {
     let payload = {};
     try { payload = JSON.parse(bodyText); } catch { payload = {}; }
 
-    const langRaw = typeof payload.lang === "string" ? payload.lang : "en";
+    const langRaw = typeof payload.lang === "string" ? payload.lang.toLowerCase() : "en";
     const lang = langRaw === "es" ? "es" : "en";
 
     // Honeypots
