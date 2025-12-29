@@ -201,12 +201,21 @@ async function handleOpsOnlineChat(request, env) {
 
 async function handleWhisperTranscription(request, env) {
   try {
-    const bodyText = await request.text();
+    const contentType = request.headers.get('content-type') || '';
+    let bodyText = '';
     let payload = {};
-    try {
-      payload = bodyText ? JSON.parse(bodyText) : {};
-    } catch {
-      payload = {};
+    let audioBytes;
+
+    if (contentType.includes('application/json')) {
+      bodyText = await request.text();
+      try {
+        payload = bodyText ? JSON.parse(bodyText) : {};
+      } catch {
+        payload = {};
+      }
+    } else {
+      const buffer = await request.arrayBuffer();
+      audioBytes = buffer ? new Uint8Array(buffer) : new Uint8Array();
     }
 
     const verify = await verifyGatewaySignature(request, env, bodyText);
@@ -228,20 +237,32 @@ async function handleWhisperTranscription(request, env) {
       );
     }
 
-    const audioBase64 = typeof payload.audio === 'string' ? payload.audio : '';
-    if (!audioBase64) {
-      return new Response(JSON.stringify({ error: 'No audio provided' }), {
-        status: 400,
-        headers: { ...corsHeaders(), 'content-type': 'application/json' }
-      });
+    if (contentType.includes('application/json')) {
+      const audioBase64 =
+        typeof payload.audio_base64 === 'string'
+          ? payload.audio_base64
+          : typeof payload.audio === 'string'
+            ? payload.audio
+            : '';
+      const audioArray = Array.isArray(payload.audio) ? payload.audio : null;
+
+      if (audioBase64) {
+        try {
+          audioBytes = base64ToBytes(audioBase64);
+        } catch (e) {
+          console.error('Invalid base64 audio:', e);
+          return new Response(JSON.stringify({ error: 'Invalid audio payload' }), {
+            status: 400,
+            headers: { ...corsHeaders(), 'content-type': 'application/json' }
+          });
+        }
+      } else if (audioArray) {
+        audioBytes = new Uint8Array(audioArray);
+      }
     }
 
-    let audioBytes;
-    try {
-      audioBytes = base64ToBytes(audioBase64);
-    } catch (e) {
-      console.error('Invalid base64 audio:', e);
-      return new Response(JSON.stringify({ error: 'Invalid audio payload' }), {
+    if (!audioBytes || !audioBytes.length) {
+      return new Response(JSON.stringify({ error: 'No audio provided' }), {
         status: 400,
         headers: { ...corsHeaders(), 'content-type': 'application/json' }
       });

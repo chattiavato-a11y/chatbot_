@@ -118,6 +118,8 @@ export default {
     const isRoot = pathname === '/';
     const origin = request.headers.get('Origin') || '';
     const clientIp = request.headers.get('CF-Connecting-IP') || '';
+    const isOpsChatPath = pathname === '/api/ops-online-chat';
+    const isTranscribePath = pathname === '/api/transcribe';
 
     if (pathname === '/ping' || isRoot) {
       return json(origin, 200, {
