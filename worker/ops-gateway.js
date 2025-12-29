@@ -113,23 +113,22 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname;
     const origin = request.headers.get('Origin') || '';
+    const isOpsChatPath = pathname === '/api/ops-online-chat';
+    const isTranscribePath = pathname === '/api/transcribe';
 
     if (pathname === '/ping') {
       return text(200, 'ops-gateway: ok');
     }
 
     // CORS preflight
-    if (pathname === '/api/ops-online-chat' && request.method === 'OPTIONS') {
-      if (origin && origin !== ALLOWED_ORIGIN) {
-        return json(origin, 403, { error: 'Origin not allowed.' });
-      }
+    if ((isOpsChatPath || isTranscribePath) && request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
         headers: { ...securityHeaders(), ...corsHeaders(origin) }
       });
     }
 
-    if (pathname !== '/api/ops-online-chat') {
+    if (!isOpsChatPath) {
       return text(404, 'Not found');
     }
 
