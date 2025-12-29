@@ -5,47 +5,36 @@
  *
  * Responsibilities:
  * - Allow CORS only from the GitHub Pages origin.
- * - Accept POST /api/ops-online-chat with X-Ops-Asset-Id header.
- * - Verify Turnstile (TURNSTILE_SECRET).
- * - Honeypot reject (hp_email / hp_website).
- * - Explicitly reject uploads (multipart / form-data / data: / base64-ish blobs).
- * - Validate and sanitize inputs (size, content, suspicious patterns).
- * - Stronger allowlist sanitization: plain text only; reject if mutations occur.
- * - Optionally run AI guard (MY_BRAIN) to reject unsafe text.
- * - Proxy to the assistant service binding (BRAIN) using shared secret handshake.
+ * - Accept POST /api/ops-online-chat with X-Ops-Asset-Id
+ * - Verify Turnstile token (TURNSTILE_SECRET)
+ * - Honeypots (hp_email, hp_website)
+ * - Reject uploads / multipart / non-JSON / base64 data URIs
+ * - Worker-level rate limit via Durable Object (OPS_RL)
+ * - Intrusion event logging hooks (console + optional KV OPS_EVENTS)
+ * - Optional AI guard (MY_BRAIN) to reject unsafe text.
+ * - Proxy to the assistant service binding (BRAIN) using shared secret HAND_SHAKE.
  * - Return structured JSON with strong security headers and clean 4xx/5xx handling.
- *
- * Required env:
- * - OPS_ASSET_IDS (comma-separated) OR ASSET_ID
- * - HAND_SHAKE
- * - TURNSTILE_SECRET
- * - BRAIN (Service Binding)
- *
- * Optional env:
- * - MY_BRAIN (Workers AI binding for llama-guard)
  */
 
 const ALLOWED_ORIGIN = "https://chattiavato-a11y.github.io";
-const MAX_BODY_BYTES = 2048;
+const MAX_BODY_BYTES = 4096;   // needs room for Turnstile token + hp fields
 const MAX_MSG_CHARS = 256;
 
-const REPO_URL = "https://github.com/chattiavato-a11y/ops-online-support";
-const BRAIN_URL =
-  "https://ops-online-assistant.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat";
+const REPO_URL  = "https://github.com/chattiavato-a11y/ops-online-support";
+const BRAIN_URL = "https://ops-online-assistant.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat";
+
+/* -------------------- Headers -------------------- */
 
 function securityHeaders() {
   return {
-    "Content-Security-Policy":
-      "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none';",
+    "Content-Security-Policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none';",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "Cross-Origin-Resource-Policy": "cross-origin",
-    "Permissions-Policy":
-      "geolocation=(), microphone=(), camera=(), payment=(), usb=(), bluetooth=(), gyroscope=(), magnetometer=(), accelerometer=()",
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=(), bluetooth=(), gyroscope=(), magnetometer=(), accelerometer=()",
     "Strict-Transport-Security": "max-age=15552000; includeSubDomains",
     "Cache-Control": "no-store",
-    "X-Frame-Options": "DENY",
-    "X-Robots-Tag": "noindex"
+    "X-Frame-Options": "DENY"
   };
 }
 
@@ -60,20 +49,30 @@ function corsHeaders(origin) {
   return headers;
 }
 
-function json(origin, status, obj) {
+function json(origin, status, obj, extra = {}) {
   return new Response(JSON.stringify(obj, null, 2), {
     status,
     headers: {
       ...securityHeaders(),
       ...corsHeaders(origin),
-      "content-type": "application/json; charset=utf-8"
+      "content-type": "application/json",
+      ...extra
     }
+  });
+}
+
+function text(status, msg) {
+  return new Response(msg, {
+    status,
+    headers: { ...securityHeaders(), "content-type": "text/plain" }
   });
 }
 
 function localizedError(lang, enText, esText) {
   return lang === "es" ? esText : enText;
 }
+
+/* -------------------- Sanitization helpers -------------------- */
 
 function normalizeUserText(s) {
   let out = String(s || "");
@@ -97,62 +96,18 @@ function looksSuspicious(s) {
   return badPatterns.some((p) => t.includes(p));
 }
 
+function hasDataUriBase64(s) {
+  return /data:\s*[^;]+;\s*base64\s*,/i.test(String(s || ""));
+}
+
 async function readBodyLimited(request) {
   const ab = await request.arrayBuffer();
   if (ab.byteLength === 0 || ab.byteLength > MAX_BODY_BYTES) return null;
   return new TextDecoder().decode(ab);
 }
 
-function isUnsupportedIncomingContentType(ct) {
-  const t = String(ct || "").toLowerCase();
-  if (!t) return false;
-  if (t.includes("multipart/form-data")) return true;
-  if (t.includes("application/x-www-form-urlencoded")) return true;
-  if (!t.includes("application/json")) return true; // enforce JSON-only
-  return false;
-}
+/* -------------------- Optional AI guard -------------------- */
 
-function bodyLooksLikeUploadOrBlob(bodyText) {
-  const t = String(bodyText || "");
-
-  // data: URIs
-  if (/data:\s*[^,\s]+,/i.test(t)) return true;
-  if (/data:\s*[^;,\s]+;base64,/i.test(t)) return true;
-
-  // long base64-ish blobs (threshold tuned for MAX_BODY_BYTES=2048)
-  if (/[A-Za-z0-9+/]{200,}={0,2}/.test(t)) return true;
-
-  return false;
-}
-
-function honeypotTripped(payload) {
-  const a = typeof payload?.hp_email === "string" ? payload.hp_email : "";
-  const b = typeof payload?.hp_website === "string" ? payload.hp_website : "";
-  return (a && a.trim().length > 0) || (b && b.trim().length > 0);
-}
-
-/**
- * Stronger allowlist sanitizer: plain text only.
- * - Strips tags and rejects if any mutation happens.
- * - Rejects if encoded angle brackets detected.
- */
-function sanitizeAllowlistPlainTextOnly(s, maxLen) {
-  const raw = String(s || "");
-  const hasEncodedAngles = /(&lt;|&gt;|&#60;|&#62;|%3c|%3e)/i.test(raw);
-
-  let stripped = raw
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<\/?[^>]+>/g, "")
-    .replace(/[<>]/g, "");
-
-  stripped = stripped.replace(/\s+/g, " ").trim();
-  if (stripped.length > maxLen) stripped = stripped.slice(0, maxLen);
-
-  const mutated = hasEncodedAngles || stripped !== raw;
-  return { ok: !mutated, text: stripped };
-}
-
-// Optional: extra content guard using Workers AI (binding name: MY_BRAIN)
 async function aiGuardIfAvailable(env, textToCheck) {
   const ai = env.MY_BRAIN;
   if (!ai || typeof ai.run !== "function") return { ok: true };
@@ -170,37 +125,64 @@ async function aiGuardIfAvailable(env, textToCheck) {
   }
 }
 
-async function verifyTurnstile({ token, secret, remoteip }) {
-  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      secret,
-      response: token,
-      remoteip
-    })
-  });
-  return res.json();
+/* -------------------- Intrusion event logging hooks -------------------- */
+
+function randId() {
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  return Array.from(b).map(x => x.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * Privacy: do NOT store raw message or tokens. Minimal metadata only.
+ * Optional KV sink: bind KV as OPS_EVENTS (optional).
+ */
+async function logEvent(ctx, env, event) {
+  const safe = { ts: new Date().toISOString(), ...event };
+  console.warn("[OPS_EVENT]", JSON.stringify(safe));
+
+  if (env.OPS_EVENTS && typeof env.OPS_EVENTS.put === "function") {
+    const key = `ops_evt:${Date.now()}:${randId()}`;
+    ctx.waitUntil(
+      env.OPS_EVENTS.put(key, JSON.stringify(safe), { expirationTtl: 60 * 60 * 24 * 7 })
+    );
+  }
+}
+
+/* -------------------- Worker-level Rate Limiting (Durable Object) -------------------- */
+
+async function rateLimitCheck(request, env) {
+  // Fail-open if binding not present.
+  if (!env.OPS_RL) return { ok: true };
+
+  const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
+  const id = env.OPS_RL.idFromName(`ip:${ip}`);
+  const stub = env.OPS_RL.get(id);
+
+  const res = await stub.fetch("https://rl/check", { method: "POST" });
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (!data || typeof data.ok !== "boolean") return { ok: true };
+  return data; // { ok: true } or { ok:false, retryAfter:number }
+}
+
+/* -------------------- Main Worker -------------------- */
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const pathname = url.pathname || "/";
     const origin = request.headers.get("Origin") || "";
     const clientIp = request.headers.get("CF-Connecting-IP") || "";
 
     const isChatPath = pathname === "/api/ops-online-chat";
-    const isRoot = pathname === "/";
-    const isPing = pathname === "/ping";
+    const isRoot = pathname === "/" || pathname === "/ping";
 
-    // Health / info
-    if (isPing || isRoot) {
+    if (isRoot) {
       return json(origin, 200, {
         ok: true,
         service: "ops-gateway",
-        endpoints: ["POST /api/ops-online-chat"],
-        usage: "POST /api/ops-online-chat with X-Ops-Asset-Id header + JSON { message, lang, v, turnstileToken, hp_* }",
+        usage: "POST /api/ops-online-chat with X-Ops-Asset-Id header",
         repo: REPO_URL
       });
     }
@@ -217,27 +199,44 @@ export default {
     }
 
     if (!isChatPath) {
-      return json(origin, 404, {
-        error: "Not found.",
-        hint: "Use POST /api/ops-online-chat"
-      });
+      return json(origin, 404, { error: "Not found.", hint: "Use POST /api/ops-online-chat" });
     }
 
-    // Only POST
     if (request.method !== "POST") {
       return json(origin, 405, { error: "POST only." });
     }
 
     // 1) Enforce origin
     if (!origin || origin !== ALLOWED_ORIGIN) {
+      await logEvent(ctx, env, { type: "ORIGIN_BLOCK", ip: clientIp });
       return json(origin, 403, { error: "Origin not allowed." });
     }
 
-    // 2) Verify repo Asset ID (public)
+    // 2) Early rate limit (before Turnstile, to save CPU)
+    const rl = await rateLimitCheck(request, env);
+    if (!rl.ok) {
+      await logEvent(ctx, env, { type: "RATE_LIMIT", ip: clientIp });
+      return json(origin, 429, { error: "Too many requests. Please wait and try again." }, {
+        "Retry-After": String(Math.max(1, Number(rl.retryAfter || 10)))
+      });
+    }
+
+    // 3) Reject uploads / non-JSON content-types
+    const ct = (request.headers.get("content-type") || "").toLowerCase();
+    if (ct.includes("multipart/form-data") || ct.includes("application/x-www-form-urlencoded")) {
+      await logEvent(ctx, env, { type: "UPLOAD_BLOCK", ip: clientIp, reason: "content-type" });
+      return json(origin, 415, { error: "Unsupported content type." });
+    }
+    if (!ct.includes("application/json")) {
+      await logEvent(ctx, env, { type: "UPLOAD_BLOCK", ip: clientIp, reason: "not-json" });
+      return json(origin, 415, { error: "JSON only." });
+    }
+
+    // 4) Verify repo Asset ID (public)
     const allowedAssets = (env.OPS_ASSET_IDS || env.ASSET_ID || "")
       .toString()
       .split(",")
-      .map((v) => v.trim())
+      .map(v => v.trim())
       .filter(Boolean);
 
     if (!allowedAssets.length) {
@@ -245,59 +244,49 @@ export default {
     }
 
     const clientAssetId = request.headers.get("X-Ops-Asset-Id") || "";
-    if (!clientAssetId || !allowedAssets.some((v) => v === clientAssetId)) {
+    if (!clientAssetId || !allowedAssets.some(v => v === clientAssetId)) {
+      await logEvent(ctx, env, { type: "ASSET_BLOCK", ip: clientIp });
       return json(origin, 401, { error: "Unauthorized client." });
     }
 
-    // 3) Read + parse body (limited)
+    // 5) Read + parse body (limited)
     const bodyText = await readBodyLimited(request);
     if (!bodyText) {
       return json(origin, 413, { error: "Request too large or empty." });
     }
 
-    // 3a) Reject data/blob/base64 payloads (defense-in-depth)
-    if (bodyLooksLikeUploadOrBlob(bodyText)) {
-      return json(origin, 400, {
-        error: localizedError("en", "Uploads / encoded blobs are not allowed.", "No se permiten cargas ni blobs codificados."),
-        lang: "en"
-      });
+    // Block base64 upload-ish payloads
+    if (hasDataUriBase64(bodyText)) {
+      await logEvent(ctx, env, { type: "UPLOAD_BLOCK", ip: clientIp, reason: "data-uri-base64" });
+      return json(origin, 400, { error: "Uploads are not allowed." });
     }
 
     let payload = {};
-    try {
-      payload = JSON.parse(bodyText);
-    } catch {
-      payload = {};
-    }
+    try { payload = JSON.parse(bodyText); } catch { payload = {}; }
 
     const langRaw = typeof payload.lang === "string" ? payload.lang : "en";
     const lang = langRaw === "es" ? "es" : "en";
 
-    // 3b) Explicitly reject uploads / non-JSON by Content-Type (defense-in-depth)
-    const ct = request.headers.get("Content-Type") || "";
-    if (isUnsupportedIncomingContentType(ct)) {
-      return json(origin, 415, {
-        error: localizedError(lang, "Unsupported content type.", "Tipo de contenido no compatible."),
-        lang
-      });
-    }
-
-    // 3c) Honeypot trap: reject bots fast
-    if (honeypotTripped(payload)) {
+    // Honeypots
+    const hpEmail = typeof payload.hp_email === "string" ? payload.hp_email.trim() : "";
+    const hpWebsite = typeof payload.hp_website === "string" ? payload.hp_website.trim() : "";
+    if (hpEmail || hpWebsite) {
+      await logEvent(ctx, env, { type: "HONEYPOT_TRIP", ip: clientIp });
       return json(origin, 400, {
-        error: localizedError(lang, "Request rejected.", "Solicitud rechazada."),
+        error: localizedError(lang, "Request blocked.", "Solicitud bloqueada."),
         lang
       });
     }
-
-    const msgRaw = typeof payload.message === "string" ? payload.message : "";
-    const message = normalizeUserText(msgRaw);
-
-    const v = Number.isInteger(payload.v) ? payload.v : 1;
 
     // Turnstile
     const turnstileToken = typeof payload.turnstileToken === "string" ? payload.turnstileToken : "";
     const turnstileSecret = (env.TURNSTILE_SECRET || "").toString();
+
+    const msgRaw = typeof payload.message === "string" ? payload.message : "";
+    const versionRaw = Number.isInteger(payload.v) ? payload.v : 1;
+
+    const message = normalizeUserText(msgRaw);
+    const v = versionRaw;
 
     if (!turnstileSecret) {
       return json(origin, 500, {
@@ -307,6 +296,7 @@ export default {
     }
 
     if (!turnstileToken) {
+      await logEvent(ctx, env, { type: "TURNSTILE_FAIL", ip: clientIp, reason: "missing" });
       return json(origin, 400, {
         error: localizedError(lang, "Turnstile verification failed.", "La verificación de Turnstile falló."),
         lang
@@ -315,13 +305,19 @@ export default {
 
     let turnstileResult;
     try {
-      turnstileResult = await verifyTurnstile({
-        token: turnstileToken,
-        secret: turnstileSecret,
-        remoteip: clientIp
+      const verificationRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          secret: turnstileSecret,
+          response: turnstileToken,
+          remoteip: clientIp
+        })
       });
+      turnstileResult = await verificationRes.json();
     } catch (err) {
       console.error("Turnstile verification error:", err);
+      await logEvent(ctx, env, { type: "TURNSTILE_FAIL", ip: clientIp, reason: "verify-error" });
       return json(origin, 502, {
         error: localizedError(lang, "Turnstile verification failed.", "La verificación de Turnstile falló."),
         lang
@@ -329,7 +325,7 @@ export default {
     }
 
     if (!turnstileResult?.success) {
-      console.warn("Turnstile verification rejected", turnstileResult?.["error-codes"] || "unknown");
+      await logEvent(ctx, env, { type: "TURNSTILE_FAIL", ip: clientIp, reason: "rejected" });
       return json(origin, 403, {
         error: localizedError(lang, "Turnstile verification failed.", "La verificación de Turnstile falló."),
         lang
@@ -343,38 +339,26 @@ export default {
       });
     }
 
-    // 4) Fast prefilter blacklist
+    // 6) Sanitization (fast prefilter)
     if (looksSuspicious(bodyText) || looksSuspicious(message)) {
+      await logEvent(ctx, env, { type: "SANITIZE_BLOCK", ip: clientIp, reason: "pattern" });
       return json(origin, 400, {
         error: localizedError(lang, "Request blocked by OPS security gateway.", "Solicitud bloqueada por el gateway de seguridad OPS."),
         lang
       });
     }
 
-    // 4a) Allowlist sanitizer (plain text only) — reject if it mutates
-    const allow = sanitizeAllowlistPlainTextOnly(message, MAX_MSG_CHARS);
-    if (!allow.ok) {
-      return json(origin, 400, {
-        error: localizedError(
-          lang,
-          "Request blocked: only plain text is allowed.",
-          "Solicitud bloqueada: solo se permite texto plano."
-        ),
-        lang
-      });
-    }
-    const safeMessage = allow.text;
-
-    // 4b) Optional AI guard
-    const guard = await aiGuardIfAvailable(env, safeMessage);
+    // 6b) Optional AI guard
+    const guard = await aiGuardIfAvailable(env, message);
     if (!guard.ok) {
+      await logEvent(ctx, env, { type: "SANITIZE_BLOCK", ip: clientIp, reason: "ai-guard" });
       return json(origin, 400, {
         error: localizedError(lang, "Request blocked by OPS safety gateway.", "Solicitud bloqueada por el gateway de seguridad OPS."),
         lang
       });
     }
 
-    // 5) Gateway -> Brain secret handshake
+    // 7) Gateway -> Brain secret handshake
     const handShake = env.HAND_SHAKE || "";
     if (!handShake) {
       return json(origin, 500, {
@@ -383,7 +367,7 @@ export default {
       });
     }
 
-    // 6) Must have service binding to brain
+    // 8) Must have service binding to brain
     if (!env.BRAIN || typeof env.BRAIN.fetch !== "function") {
       return json(origin, 500, {
         error: localizedError(lang, "Gateway config error (missing BRAIN binding).", "Error de configuración del gateway (falta la vinculación BRAIN)."),
@@ -391,7 +375,7 @@ export default {
       });
     }
 
-    // 7) Forward to brain (service binding)
+    // 9) Forward to brain (service binding)
     let brainRes;
     try {
       brainRes = await env.BRAIN.fetch(BRAIN_URL, {
@@ -400,10 +384,11 @@ export default {
           "Content-Type": "application/json",
           "X-Ops-Hand-Shake": handShake
         },
-        body: JSON.stringify({ message: safeMessage, lang, v })
+        body: JSON.stringify({ message, lang, v })
       });
     } catch (err) {
       console.error("Gateway -> Brain error:", err);
+      await logEvent(ctx, env, { type: "BRAIN_UNREACHABLE", ip: clientIp });
       return json(origin, 502, {
         error: localizedError(lang, "Gateway could not reach brain.", "El gateway no pudo conectarse con el cerebro."),
         lang
@@ -412,14 +397,12 @@ export default {
 
     const responseText = await brainRes.text();
 
+    // Always return JSON
     let out = null;
-    try {
-      out = JSON.parse(responseText);
-    } catch {
-      out = null;
-    }
+    try { out = JSON.parse(responseText); } catch { out = null; }
 
     if (!out || typeof out !== "object") {
+      await logEvent(ctx, env, { type: "BRAIN_BAD_JSON", ip: clientIp });
       return json(origin, 502, {
         error: localizedError(lang, "Brain returned invalid JSON.", "El cerebro devolvió JSON no válido."),
         lang
@@ -429,3 +412,88 @@ export default {
     return json(origin, brainRes.status, { ...out, lang });
   }
 };
+
+/* -------------------- Durable Object: Rate Limiter -------------------- */
+/**
+ * Limits:
+ *  - Burst: 5 requests / 10 seconds
+ *  - Sustained: 60 requests / 5 minutes
+ *
+ * Bind this DO in the Gateway Worker:
+ *   Binding name: OPS_RL
+ *   Class name:   OpsRateLimiter
+ */
+export class OpsRateLimiter {
+  constructor(state, env) {
+    this.state = state;
+    this.storage = state.storage;
+    this.env = env;
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    if (request.method !== "POST" || url.pathname !== "/check") {
+      return new Response("Not found", { status: 404 });
+    }
+
+    const now = Date.now();
+
+    const burstLimit = 5;
+    const burstWindowMs = 10_000;
+
+    const sustainedLimit = 60;
+    const minuteMs = 60_000;
+    const windowMinutes = 5;
+
+    const burstBucket = Math.floor(now / burstWindowMs);
+    const minuteBucket = Math.floor(now / minuteMs);
+
+    const kBurst = `b:${burstBucket}`;
+    const kMinute = (i) => `m:${minuteBucket - i}`;
+
+    const burstCount = Number(await this.storage.get(kBurst) || 0);
+
+    const keys = [];
+    for (let i = 0; i < windowMinutes; i++) keys.push(kMinute(i));
+    const got = await this.storage.get(keys);
+
+    let sum = 0;
+    for (const k of keys) sum += Number(got?.get?.(k) || 0);
+
+    const currentMinute = Number(got?.get?.(kMinute(0)) || 0);
+
+    const nextBurst = burstCount + 1;
+    const nextMinute = currentMinute + 1;
+    const nextSum = (sum - currentMinute) + nextMinute;
+
+    if (nextBurst > burstLimit) {
+      return new Response(JSON.stringify({ ok: false, retryAfter: 10 }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }
+
+    if (nextSum > sustainedLimit) {
+      return new Response(JSON.stringify({ ok: false, retryAfter: 30 }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }
+
+    await this.storage.put(kBurst, nextBurst);
+    await this.storage.put(kMinute(0), nextMinute);
+
+    // Cleanup old buckets (best effort)
+    await this.storage.delete([
+      `b:${burstBucket - 4}`,
+      `b:${burstBucket - 5}`,
+      `m:${minuteBucket - 11}`,
+      `m:${minuteBucket - 12}`
+    ]);
+
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  }
+}
