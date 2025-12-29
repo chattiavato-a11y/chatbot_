@@ -13,7 +13,7 @@
  */
 
 const ALLOWED_ORIGIN = 'https://chattiavato-a11y.github.io';
-const MAX_BODY_BYTES = 4096;
+const MAX_BODY_BYTES = 3096;
 const MAX_MSG_CHARS = 256;
 
 function securityHeaders() {
