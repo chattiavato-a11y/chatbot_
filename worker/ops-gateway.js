@@ -117,6 +117,8 @@ export default {
     const isChatPath = pathname === '/api/ops-online-chat';
     const isRoot = pathname === '/';
     const origin = request.headers.get('Origin') || '';
+    const isOpsChatPath = pathname === '/api/ops-online-chat';
+    const isTranscribePath = pathname === '/api/transcribe';
 
     if (pathname === '/ping' || isRoot) {
       return json(origin, 200, {
