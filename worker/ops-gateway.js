@@ -111,25 +111,39 @@ async function aiGuardIfAvailable(env, textToCheck) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const pathname = url.pathname;
+    const rawPath = url.pathname || '/';
+    const pathname =
+      rawPath !== '/' && rawPath.endsWith('/') ? rawPath.replace(/\/+$/, '') : rawPath;
+    const isChatPath = pathname === '/api/ops-online-chat';
+    const isRoot = pathname === '/';
     const origin = request.headers.get('Origin') || '';
     const isOpsChatPath = pathname === '/api/ops-online-chat';
     const isTranscribePath = pathname === '/api/transcribe';
 
-    if (pathname === '/ping') {
-      return text(200, 'ops-gateway: ok');
+    if (pathname === '/ping' || isRoot) {
+      return json(origin, 200, {
+        ok: true,
+        service: 'ops-gateway',
+        usage: 'POST /api/ops-online-chat with X-Ops-Asset-Id header'
+      });
     }
 
     // CORS preflight
-    if ((isOpsChatPath || isTranscribePath) && request.method === 'OPTIONS') {
+    if (isChatPath && request.method === 'OPTIONS') {
+      if (origin && origin !== ALLOWED_ORIGIN) {
+        return json(origin, 403, { error: 'Origin not allowed.' });
+      }
       return new Response(null, {
         status: 204,
         headers: { ...securityHeaders(), ...corsHeaders(origin) }
       });
     }
 
-    if (!isOpsChatPath) {
-      return text(404, 'Not found');
+    if (!isChatPath) {
+      return json(origin, 404, {
+        error: 'Not found.',
+        hint: 'Use POST /api/ops-online-chat'
+      });
     }
 
     // Only POST
