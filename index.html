@@ -94,18 +94,37 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 #chatbot-send .icon { transition:transform .3s; }
 #chatbot-send:hover .icon { transform:rotate(-45deg); }
 
-  #voice-status {
-    margin:0.25rem 0 0.35rem;
-    font-size:.83rem;
-    color:#f5f7fb;
-    opacity:.9;
-    min-height:1.2em;
-  }
+#voice-status {
+  margin:0.25rem 0 0.35rem;
+  font-size:.83rem;
+  color:#f5f7fb;
+  opacity:.9;
+  min-height:1.2em;
+}
 
-  #turnstile-container { display:flex; justify-content:flex-end; }
-  #chatbot-send { align-self:flex-end; }
+#turnstile-container { display:flex; justify-content:flex-end; }
+#chatbot-send { align-self:flex-end; }
 
+/* Honeypots: visually hidden but still in DOM flow for bot traps (NOT display:none) */
+.hp-trap {
+  position: absolute !important;
+  left: -9999px !important;
+  top: auto !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  opacity: 0.01 !important;
+  pointer-events: none !important;
+}
+.hp-trap input {
+  width: 1px !important;
+  height: 1px !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
 </style>
+
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>
 </head>
 <body>
@@ -125,24 +144,32 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       <button type="button" id="speechToggle" class="ctrl" data-en="Speech" data-es="Voz">Speech</button>
       <button id="listenCtrl" type="button" aria-label="Start voice input"
         data-en-label="Start voice input" data-es-label="Comenzar voz">
-        <!-- Mic SVG -->
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zM11 19h2v3h-2z"/>
         </svg>
         <span class="btn-label" data-en="Speak" data-es="Hablar">Speak</span>
       </button>
     </div>
+
     <div id="voice-status" role="status" aria-live="polite"></div>
+
     <form id="chatbot-input-row" autocomplete="off">
       <input id="chatbot-input" type="text" placeholder="Type your message..." required maxlength="256"
         data-en-ph="Type your message..." data-es-ph="Escriba su mensaje...">
+
+      <!-- Honeypot fields (must remain empty for real users) -->
+      <div class="hp-trap" aria-hidden="true">
+        <label>email <input id="hp_email" name="hp_email" type="text" tabindex="-1" autocomplete="off"></label>
+        <label>website <input id="hp_website" name="hp_website" type="text" tabindex="-1" autocomplete="off"></label>
+      </div>
+
       <div id="turnstile-container">
         <div id="turnstile-widget" class="cf-turnstile" data-sitekey="0x4AAAAAACCemZgiIexxcpTR"
           data-callback="opsTurnstileCallback" data-expired-callback="opsTurnstileExpired"
           data-error-callback="opsTurnstileErrored"></div>
       </div>
+
       <button id="chatbot-send" type="submit" aria-label="Send">
-        <!-- Paper plane SVG -->
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M2 21l20-9L2 3v7l14 2L2 14v7z"/>
         </svg>
@@ -161,8 +188,8 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const ASSET_ID = "CAFF600A21B457E5D909FD887AF48018B3CBFDDF6F9746E56238B23AF061F9E2";
 
   /* ===== HARD LOCK: exact origin + exact path prefix ===== */
-  const EXPECTED_ORIGIN = "https://chattiavato-a11y.github.io";   // scheme + host only
-  const ALLOWED_PATH_PREFIX = "/ops-online-support/";             // required path prefix
+  const EXPECTED_ORIGIN = "https://chattiavato-a11y.github.io";
+  const ALLOWED_PATH_PREFIX = "/ops-online-support/";
   const atExpectedOrigin = (self.origin === EXPECTED_ORIGIN);
   const atExpectedPath   = (self.location.pathname.startsWith(ALLOWED_PATH_PREFIX));
   const fullyAuthorized  = atExpectedOrigin && atExpectedPath;
@@ -185,7 +212,11 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const log   = qs('#chat-log');
   const form  = qs('#chatbot-input-row');
   const input = qs('#chatbot-input');
+
   const turnstileWidget = qs('#turnstile-widget');
+
+  const hpEmail = qs('#hp_email');
+  const hpWebsite = qs('#hp_website');
 
   let turnstileToken = '';
 
@@ -262,10 +293,10 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   }
   function cleanForSpeech(s) {
     let out = String(s || '');
-    out = out.replace(/`{3}[\s\S]*?`{3}/g, ' ');     // remove code blocks
-    out = out.replace(/`([^`]+)`/g, '$1');             // inline code
-    out = out.replace(/[*_~]+/g, '');                  // emphasis markers
-    out = out.replace(/^-\s+/gm, '');                 // list dashes
+    out = out.replace(/`{3}[\s\S]*?`{3}/g, ' ');
+    out = out.replace(/`([^`]+)`/g, '$1');
+    out = out.replace(/[*_~]+/g, '');
+    out = out.replace(/^-\s+/gm, '');
     out = out.replace(/\s+/g, ' ').trim();
     return out;
   }
@@ -323,22 +354,16 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       setVoiceStatus('Voice features are not supported in this browser.', 'Las funciones de voz no son compatibles con este navegador.');
       return;
     }
-
     const parts = [];
     if (speechSupported && speechEnabled) {
-      parts.push(
-        currentLang === 'es' ? 'Lectura por voz activada.' : 'Speech output on.'
-      );
+      parts.push(currentLang === 'es' ? 'Lectura por voz activada.' : 'Speech output on.');
     }
     if (recognitionSupported && listening) {
-      parts.push(
-        currentLang === 'es' ? 'Escuchando…' : 'Listening…'
-      );
+      parts.push(currentLang === 'es' ? 'Escuchando…' : 'Listening…');
     }
     setVoiceStatus(parts.join(' '));
   }
 
-  /* ===== Language, theme, speech, listen ===== */
   function persistPrefs() {
     savePrefs({ lang: currentLang, theme: currentTheme });
   }
@@ -391,10 +416,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     const v = getVoiceForLang(langForReply); if (v) u.voice = v;
     if (langForReply === 'en') { u.rate = 1.03; u.pitch = 1.02; }
     synth.speak(u);
-    setVoiceStatus(
-      'Speaking response…',
-      'Hablando la respuesta…'
-    );
+    setVoiceStatus('Speaking response…','Hablando la respuesta…');
     u.onend = () => updateVoiceStatus();
   }
   if (synth) synth.onvoiceschanged = () => getVoiceForLang(currentLang);
@@ -409,9 +431,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       if (cleaned) {
         input.value = cleaned;
         input.focus();
-        if (fullyAuthorized) {
-          form.requestSubmit();
-        }
+        if (fullyAuthorized) form.requestSubmit();
       }
     };
     recognition.onerror = () => { listening = false; updateListenUI(); updateVoiceStatus(); };
@@ -502,7 +522,14 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
           'Content-Type': 'application/json',
           'X-Ops-Asset-Id': ASSET_ID
         },
-        body: JSON.stringify({ message: msg, lang: requestLang, v: 1, turnstileToken: activeTurnstileToken }),
+        body: JSON.stringify({
+          message: msg,
+          lang: requestLang,
+          v: 1,
+          turnstileToken: activeTurnstileToken,
+          hp_email: hpEmail ? String(hpEmail.value || '') : '',
+          hp_website: hpWebsite ? String(hpWebsite.value || '') : ''
+        }),
         signal: ctrl.signal
       });
       clearTimeout(to);
