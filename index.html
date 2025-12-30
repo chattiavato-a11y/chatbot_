@@ -501,9 +501,10 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     } catch {
       const fallback = requestLang==='es' ? 'Error: no puedo conectar con el asistente OPS.' : 'Error: can’t reach OPS assistant.';
       botDiv.textContent = fallback; speak(fallback, requestLang);
-    } finally {
-      resetTurnstile();
-    }
+    } 
+    if (!res.ok) {
+  resetTurnstile();
+}
   };
 })();
 </script>
