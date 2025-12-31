@@ -102,6 +102,15 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 }
 
 #turnstile-container { display:flex; justify-content:flex-end; }
+.ts-cleared {
+  height:0;
+  overflow:hidden;
+  padding:0 !important;
+  margin:0 !important;
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+}
 
 /* Honeypots: visually hidden, not display:none */
 .hp-wrap{
@@ -207,6 +216,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const form  = qs('#chatbot-input-row');
   const input = qs('#chatbot-input');
   const turnstileWidget = qs('#turnstile-widget');
+  const turnstileContainer = qs('#turnstile-container');
 
   const hpEmail = qs('#hp_email');
   const hpWebsite = qs('#hp_website');
@@ -240,11 +250,30 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     );
   }
 
+  function markTurnstileCleared() {
+    if (!turnstileContainer) return;
+    turnstileContainer.classList.add('ts-cleared');
+    turnstileContainer.setAttribute('aria-hidden', 'true');
+  }
+
+  function showTurnstileAgain() {
+    if (!turnstileContainer) return;
+    turnstileContainer.classList.remove('ts-cleared');
+    turnstileContainer.removeAttribute('aria-hidden');
+  }
+
   window.opsTurnstileCallback = (token) => {
     turnstileToken = (typeof token === 'string') ? token : '';
+    if (turnstileToken) { markTurnstileCleared(); }
   };
-  window.opsTurnstileExpired = () => { turnstileToken = ''; };
-  window.opsTurnstileErrored = () => { turnstileToken = ''; };
+  window.opsTurnstileExpired = () => {
+    turnstileToken = '';
+    showTurnstileAgain();
+  };
+  window.opsTurnstileErrored = () => {
+    turnstileToken = '';
+    showTurnstileAgain();
+  };
 
   function getTurnstileToken() {
     if (turnstileToken) return turnstileToken;
@@ -263,6 +292,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 
   function resetTurnstile() {
     turnstileToken = '';
+    showTurnstileAgain();
     if (window.turnstile && typeof window.turnstile.reset === 'function') {
       try { window.turnstile.reset(turnstileWidget); return; } catch {}
       try { window.turnstile.reset(); } catch {}
