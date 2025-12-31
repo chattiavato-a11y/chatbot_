@@ -1,8 +1,3 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://chattia.io/sitemap.xml
-
 User-agent: GPTBot
 Disallow: /
 
@@ -23,3 +18,8 @@ Disallow: /
 
 User-agent: PerplexityBot
 Disallow: /
+
+User-agent: *
+Allow: /
+
+Sitemap: https://www.chattia.io/sitemap.xml
