@@ -176,7 +176,7 @@ async function handleOpsOnlineChat(request, env) {
 
     const aiResult = await env.AI.run(CHAT_MODEL_ID, {
       messages,
-      max_tokens: 512
+      max_tokens: 1548
     });
 
     const replyText =
