@@ -6,131 +6,55 @@
 <title>OPS Online Support</title>
 
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'self';
-    base-uri 'self';
+  content="default-src 'none';
+    base-uri 'none';
     object-src 'none';
-    style-src 'self' 'unsafe-inline';
+    style-src 'self';
     img-src 'self' data:;
     font-src 'self' data:;
-    frame-src 'self' https://challenges.cloudflare.com;
+    frame-src https://challenges.cloudflare.com;
     connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev https://challenges.cloudflare.com;
     form-action 'self';
     worker-src 'self';
+    manifest-src 'self';
+    media-src 'self';
     script-src 'self' https://challenges.cloudflare.com 'nonce-ops-inline-asset';
+    report-to csp-endpoint;
+    report-uri https://ops-gateway.grabem-holdem-nuts-right.workers.dev/reports/csp;
     upgrade-insecure-requests;">
 
-<meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains; preload">
+<meta http-equiv="Strict-Transport-Security" content="max-age=15552000; includeSubDomains; preload">
 <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
-<meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=()">
+<meta http-equiv="Permissions-Policy" content="accelerometer=(), camera=(), display-capture=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), bluetooth=()">
 <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
 <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
 <link rel="sitemap" type="application/xml" href="/sitemap.xml" title="OPS Online Support Sitemap">
+<link rel="stylesheet" href="assets/styles.css" integrity="sha384-Kuw+CpXG3kB2wy3CGC3Z+lpHtDAhAiEPN/roIeIFlyD/BNIC5EM/9lYE7y/5EMsy" crossorigin="anonymous">
 
-<style>
-:root {
-  --clr-primary:#00c4ff;
-  --clr-accent:#ff3bdb;
-  --clr-bg:#ffffff;
-  --clr-bg-dark:#121212;
-  --clr-tx:#333333;
-  --clr-tx-dark:#f0f0f0;
-}
-body {
-  margin:0; display:flex; align-items:center; justify-content:center;
-  height:100vh; font-family:'Segoe UI',Arial,sans-serif;
-  background:var(--clr-bg); color:var(--clr-tx); transition:background .3s,color .3s;
-}
-body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
-
-#chatbot-container {
-  width:300px; height:540px; background:#251541;
-  border:2px solid var(--clr-accent); border-radius:18px; box-shadow:0 8px 32px #0006;
-  display:flex; flex-direction:column; overflow:hidden;
-}
-#chatbot-header {
-  display:flex; justify-content:center; align-items:center; gap:.5rem;
-  background:linear-gradient(135deg,var(--clr-primary) 0%,var(--clr-accent) 100%);
-  color:#fff; font-weight:600; font-size:1.1rem; padding:.75rem 1rem;
-}
-.ctrl-group { display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; }
-.ctrl {
-  cursor:pointer; font-size:.75rem; font-weight:600; user-select:none; opacity:.9; color:#fff;
-  background:#321b53; border:1px solid #fff3; border-radius:6px; padding:.25rem .55rem;
-  transition:background .2s, color .2s, opacity .2s, box-shadow .2s;
-}
-.ctrl:hover { opacity:1; background:#3d2264; }
-.ctrl.active { background:#fff; color:#321b53; opacity:1; box-shadow:0 0 0 1px #fff4; }
-
-.icon { width:1em; height:1em; display:inline-block; vertical-align:-0.15em; fill:currentColor; }
-
-#chat-log {
-  flex:1; overflow-y:auto; padding:1rem; background:#1b0e2d; color:#eee; font-size:.94rem;
-}
-.chat-msg { margin:.5rem 0; max-width:90%; }
-.user { margin-left:auto; background:var(--clr-primary); color:#000; padding:.5rem .7rem; border-radius:14px 14px 0 14px; }
-.bot  { margin-right:auto; background:#321b53; color:#fff; padding:.5rem .7rem; border-radius:14px 14px 14px 0; }
-
-#chatbot-form-container { background:#220f3a; border-top:1px solid var(--clr-accent); padding:.55rem .7rem .75rem; color:#fff; }
-#control-row { display:flex; justify-content:flex-start; margin-bottom:.55rem; }
-#chatbot-input-row { display:flex; flex-direction:column; gap:.6rem; }
-
-#listenCtrl {
-  background:#ffb703; border:none; color:#1b0e2d; font-weight:700;
-  padding:.45rem .65rem; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center;
-  transition:transform .2s, box-shadow .2s;
-}
-#listenCtrl .btn-label { margin-left:.35rem; font-weight:700; }
-#listenCtrl.active { box-shadow:0 0 0 2px #fff3; transform:scale(1.02); }
-
-#chatbot-input { flex:1; background:transparent; border:none; color:#fff; font-size:.95rem; padding:.55rem .6rem; }
-#chatbot-input::placeholder { color:#bfbfbf; }
-
-#chatbot-send {
-  display:flex; align-items:center; gap:6px; background:var(--clr-accent); border:none; color:#fff;
-  font-weight:600; padding:.5rem .9rem; border-radius:8px; cursor:pointer; transition:.3s;
-  align-self:flex-end;
-}
-#chatbot-send .icon { transition:transform .3s; }
-#chatbot-send:hover .icon { transform:rotate(-45deg); }
-
-#voice-status {
-  margin:0.25rem 0 0.35rem;
-  font-size:.83rem;
-  color:#f5f7fb;
-  opacity:.9;
-  min-height:1.2em;
-}
-
-#turnstile-container { display:flex; justify-content:flex-end; }
-.ts-cleared {
-  height:0;
-  overflow:hidden;
-  padding:0 !important;
-  margin:0 !important;
-  opacity:0;
-  visibility:hidden;
-  pointer-events:none;
-}
-
-/* Honeypots: visually hidden, not display:none */
-.hp-wrap{
-  position:absolute !important;
-  left:-9999px !important;
-  top:auto !important;
-  width:1px !important;
-  height:1px !important;
-  overflow:hidden !important;
-  opacity:0 !important;
-}
-</style>
-
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb" crossorigin="anonymous"></script>
 </head>
 <body>
+
+<div id="page-shell">
+<div id="consent-banner" role="region" aria-live="polite">
+  <h2 data-en="Privacy & consent" data-es="Privacidad y consentimiento">Privacy & consent</h2>
+  <p data-en="We store your language/theme preference in localStorage and send API requests to the OPS gateway. Choose how you want us to handle your preferences."
+     data-es="Guardamos tu preferencia de idioma/tema en localStorage y enviamos solicitudes API al gateway OPS. Elige cómo quieres que manejemos tus preferencias.">
+    We store your language/theme preference in localStorage and send API requests to the OPS gateway. Choose how you want us to handle your preferences.
+  </p>
+  <div id="consent-actions">
+    <button type="button" id="consent-accept" class="link-button" data-en="Accept" data-es="Aceptar">Accept</button>
+    <button type="button" id="consent-deny" class="link-button" data-en="Deny" data-es="Rechazar">Deny</button>
+  </div>
+</div>
 
 <div id="chatbot-container" role="dialog" aria-modal="true">
   <div id="chatbot-header">
     <span id="title" data-en="OPS Online Support" data-es="Soporte en línea OPS">OPS Online Support</span>
+    <span id="policy-links" aria-label="Policies">
+      <a href="https://www.chattia.io/privacy" target="_blank" rel="noopener">Privacy</a>
+      <a href="https://www.chattia.io/terms" target="_blank" rel="noopener">Terms</a>
+    </span>
   </div>
 
   <div id="chat-log" aria-live="polite"></div>
@@ -141,6 +65,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
         aria-label="Toggle language" data-en-label="Toggle language" data-es-label="Cambiar idioma">EN</button>
       <button type="button" id="themeCtrl" class="ctrl">Dark</button>
       <button type="button" id="speechToggle" class="ctrl" data-en="Speech" data-es="Voz">Speech</button>
+      <button type="button" id="motionCtrl" class="ctrl" data-en="Reduce motion" data-es="Reducir movimiento">Reduce motion</button>
 
       <button id="listenCtrl" type="button" aria-label="Start voice input"
         data-en-label="Start voice input" data-es-label="Comenzar voz">
@@ -180,12 +105,32 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   </div>
 </div>
 
+<details id="transcript-panel">
+  <summary>
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v2H4zm0 7h16v2H4zm0 7h10v2H4z"/></svg>
+    <span data-en="Transcript" data-es="Transcripción">Transcript</span>
+  </summary>
+  <div id="transcript-text" role="region" aria-live="polite"></div>
+  <button id="transcript-copy" type="button">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+    <span data-en="Copy" data-es="Copiar">Copy</span>
+  </button>
+</details>
+
+<div class="footer-links">
+  <a href="https://www.chattia.io/privacy" target="_blank" rel="noopener">Privacy</a>
+  <a href="https://www.chattia.io/terms" target="_blank" rel="noopener">Terms</a>
+</div>
+</div>
+
 <script nonce="ops-inline-asset">
 (() => {
   const qs  = s => document.querySelector(s);
   const qsa = s => [...document.querySelectorAll(s)];
 
   const ASSET_ID = "CAFF600A21B457E5D909FD887AF48018B3CBFDDF6F9746E56238B23AF061F9E2";
+  const GATEWAY_ORIGIN = "https://ops-gateway.grabem-holdem-nuts-right.workers.dev";
+  const TELEMETRY_URL = `${GATEWAY_ORIGIN}/reports/telemetry`;
 
   // === Accept BOTH sites (GitHub Pages path + chattia.io root) ===
   const AUTH_RULES = [
@@ -207,8 +152,12 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   const ariaNodes    = qsa('[data-en-label]');
 
   const themeCtrl     = qs('#themeCtrl');
+  const motionCtrl    = qs('#motionCtrl');
   const speechToggle  = qs('#speechToggle');
   const listenCtrl    = qs('#listenCtrl');
+  const consentBanner = qs('#consent-banner');
+  const consentAccept = qs('#consent-accept');
+  const consentDeny   = qs('#consent-deny');
 
   const voiceStatus   = qs('#voice-status');
 
@@ -220,10 +169,15 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 
   const hpEmail = qs('#hp_email');
   const hpWebsite = qs('#hp_website');
+  const transcriptText = qs('#transcript-text');
+  const transcriptCopy = qs('#transcript-copy');
 
   let turnstileToken = '';
   let showedAuthWarning = false;
   let showedTurnstileDown = false;
+  let consentState = 'pending';
+  let reduceMotion = false;
+  const transcript = [];
 
   function addMsg(txt, cls) {
     const div = document.createElement('div');
@@ -231,6 +185,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     div.textContent = txt;
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
+    recordTranscript(cls, txt);
     return div;
   }
 
@@ -303,6 +258,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
   function turnstileUnavailableOnce() {
     if (showedTurnstileDown) return;
     showedTurnstileDown = true;
+    sendTelemetry('turnstile_unavailable');
     addMsg(
       (currentLang === 'es')
         ? 'La verificación de seguridad no está disponible ahora. Intenta de nuevo en unos segundos.'
@@ -311,14 +267,52 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     );
   }
 
-  const PREF_KEY = 'ops-chat-preferences';
-  function loadPrefs() { try { const raw = localStorage.getItem(PREF_KEY); return raw ? JSON.parse(raw) : {}; } catch { return {}; } }
-  function savePrefs(next) { try { localStorage.setItem(PREF_KEY, JSON.stringify(next || {})); } catch {} }
+  const STORAGE_KEYS = {
+    prefs: 'ops-chat-preferences',
+    consent: 'ops-chat-consent'
+  };
 
+  const memoryPrefs = {};
+
+  function readConsent() {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.consent) || 'pending';
+    } catch {
+      return 'pending';
+    }
+  }
+
+  function persistConsent(value) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.consent, value);
+    } catch {}
+  }
+
+  function loadPrefs() {
+    if (consentState !== 'accepted') return memoryPrefs;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.prefs);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function savePrefs(next) {
+    const payload = next || {};
+    if (consentState === 'accepted') {
+      try { localStorage.setItem(STORAGE_KEYS.prefs, JSON.stringify(payload)); } catch {}
+    } else {
+      Object.assign(memoryPrefs, payload);
+    }
+  }
+
+  consentState = readConsent();
   const prefs = loadPrefs();
   let currentLang = (prefs.lang === 'es') ? 'es' : 'en';
   if (!prefs.lang) currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
   let currentTheme = prefs.theme === 'dark' ? 'dark' : 'light';
+  reduceMotion = prefs.reduceMotion === true;
 
   const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -329,6 +323,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 
   let listening = false;
   let speechEnabled = false;
+  const telemetrySampleRate = 0.35;
 
   function normalizeUserText(s) {
     let out = String(s || '');
@@ -371,7 +366,66 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     listenCtrl.setAttribute('aria-pressed', listening ? 'true' : 'false');
   }
 
-  function persistPrefs() { savePrefs({ lang: currentLang, theme: currentTheme }); }
+  function recordTranscript(role, text) {
+    if (!text) return;
+    transcript.push({ role, text, ts: Date.now() });
+    if (transcriptText) {
+      const cleaned = transcript.map(item => `${item.role.toUpperCase()}: ${item.text}`).join('\n');
+      transcriptText.textContent = cleaned;
+    }
+  }
+
+  function copyTranscript() {
+    if (!navigator?.clipboard || !transcriptText) return;
+    navigator.clipboard.writeText(transcriptText.textContent || '').catch(() => {});
+  }
+
+  function sendTelemetry(eventType, detail = {}) {
+    if (Math.random() > telemetrySampleRate) return;
+    try {
+      const payload = {
+        event: eventType,
+        lang: currentLang,
+        ts: Date.now(),
+        detail
+      };
+      fetch(TELEMETRY_URL, {
+        method: 'POST',
+        mode: 'cors',
+        cache: 'no-store',
+        credentials: 'omit',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).catch(() => {});
+    } catch {}
+  }
+
+  function applyConsentUI() {
+    if (!consentBanner) return;
+    const hide = consentState === 'accepted' || consentState === 'denied';
+    consentBanner.style.display = hide ? 'none' : 'block';
+  }
+
+  if (consentAccept) {
+    consentAccept.onclick = () => {
+      consentState = 'accepted';
+      persistConsent('accepted');
+      savePrefs({ lang: currentLang, theme: currentTheme, reduceMotion });
+      applyConsentUI();
+    };
+  }
+
+  if (consentDeny) {
+    consentDeny.onclick = () => {
+      consentState = 'denied';
+      persistConsent('denied');
+      try { localStorage.removeItem(STORAGE_KEYS.prefs); } catch {}
+      applyConsentUI();
+    };
+  }
+  applyConsentUI();
+
+  function persistPrefs() { savePrefs({ lang: currentLang, theme: currentTheme, reduceMotion }); }
 
   function setLanguage(lang) {
     const toES = lang === 'es';
@@ -389,6 +443,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     if (recognition) recognition.lang = toES ? 'es-ES' : 'en-US';
     persistPrefs();
     setVoiceStatus('', '');
+    setMotionPreference(reduceMotion);
   }
   langCtrl.addEventListener('click', () => setLanguage(currentLang === 'es' ? 'en' : 'es'));
 
@@ -400,6 +455,30 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     persistPrefs();
   }
   themeCtrl.onclick = () => setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+
+  function setMotionPreference(enabled) {
+    reduceMotion = !!enabled;
+    document.body.classList.toggle('reduce-motion', reduceMotion);
+    if (motionCtrl) {
+      motionCtrl.textContent = reduceMotion ? (currentLang === 'es' ? 'Movimiento reducido' : 'Reduced motion') : (currentLang === 'es' ? 'Reducir movimiento' : 'Reduce motion');
+      motionCtrl.classList.toggle('active', reduceMotion);
+      motionCtrl.setAttribute('aria-pressed', reduceMotion ? 'true' : 'false');
+    }
+    persistPrefs();
+  }
+
+  const prefersReducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  if (prefersReducedMotion && prefersReducedMotion.matches && prefs.reduceMotion === undefined) {
+    reduceMotion = true;
+  }
+  if (prefersReducedMotion) {
+    prefersReducedMotion.addEventListener('change', (e) => {
+      if (prefs.reduceMotion === undefined) {
+        setMotionPreference(e.matches);
+      }
+    });
+  }
+  motionCtrl.onclick = () => setMotionPreference(!reduceMotion);
 
   function getVoiceForLang(langCode) {
     if (!synth) return null;
@@ -465,8 +544,11 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     startListening();
   };
 
+  if (transcriptCopy) transcriptCopy.onclick = copyTranscript;
+
   setLanguage(currentLang);
   setTheme(currentTheme);
+  setMotionPreference(reduceMotion);
   updateSpeechToggleUI();
   updateListenUI();
 
@@ -479,6 +561,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
 
     if (!isFullyAuthorized()) {
       showAuthWarningOnce();
+      sendTelemetry('auth_block', { reason: 'origin' });
       return;
     }
 
@@ -486,7 +569,9 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       const warn = requestLang === 'es'
         ? 'Mensaje bloqueado por seguridad. Escribe sin etiquetas o scripts.'
         : 'Message blocked for security. Please write without tags or scripts.';
-      addMsg(warn, 'bot'); speak(warn, requestLang); return;
+      addMsg(warn, 'bot'); speak(warn, requestLang);
+      sendTelemetry('client_suspicious');
+      return;
     }
 
     // Honeypots
@@ -505,6 +590,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
           : 'Please complete the security check to continue.';
         addMsg(warn, 'bot'); speak(warn, requestLang);
       }
+      sendTelemetry('turnstile_missing');
       return;
     }
 
@@ -549,6 +635,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
         const errMsg = (data && (data.error || data.public_error)) ? (data.error || data.public_error) : (text || fallback);
         botDiv.textContent = errMsg;
         speak(errMsg, requestLang);
+        sendTelemetry('api_error', { status: res.status, type: 'gateway' });
 
         // If Turnstile failed, reset ONLY then
         if (res.status === 403 && /turnstile/i.test(errMsg)) {
@@ -560,12 +647,14 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
       if (!data || typeof data !== 'object') {
         const fallback = requestLang==='es' ? 'Respuesta no válida del gateway.' : 'Invalid response from gateway.';
         botDiv.textContent = fallback; speak(fallback, requestLang);
+        sendTelemetry('api_error', { status: res.status, type: 'invalid_json' });
         return;
       }
 
       if (data.error || data.public_error) {
         const err = data.error || data.public_error;
         botDiv.textContent = err; speak(err, requestLang);
+        sendTelemetry('api_error', { status: res.status, type: 'error_field' });
 
         if (res.status === 403 && /turnstile/i.test(err)) {
           resetTurnstile();
@@ -584,6 +673,7 @@ body.dark { --clr-bg:var(--clr-bg-dark); --clr-tx:var(--clr-tx-dark); }
     } catch {
       const fallback = requestLang==='es' ? 'No puedo conectar con el asistente OPS.' : 'Can’t reach OPS assistant.';
       botDiv.textContent = fallback; speak(fallback, requestLang);
+      sendTelemetry('network_error');
     }
   };
 })();
