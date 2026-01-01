@@ -6,7 +6,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>Chattia for OPS</title>
   <meta name="description" content="Chattia for OPS — secure, fast, accessible assistant UI." />
-  <meta name="referrer" content="no-referrer" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta name="color-scheme" content="light dark" />
 
   <!-- Fallback CSP (best-effort on static hosts).
        For A+ scores, set these as REAL HTTP response headers at the edge. -->
@@ -29,13 +30,33 @@
     report-uri https://ops-gateway.grabem-holdem-nuts-right.workers.dev/reports/csp;
   ">
 
-  <link rel="stylesheet" href="assets/chattia-ui.css" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="X-Frame-Options" content="DENY" />
+  <meta http-equiv="Strict-Transport-Security" content="max-age=15552000; includeSubDomains; preload" />
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+  <meta http-equiv="Permissions-Policy" content="accelerometer=(), camera=(), display-capture=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), bluetooth=()" />
+  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin" />
+  <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp" />
+
+  <link rel="preconnect" href="https://challenges.cloudflare.com" crossorigin />
+  <link rel="preconnect" href="https://ops-gateway.grabem-holdem-nuts-right.workers.dev" crossorigin />
+
+  <link rel="stylesheet"
+    href="assets/chattia-ui.css"
+    integrity="sha384-K4H4aXkah+rRusGU11JzeaaUTA41ciYKMqM2qvIiOaL9HmphSsVcwoG2wacd2KfZ"
+    crossorigin="anonymous" />
 
   <!-- Cloudflare Turnstile -->
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer crossorigin="anonymous"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+    defer
+    crossorigin="anonymous"
+    integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb"></script>
 
   <!-- App -->
-  <script src="assets/chattia-ui.js" defer></script>
+  <script src="assets/chattia-ui.js"
+    defer
+    integrity="sha384-1AbXKn/wcjZgNr8YQjXV7jkiWJHptlWRIAcpEFN5dG5xCcfCbZW7KNOdKDtz6b9H"
+    crossorigin="anonymous"></script>
 </head>
 <body>
   <noscript>
