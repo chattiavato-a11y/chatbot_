@@ -1,24 +1,16 @@
+# AI and data-extraction crawlers (block all content)
 User-agent: GPTBot
-Disallow: /
-
+User-agent: ChatGPT-User
 User-agent: Google-Extended
-Disallow: /
-
 User-agent: ClaudeBot
-Disallow: /
-
 User-agent: CCBot
-Disallow: /
-
 User-agent: Bytespider
-Disallow: /
-
 User-agent: anthropic-ai
-Disallow: /
-
 User-agent: PerplexityBot
+User-agent: cohere-ai
 Disallow: /
 
+# Default policy for other crawlers
 User-agent: *
 Allow: /
 
