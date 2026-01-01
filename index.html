@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>OPS Online Support</title>
+<title>Chattia for OPS</title>
 
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'none';
@@ -54,9 +54,10 @@
 
 <div id="chatbot-container" role="dialog" aria-modal="true">
   <div id="chatbot-header">
-    <span id="title" data-en="OPS Online Support" data-es="Soporte en línea OPS">OPS Online Support</span>
+    <span id="title" data-en="Chattia for OPS" data-es="Chattia para OPS">Chattia for OPS</span>
     <span id="policy-links" aria-label="Policies">
       <a href="https://www.chattia.io/privacy" target="_blank" rel="noopener">Privacy</a>
+      <a href="https://www.chattia.io/terms" target="_blank" rel="noopener">Terms</a>
     </span>
   </div>
 
@@ -77,8 +78,7 @@
       <button type="button" id="langCtrl" class="ctrl"
         aria-label="Toggle language" data-en-label="Toggle language" data-es-label="Cambiar idioma">EN</button>
       <button type="button" id="themeCtrl" class="ctrl">Dark</button>
-      <button type="button" id="speechToggle" class="ctrl" data-en="Speech" data-es="Voz">Speech</button>
-      <button type="button" id="motionCtrl" class="ctrl" data-en="Reduce motion" data-es="Reducir movimiento">Reduce motion</button>
+      <button type="button" id="speechToggle" class="ctrl" data-en="Voice" data-es="Voz">Voice</button>
 
       <button id="listenCtrl" type="button" aria-label="Start voice input"
         data-en-label="Start voice input" data-es-label="Comenzar voz">
@@ -101,7 +101,7 @@
         <label>website<input id="hp_website" name="hp_website" type="text" autocomplete="off"></label>
       </div>
 
-      <div id="turnstile-container">
+      <div id="turnstile-container" aria-label="Cloudflare Turnstile verification">
         <div id="turnstile-widget" class="cf-turnstile"
           data-sitekey="0x4AAAAAACCemZgiIexxcpTR"
           data-callback="opsTurnstileCallback"
@@ -138,6 +138,7 @@
 
 <div class="footer-links">
   <a href="https://www.chattia.io/privacy" target="_blank" rel="noopener">Privacy</a>
+  <a href="https://www.chattia.io/terms" target="_blank" rel="noopener">Terms</a>
 </div>
 </div>
 
@@ -170,7 +171,6 @@
   const ariaNodes    = qsa('[data-en-label]');
 
   const themeCtrl     = qs('#themeCtrl');
-  const motionCtrl    = qs('#motionCtrl');
   const speechToggle  = qs('#speechToggle');
   const listenCtrl    = qs('#listenCtrl');
   const consentBanner = qs('#consent-banner');
@@ -198,7 +198,6 @@
   let showedAuthWarning = false;
   let showedTurnstileDown = false;
   let consentState = 'pending';
-  let reduceMotion = false;
   const transcript = [];
 
   function addMsg(txt, cls) {
@@ -334,7 +333,6 @@
   let currentLang = (prefs.lang === 'es') ? 'es' : 'en';
   if (!prefs.lang) currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
   let currentTheme = prefs.theme === 'dark' ? 'dark' : 'light';
-  reduceMotion = prefs.reduceMotion === true;
 
   const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -448,7 +446,7 @@
     consentState = next;
     persistConsent(next);
     if (next === 'accepted') {
-      savePrefs({ lang: currentLang, theme: currentTheme, reduceMotion });
+      savePrefs({ lang: currentLang, theme: currentTheme });
     } else if (next === 'denied') {
       try { localStorage.removeItem(STORAGE_KEYS.prefs); } catch {}
     }
@@ -472,7 +470,7 @@
   }
   applyConsentUI();
 
-  function persistPrefs() { savePrefs({ lang: currentLang, theme: currentTheme, reduceMotion }); }
+  function persistPrefs() { savePrefs({ lang: currentLang, theme: currentTheme }); }
 
   function setLanguage(lang) {
     const toES = lang === 'es';
@@ -490,7 +488,6 @@
     if (recognition) recognition.lang = toES ? 'es-ES' : 'en-US';
     persistPrefs();
     setVoiceStatus('', '');
-    setMotionPreference(reduceMotion);
   }
   langCtrl.addEventListener('click', () => setLanguage(currentLang === 'es' ? 'en' : 'es'));
 
@@ -502,30 +499,6 @@
     persistPrefs();
   }
   themeCtrl.onclick = () => setTheme(currentTheme === 'dark' ? 'light' : 'dark');
-
-  function setMotionPreference(enabled) {
-    reduceMotion = !!enabled;
-    document.body.classList.toggle('reduce-motion', reduceMotion);
-    if (motionCtrl) {
-      motionCtrl.textContent = reduceMotion ? (currentLang === 'es' ? 'Movimiento reducido' : 'Reduced motion') : (currentLang === 'es' ? 'Reducir movimiento' : 'Reduce motion');
-      motionCtrl.classList.toggle('active', reduceMotion);
-      motionCtrl.setAttribute('aria-pressed', reduceMotion ? 'true' : 'false');
-    }
-    persistPrefs();
-  }
-
-  const prefersReducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
-  if (prefersReducedMotion && prefersReducedMotion.matches && prefs.reduceMotion === undefined) {
-    reduceMotion = true;
-  }
-  if (prefersReducedMotion) {
-    prefersReducedMotion.addEventListener('change', (e) => {
-      if (prefs.reduceMotion === undefined) {
-        setMotionPreference(e.matches);
-      }
-    });
-  }
-  motionCtrl.onclick = () => setMotionPreference(!reduceMotion);
 
   function getVoiceForLang(langCode) {
     if (!synth) return null;
@@ -596,9 +569,18 @@
 
   setLanguage(currentLang);
   setTheme(currentTheme);
-  setMotionPreference(reduceMotion);
   updateSpeechToggleUI();
   updateListenUI();
+
+  function ensureWelcome() {
+    if (!log || log.dataset.welcomed) return;
+    const welcome = currentLang === 'es'
+      ? 'Chattia para OPS está listo. Usa el botón de micrófono o escribe para chatear.'
+      : 'Chattia for OPS is ready. Use the mic button or type to chat.';
+    addMsg(welcome, 'bot');
+    log.dataset.welcomed = 'true';
+  }
+  ensureWelcome();
 
   form.onsubmit = async e => {
     e.preventDefault();
