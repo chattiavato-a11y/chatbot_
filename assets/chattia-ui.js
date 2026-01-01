@@ -1,0 +1,637 @@
+/* assets/chattia-ui.js */
+(() => {
+  const qs  = (s) => document.querySelector(s);
+  const qsa = (s) => [...document.querySelectorAll(s)];
+
+  // === CONFIG ===
+  const ASSET_ID = "CAFF600A21B457E5D909FD887AF48018B3CBFDDF6F9746E56238B23AF061F9E2";
+  const GATEWAY_ORIGIN = "https://ops-gateway.grabem-holdem-nuts-right.workers.dev";
+  const API_URL = `${GATEWAY_ORIGIN}/api/ops-online-chat`;
+  const TELEMETRY_URL = `${GATEWAY_ORIGIN}/reports/telemetry`;
+
+  // Optional extra client-side allowlist (gateway still enforces Origin)
+  const AUTH_RULES = [
+    { origin: "https://chattiavato-a11y.github.io", pathPrefix: "/ops-online-support/" },
+    { origin: "https://www.chattia.io", pathPrefix: "/" },
+    { origin: "https://chattia.io", pathPrefix: "/" }
+  ];
+
+  // === ELEMENTS ===
+  const log = qs("#chat-log");
+  const form = qs("#chatbot-input-row");
+  const input = qs("#chatbot-input");
+  const sendBtn = qs("#chatbot-send");
+
+  const langCtrl = qs("#langCtrl");
+  const themeCtrl = qs("#themeCtrl");
+  const speechToggle = qs("#speechToggle");
+  const listenCtrl = qs("#listenCtrl");
+  const voiceStatus = qs("#voice-status");
+
+  const netDot = qs("#netDot");
+  const netText = qs("#netText");
+
+  const consentBanner = qs("#consent-banner");
+  const consentAccept = qs("#consent-accept");
+  const consentDeny = qs("#consent-deny");
+  const inlineConsent = qs("#inline-consent");
+  const inlineConsentAccept = qs("#inline-consent-accept");
+  const inlineConsentDeny = qs("#inline-consent-deny");
+
+  const hpEmail = qs("#hp_email");
+  const hpWebsite = qs("#hp_website");
+
+  const turnstileWidget = qs("#turnstile-widget");
+  const turnstileContainer = qs("#turnstile-container");
+
+  const clearChatBtn = qs("#clearChat");
+  const openTranscriptBtn = qs("#openTranscript");
+  const transcriptDrawer = qs("#transcriptDrawer");
+  const closeTranscriptBtn = qs("#closeTranscript");
+  const transcriptText = qs("#transcript-text");
+  const transcriptCopy = qs("#transcript-copy");
+
+  const tncButton = qs("#tnc-button");
+
+  // === I18N NODES ===
+  const transNodes = qsa("[data-en]");
+  const phNodes = qsa("[data-en-ph]");
+  const ariaNodes = qsa("[data-en-label]");
+
+  // === CONSENT + PREFS ===
+  const STORAGE_KEYS = {
+    prefs: "ops-chat-preferences",
+    consent: "ops-chat-consent"
+  };
+
+  let consentState = "pending"; // pending | accepted | denied
+  const memoryPrefs = {}; // used when denied/pending
+
+  function readConsent() {
+    try { return localStorage.getItem(STORAGE_KEYS.consent) || "pending"; }
+    catch { return "pending"; }
+  }
+
+  function persistConsent(value) {
+    try { localStorage.setItem(STORAGE_KEYS.consent, value); } catch {}
+  }
+
+  function loadPrefs() {
+    if (consentState !== "accepted") return memoryPrefs;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.prefs);
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  }
+
+  function savePrefs(next) {
+    const payload = next || {};
+    if (consentState === "accepted") {
+      try { localStorage.setItem(STORAGE_KEYS.prefs, JSON.stringify(payload)); } catch {}
+    } else {
+      Object.assign(memoryPrefs, payload);
+    }
+  }
+
+  function applyConsentUI() {
+    const hide = consentState === "accepted" || consentState === "denied";
+    // toast
+    if (consentBanner) {
+      consentBanner.style.display = hide ? "none" : "block";
+      consentBanner.setAttribute("aria-hidden", hide ? "true" : "false");
+    }
+    // inline panel
+    if (inlineConsent) {
+      inlineConsent.style.display = hide ? "none" : "flex";
+      inlineConsent.setAttribute("aria-hidden", hide ? "true" : "false");
+    }
+  }
+
+  function handleConsent(next) {
+    consentState = next;
+    persistConsent(next);
+    if (next === "accepted") {
+      savePrefs({ lang: currentLang, theme: currentTheme });
+    } else if (next === "denied") {
+      try { localStorage.removeItem(STORAGE_KEYS.prefs); } catch {}
+    }
+    applyConsentUI();
+  }
+
+  // === THEME + LANGUAGE ===
+  consentState = readConsent();
+  const prefs = loadPrefs();
+
+  let currentLang = (prefs.lang === "es") ? "es" : "en";
+  if (!prefs.lang) currentLang = (document.documentElement.lang === "es") ? "es" : "en";
+
+  let currentTheme = (prefs.theme === "dark") ? "dark" : "light";
+
+  function setLanguage(lang) {
+    const toES = lang === "es";
+    currentLang = toES ? "es" : "en";
+    document.documentElement.lang = currentLang;
+
+    langCtrl.textContent = toES ? "ES" : "EN";
+    langCtrl.setAttribute("aria-pressed", toES ? "true" : "false");
+    langCtrl.classList.toggle("active", toES);
+
+    transNodes.forEach((node) => { node.textContent = toES ? node.dataset.es : node.dataset.en; });
+    phNodes.forEach((node) => { node.placeholder = toES ? node.dataset.esPh : node.dataset.enPh; });
+    ariaNodes.forEach((node) => { node.setAttribute("aria-label", toES ? node.dataset.esLabel : node.dataset.enLabel); });
+
+    if (recognition) recognition.lang = toES ? "es-ES" : "en-US";
+    savePrefs({ lang: currentLang, theme: currentTheme });
+    setVoiceStatus("", "");
+  }
+
+  function setTheme(mode) {
+    currentTheme = (mode === "dark") ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", currentTheme);
+    themeCtrl.textContent = (currentTheme === "dark") ? "Light" : "Dark";
+    themeCtrl.setAttribute("aria-pressed", currentTheme === "dark" ? "true" : "false");
+    savePrefs({ lang: currentLang, theme: currentTheme });
+  }
+
+  // === TURNSTILE ===
+  let turnstileToken = "";
+  let showedTurnstileDown = false;
+
+  function markTurnstileCleared() {
+    if (!turnstileContainer) return;
+    turnstileContainer.classList.add("ts-cleared");
+    turnstileContainer.setAttribute("aria-hidden", "true");
+  }
+  function showTurnstileAgain() {
+    if (!turnstileContainer) return;
+    turnstileContainer.classList.remove("ts-cleared");
+    turnstileContainer.removeAttribute("aria-hidden");
+  }
+
+  window.opsTurnstileCallback = (token) => {
+    turnstileToken = (typeof token === "string") ? token : "";
+    if (turnstileToken) markTurnstileCleared();
+  };
+  window.opsTurnstileExpired = () => {
+    turnstileToken = "";
+    showTurnstileAgain();
+  };
+  window.opsTurnstileErrored = () => {
+    turnstileToken = "";
+    showTurnstileAgain();
+  };
+
+  function getTurnstileToken() {
+    if (turnstileToken) return turnstileToken;
+    if (window.turnstile && typeof window.turnstile.getResponse === "function") {
+      try {
+        const resp = window.turnstile.getResponse(turnstileWidget);
+        if (resp) { turnstileToken = resp; return resp; }
+      } catch {}
+      try {
+        const resp = window.turnstile.getResponse();
+        if (resp) { turnstileToken = resp; return resp; }
+      } catch {}
+    }
+    return "";
+  }
+
+  function resetTurnstile() {
+    turnstileToken = "";
+    showTurnstileAgain();
+    if (window.turnstile && typeof window.turnstile.reset === "function") {
+      try { window.turnstile.reset(turnstileWidget); return; } catch {}
+      try { window.turnstile.reset(); } catch {}
+    }
+  }
+
+  function turnstileUnavailableOnce() {
+    if (showedTurnstileDown) return;
+    showedTurnstileDown = true;
+    sendTelemetry("turnstile_unavailable");
+    addBotLine(currentLang === "es"
+      ? "La verificación no está disponible ahora. Intenta de nuevo en unos segundos."
+      : "Security verification is unavailable right now. Try again in a few seconds."
+    );
+  }
+
+  // === SAFETY HELPERS ===
+  function normalizeUserText(s) {
+    let out = String(s || "");
+    out = out.replace(/[\u0000-\u001F\u007F]/g, " ");
+    out = out.replace(/\s+/g, " ").trim();
+    if (out.length > 256) out = out.slice(0, 256);
+    return out;
+  }
+
+  function looksSuspicious(s) {
+    const t = String(s || "").toLowerCase();
+    const bad = [
+      "<script", "</script", "javascript:",
+      "<img", "onerror", "onload",
+      "<iframe", "<object", "<embed",
+      "<svg", "<link", "<meta", "<style",
+      "document.cookie",
+      "onmouseover", "onmouseenter",
+      "<form", "<input", "<textarea"
+    ];
+    return bad.some((p) => t.includes(p));
+  }
+
+  function isFullyAuthorized() {
+    const o = self.origin;
+    const p = self.location.pathname || "/";
+    return AUTH_RULES.some((r) => (o === r.origin) && p.startsWith(r.pathPrefix));
+  }
+
+  // === TELEMETRY (light sampling) ===
+  const telemetrySampleRate = 0.25;
+  function sendTelemetry(eventType, detail = {}) {
+    if (Math.random() > telemetrySampleRate) return;
+    try {
+      fetch(TELEMETRY_URL, {
+        method: "POST",
+        mode: "cors",
+        cache: "no-store",
+        credentials: "omit",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event: eventType, lang: currentLang, ts: Date.now(), detail })
+      }).catch(() => {});
+    } catch {}
+  }
+
+  // === VOICE (Web Speech API) ===
+  const synth = ("speechSynthesis" in window) ? window.speechSynthesis : null;
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = Recognition ? new Recognition() : null;
+
+  let speechEnabled = false;
+  let listening = false;
+
+  function cleanForSpeech(s) {
+    let out = String(s || "");
+    out = out.replace(/`{3}[\s\S]*?`{3}/g, " ");
+    out = out.replace(/`([^`]+)`/g, "$1");
+    out = out.replace(/[*_~]+/g, "");
+    out = out.replace(/^-\s+/gm, "");
+    out = out.replace(/\s+/g, " ").trim();
+    return out;
+  }
+
+  function getVoiceForLang(langCode) {
+    if (!synth) return null;
+    const voices = synth.getVoices();
+    const want = (langCode === "es") ? ["es-", "es_"] : ["en-", "en_"];
+    const preferred = voices
+      .filter(v => want.some(p => (v.lang || "").toLowerCase().startsWith(p)))
+      .sort((a,b)=>((b.localService?2:0)+(/google|microsoft|natural/i.test(b.name)?1:0))-((a.localService?2:0)+(/google|microsoft|natural/i.test(a.name)?1:0)));
+    return preferred[0] || null;
+  }
+
+  function speak(text, langOverride) {
+    if (!synth || !speechEnabled) return;
+    const clean = cleanForSpeech(normalizeUserText(text));
+    if (!clean) return;
+
+    const langForReply = (langOverride === "es") ? "es" : (langOverride === "en" ? "en" : currentLang);
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = (langForReply === "es") ? "es-ES" : "en-US";
+    const v = getVoiceForLang(langForReply);
+    if (v) u.voice = v;
+    synth.speak(u);
+  }
+
+  function updateSpeechToggleUI() {
+    speechToggle.classList.toggle("active", speechEnabled);
+    speechToggle.setAttribute("aria-pressed", speechEnabled ? "true" : "false");
+  }
+  function updateListenUI() {
+    listenCtrl.classList.toggle("active", listening);
+    listenCtrl.setAttribute("aria-pressed", listening ? "true" : "false");
+  }
+  function setVoiceStatus(enText, esText) {
+    if (!voiceStatus) return;
+    voiceStatus.textContent = (currentLang === "es") ? (esText || enText) : enText;
+  }
+
+  if (recognition) {
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = (currentLang === "es") ? "es-ES" : "en-US";
+    recognition.onstart = () => { listening = true; updateListenUI(); setVoiceStatus("Listening…", "Escuchando…"); };
+    recognition.onresult = (e) => {
+      const t = e.results?.[0]?.[0]?.transcript || "";
+      const cleaned = normalizeUserText(t);
+      if (!cleaned) return;
+      input.value = cleaned;
+      input.focus();
+
+      // Fast UX: auto-send if authorized
+      if (isFullyAuthorized()) form.requestSubmit();
+      else addBotLine(currentLang === "es"
+        ? "Este asistente solo acepta mensajes desde sitios autorizados."
+        : "This assistant only accepts messages from authorized sites."
+      );
+    };
+    recognition.onerror = () => { listening = false; updateListenUI(); setVoiceStatus("Voice error.", "Error de voz."); };
+    recognition.onend = () => { listening = false; updateListenUI(); setVoiceStatus("", ""); };
+  }
+
+  function startListening() {
+    if (!recognition) return;
+    recognition.lang = (currentLang === "es") ? "es-ES" : "en-US";
+    try { recognition.start(); } catch {}
+  }
+
+  // === TRANSCRIPT ===
+  const transcript = [];
+  function recordTranscript(role, text) {
+    if (!text) return;
+    transcript.push({ role, text, ts: Date.now() });
+    if (!transcriptText) return;
+    transcriptText.textContent = transcript
+      .map(item => `${item.role.toUpperCase()}: ${item.text}`)
+      .join("\n");
+  }
+
+  function copyTranscript() {
+    if (!navigator?.clipboard || !transcriptText) return;
+    navigator.clipboard.writeText(transcriptText.textContent || "").catch(() => {});
+  }
+
+  function openTranscript() {
+    transcriptDrawer.classList.add("open");
+    transcriptDrawer.setAttribute("aria-hidden", "false");
+  }
+  function closeTranscript() {
+    transcriptDrawer.classList.remove("open");
+    transcriptDrawer.setAttribute("aria-hidden", "true");
+  }
+
+  // === CHAT UI ===
+  function setNet(ok, textEn, textEs) {
+    if (!netDot || !netText) return;
+    netDot.style.background = ok ? "rgba(44,242,162,.9)" : "rgba(255,59,143,.9)";
+    netText.textContent = (currentLang === "es") ? (textEs || textEn) : textEn;
+  }
+
+  function addLine(text, who) {
+    const wrap = document.createElement("div");
+    wrap.className = `msg ${who}`;
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    wrap.appendChild(bubble);
+    wrap.appendChild(meta);
+
+    log.appendChild(wrap);
+    log.scrollTop = log.scrollHeight;
+
+    recordTranscript(who, text);
+    return bubble;
+  }
+
+  function addUserLine(text) { return addLine(text, "user"); }
+  function addBotLine(text) { return addLine(text, "bot"); }
+
+  function clearChat() {
+    log.textContent = "";
+    transcript.length = 0;
+    if (transcriptText) transcriptText.textContent = "";
+    ensureWelcome();
+  }
+
+  function ensureWelcome() {
+    if (log.dataset.welcomed === "true") return;
+    const welcome = (currentLang === "es")
+      ? "Chattia para OPS está listo. Escribe o usa el micrófono para chatear."
+      : "Chattia for OPS is ready. Type or use the mic to chat.";
+    addBotLine(welcome);
+    log.dataset.welcomed = "true";
+  }
+
+  function showTncDetails() {
+    const msg = (currentLang === "es")
+      ? (tncButton.dataset.esMsg || tncButton.dataset.enMsg || "")
+      : (tncButton.dataset.enMsg || tncButton.dataset.esMsg || "");
+    if (!msg) return;
+    addBotLine(msg);
+    speak(msg, currentLang);
+  }
+
+  // === EVENTS ===
+  if (consentAccept) consentAccept.onclick = () => handleConsent("accepted");
+  if (consentDeny) consentDeny.onclick = () => handleConsent("denied");
+  if (inlineConsentAccept) inlineConsentAccept.onclick = () => handleConsent("accepted");
+  if (inlineConsentDeny) inlineConsentDeny.onclick = () => handleConsent("denied");
+
+  langCtrl.addEventListener("click", () => setLanguage(currentLang === "es" ? "en" : "es"));
+  themeCtrl.addEventListener("click", () => setTheme(currentTheme === "dark" ? "light" : "dark"));
+
+  speechToggle.addEventListener("click", () => {
+    if (!synth) {
+      addBotLine(currentLang === "es"
+        ? "La síntesis de voz no está disponible en este navegador."
+        : "Speech synthesis is not available in this browser."
+      );
+      return;
+    }
+    speechEnabled = !speechEnabled;
+    updateSpeechToggleUI();
+  });
+
+  listenCtrl.addEventListener("click", () => {
+    if (!recognition) {
+      addBotLine(currentLang === "es"
+        ? "Entrada por voz no disponible en este navegador."
+        : "Voice input is not available in this browser."
+      );
+      return;
+    }
+    if (listening) { try { recognition.stop(); } catch {} return; }
+    startListening();
+  });
+
+  if (clearChatBtn) clearChatBtn.onclick = clearChat;
+
+  if (openTranscriptBtn) openTranscriptBtn.onclick = openTranscript;
+  if (closeTranscriptBtn) closeTranscriptBtn.onclick = closeTranscript;
+
+  if (transcriptCopy) transcriptCopy.onclick = copyTranscript;
+  if (tncButton) tncButton.onclick = showTncDetails;
+
+  // Close drawer on Escape
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeTranscript();
+  });
+
+  // === SEND ===
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const msg = normalizeUserText(input.value);
+    if (!msg) return;
+
+    // Client allowlist (extra)
+    if (!isFullyAuthorized()) {
+      addBotLine(currentLang === "es"
+        ? "Este asistente solo acepta mensajes desde sitios autorizados."
+        : "This assistant only accepts messages from authorized sites."
+      );
+      sendTelemetry("auth_block", { reason: "origin" });
+      return;
+    }
+
+    // Fast local block for obvious injection attempts
+    if (looksSuspicious(msg)) {
+      const warn = (currentLang === "es")
+        ? "Mensaje bloqueado por seguridad. Escribe sin etiquetas o scripts."
+        : "Message blocked for security. Please write without tags or scripts.";
+      addBotLine(warn);
+      speak(warn, currentLang);
+      sendTelemetry("client_suspicious");
+      return;
+    }
+
+    // Honeypots
+    const hp1 = normalizeUserText(hpEmail?.value || "");
+    const hp2 = normalizeUserText(hpWebsite?.value || "");
+
+    // Turnstile token required
+    const ts = getTurnstileToken();
+    if (!ts) {
+      if (!window.turnstile) turnstileUnavailableOnce();
+      else {
+        const warn = (currentLang === "es")
+          ? "Completa la verificación de seguridad para continuar."
+          : "Please complete the security check to continue.";
+        addBotLine(warn);
+        speak(warn, currentLang);
+      }
+      sendTelemetry("turnstile_missing");
+      return;
+    }
+
+    addUserLine(msg);
+    input.value = "";
+
+    setNet(true, "Sending…", "Enviando…");
+    sendBtn.disabled = true;
+
+    const botBubble = addBotLine("…");
+
+    try {
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), 15000);
+
+      const res = await fetch(API_URL, {
+        method: "POST",
+        mode: "cors",
+        cache: "no-store",
+        credentials: "omit",
+        redirect: "error",
+        referrerPolicy: "no-referrer",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Ops-Asset-Id": ASSET_ID
+        },
+        body: JSON.stringify({
+          message: msg,
+          lang: currentLang,
+          v: 2,
+          turnstileToken: ts,
+          hp_email: hp1,
+          hp_website: hp2
+        }),
+        signal: ctrl.signal
+      });
+
+      clearTimeout(timeout);
+
+      const text = await res.text();
+      let data = null; try { data = JSON.parse(text); } catch {}
+
+      if (!res.ok) {
+        const fallback = (currentLang === "es") ? "Error del gateway de OPS." : "OPS gateway error.";
+        const errMsg = (data && (data.error || data.public_error))
+          ? (data.error || data.public_error)
+          : (text || fallback);
+
+        botBubble.textContent = errMsg;
+        speak(errMsg, currentLang);
+        sendTelemetry("api_error", { status: res.status });
+
+        if (res.status === 403 && /turnstile/i.test(errMsg)) resetTurnstile();
+        setNet(false, "Error", "Error");
+        return;
+      }
+
+      if (!data || typeof data !== "object") {
+        const fallback = (currentLang === "es")
+          ? "Respuesta no válida del gateway."
+          : "Invalid response from gateway.";
+        botBubble.textContent = fallback;
+        speak(fallback, currentLang);
+        sendTelemetry("api_error", { type: "invalid_json" });
+        setNet(false, "Error", "Error");
+        return;
+      }
+
+      const replyLang = (data.lang === "es") ? "es" : currentLang;
+      const reply = (typeof data.reply === "string" && data.reply.trim())
+        ? data.reply.trim()
+        : (currentLang === "es" ? "Sin respuesta." : "No reply.");
+
+      botBubble.textContent = reply;
+      speak(reply, replyLang);
+
+      setNet(true, "Ready", "Listo");
+    } catch (err) {
+      const fallback = (currentLang === "es")
+        ? "No puedo conectar con el asistente OPS."
+        : "Can’t reach OPS assistant.";
+      botBubble.textContent = fallback;
+      speak(fallback, currentLang);
+      sendTelemetry("network_error");
+      setNet(false, "Offline", "Sin conexión");
+    } finally {
+      sendBtn.disabled = false;
+    }
+  });
+
+  // === INIT ===
+  if (!document.documentElement.getAttribute("data-theme")) {
+    document.documentElement.setAttribute("data-theme", currentTheme);
+  }
+
+  setLanguage(currentLang);
+  setTheme(currentTheme);
+
+  if (synth) synth.onvoiceschanged = () => getVoiceForLang(currentLang);
+
+  updateSpeechToggleUI();
+  updateListenUI();
+
+  applyConsentUI();
+
+  ensureWelcome();
+
+  // Show consent toast when pending
+  if (consentState === "pending") {
+    consentBanner.style.display = "block";
+    consentBanner.setAttribute("aria-hidden", "false");
+  }
+
+  // Basic online/offline indicator
+  const updateOnline = () => setNet(navigator.onLine, "Ready", "Listo");
+  window.addEventListener("online", updateOnline);
+  window.addEventListener("offline", () => setNet(false, "Offline", "Sin conexión"));
+  updateOnline();
+})();
