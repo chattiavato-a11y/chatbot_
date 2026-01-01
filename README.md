@@ -11,7 +11,8 @@
 - **Input safety:** 4KB max body, honeypots, Turnstile verification, content-type checks, data URI/base64 rejection, pattern-based sanitization, optional AI guard, and structured logging to KV (if bound).
 
 ## Frontend (GitHub Pages)
-- **CSP (meta):** Mirrors the worker allowlists and reports to `https://ops-gateway.grabem-holdem-nuts-right.workers.dev/reports/csp`.
+- **CSP (meta):** Mirrors the worker allowlists, adds `frame-ancestors 'none'`, and reports to `https://ops-gateway.grabem-holdem-nuts-right.workers.dev/reports/csp`.
+- **HTTP-equivalent headers (meta):** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=15552000; includeSubDomains; preload`, `Referrer-Policy: strict-origin-when-cross-origin` (also set via `<meta name=\"referrer\">`), `Permissions-Policy: accelerometer=(), camera=(), display-capture=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), bluetooth=()`, `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`.
 - **Assets with SRI:**  
   - `assets/styles.css` — `sha384-Kuw+CpXG3kB2wy3CGC3Z+lpHtDAhAiEPN/roIeIFlyD/BNIC5EM/9lYE7y/5EMsy`  
   - `https://challenges.cloudflare.com/turnstile/v0/api.js` — `sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb`
