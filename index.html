@@ -1,712 +1,209 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Chattia for OPS</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Chattia for OPS</title>
+  <meta name="description" content="Chattia for OPS — secure, fast, accessible assistant UI." />
+  <meta name="referrer" content="no-referrer" />
 
-<meta http-equiv="Content-Security-Policy"
-  content="default-src 'none';
+  <!-- Fallback CSP (best-effort on static hosts).
+       For A+ scores, set these as REAL HTTP response headers at the edge. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
     base-uri 'none';
-    frame-ancestors 'none';
     object-src 'none';
-    style-src 'self';
+    frame-ancestors 'none';
+    form-action 'self';
     img-src 'self' data:;
     font-src 'self' data:;
+    style-src 'self';
+    script-src 'self' https://challenges.cloudflare.com;
+    connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev;
     frame-src https://challenges.cloudflare.com;
-    connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev https://challenges.cloudflare.com;
-    form-action 'self';
     worker-src 'self';
     manifest-src 'self';
     media-src 'self';
-    script-src 'self' https://challenges.cloudflare.com 'nonce-ops-inline-asset';
-    report-to csp-endpoint;
+    upgrade-insecure-requests;
     report-uri https://ops-gateway.grabem-holdem-nuts-right.workers.dev/reports/csp;
-    upgrade-insecure-requests;">
+  ">
 
-<meta http-equiv="X-Content-Type-Options" content="nosniff">
-<meta http-equiv="X-Frame-Options" content="DENY">
-<meta http-equiv="Strict-Transport-Security" content="max-age=15552000; includeSubDomains; preload">
-<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
-<meta name="referrer" content="strict-origin-when-cross-origin">
-<meta http-equiv="Permissions-Policy" content="accelerometer=(), camera=(), display-capture=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), bluetooth=()">
-<meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
-<meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
-<link rel="sitemap" type="application/xml" href="/sitemap.xml" title="OPS Online Support Sitemap">
-<link rel="stylesheet" href="assets/styles.css" integrity="sha384-Kuw+CpXG3kB2wy3CGC3Z+lpHtDAhAiEPN/roIeIFlyD/BNIC5EM/9lYE7y/5EMsy" crossorigin="anonymous">
+  <link rel="stylesheet" href="assets/chattia-ui.css" />
 
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb" crossorigin="anonymous"></script>
+  <!-- Cloudflare Turnstile -->
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer crossorigin="anonymous"></script>
+
+  <!-- App -->
+  <script src="assets/chattia-ui.js" defer></script>
 </head>
 <body>
-
-<div id="page-shell">
-<div id="consent-banner" role="region" aria-live="polite">
-  <h2 data-en="Privacy & consent" data-es="Privacidad y consentimiento">Privacy & consent</h2>
-  <p data-en="We store your language/theme preference in localStorage and send API requests to the OPS gateway. By interacting with the chatbot you authorize the collection of behavioral data. Choose how you want us to handle your preferences."
-     data-es="Guardamos tu preferencia de idioma/tema en localStorage y enviamos solicitudes API al gateway OPS. Al interactuar con el chatbot autorizas la recopilación de datos de comportamiento. Elige cómo quieres que manejemos tus preferencias.">
-    We store your language/theme preference in localStorage and send API requests to the OPS gateway. By interacting with the chatbot you authorize the collection of behavioral data. Choose how you want us to handle your preferences.
-  </p>
-  <div id="consent-actions">
-    <button type="button" id="consent-accept" class="link-button" data-en="Accept" data-es="Aceptar">Accept</button>
-    <button type="button" id="consent-deny" class="link-button" data-en="Deny" data-es="Rechazar">Deny</button>
-  </div>
-</div>
-
-<div id="chatbot-container" role="dialog" aria-modal="true">
-  <div id="chatbot-header">
-    <span id="title" data-en="Chattia for OPS" data-es="Chattia para OPS">Chattia for OPS</span>
-    <span id="policy-links" aria-label="Policies">
-      <a href="https://www.chattia.io/privacy" target="_blank" rel="noopener">Privacy</a>
-      <a href="https://www.chattia.io/terms" target="_blank" rel="noopener">Terms</a>
-    </span>
-  </div>
-
-  <div id="chat-log" aria-live="polite"></div>
-
-  <div id="inline-consent" role="region" aria-live="polite">
-    <div class="inline-consent-text" data-en="Interacting with the chatbot authorizes us to gather behavioral data for service quality. Review your preference." data-es="Interactuar con el chatbot nos autoriza a recopilar datos de comportamiento para la calidad del servicio. Revisa tu preferencia.">
-      Interacting with the chatbot authorizes us to gather behavioral data for service quality. Review your preference.
+  <noscript>
+    <div class="noscript">
+      This app requires JavaScript to run.
     </div>
-    <div class="inline-consent-actions">
-      <button type="button" id="inline-consent-accept" class="link-button" data-en="Accept" data-es="Aceptar">Accept</button>
-      <button type="button" id="inline-consent-deny" class="link-button" data-en="Deny" data-es="Rechazar">Deny</button>
-    </div>
-  </div>
+  </noscript>
 
-  <div id="chatbot-form-container">
-    <div id="control-row" class="ctrl-group" aria-label="Language, theme, and speech controls">
-      <button type="button" id="langCtrl" class="ctrl"
-        aria-label="Toggle language" data-en-label="Toggle language" data-es-label="Cambiar idioma">EN</button>
-      <button type="button" id="themeCtrl" class="ctrl">Dark</button>
-      <button type="button" id="speechToggle" class="ctrl" data-en="Voice" data-es="Voz">Voice</button>
+  <div class="bg" aria-hidden="true"></div>
 
-      <button id="listenCtrl" type="button" aria-label="Start voice input"
-        data-en-label="Start voice input" data-es-label="Comenzar voz">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zM11 19h2v3h-2z"/>
-        </svg>
-        <span class="btn-label" data-en="Speak" data-es="Hablar">Speak</span>
-      </button>
-    </div>
-
-    <div id="voice-status" role="status" aria-live="polite"></div>
-
-    <form id="chatbot-input-row" autocomplete="off">
-      <input id="chatbot-input" type="text" placeholder="Type your message..." required maxlength="256"
-        data-en-ph="Type your message..." data-es-ph="Escriba su mensaje...">
-
-      <!-- Honeypots -->
-      <div class="hp-wrap" aria-hidden="true">
-        <label>email<input id="hp_email" name="hp_email" type="text" autocomplete="off"></label>
-        <label>website<input id="hp_website" name="hp_website" type="text" autocomplete="off"></label>
+  <div class="shell">
+    <header class="topbar" role="banner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div class="brand-text">
+          <div class="brand-title" data-en="Chattia for OPS" data-es="Chattia para OPS">Chattia for OPS</div>
+          <div class="brand-sub" data-en="Secure assistant UI" data-es="UI segura del asistente">Secure assistant UI</div>
+        </div>
       </div>
 
-      <div id="turnstile-container" aria-label="Cloudflare Turnstile verification">
-        <div id="turnstile-widget" class="cf-turnstile"
-          data-sitekey="0x4AAAAAACCemZgiIexxcpTR"
-          data-callback="opsTurnstileCallback"
-          data-expired-callback="opsTurnstileExpired"
-          data-error-callback="opsTurnstileErrored"></div>
-      </div>
+      <nav class="top-actions" aria-label="Policy links and settings">
+        <a class="pill-link" href="https://www.chattia.io/privacy" target="_blank" rel="noopener noreferrer">
+          <span data-en="Privacy" data-es="Privacidad">Privacy</span>
+        </a>
+        <a class="pill-link" href="https://www.chattia.io/terms" target="_blank" rel="noopener noreferrer">
+          <span data-en="Terms" data-es="Términos">Terms</span>
+        </a>
 
-      <button id="chatbot-send" type="submit" aria-label="Send">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M2 21l20-9L2 3v7l14 2L2 14v7z"/>
-        </svg>
-      </button>
-    </form>
+        <div class="divider" aria-hidden="true"></div>
 
-    <div id="tnc-footnote">
-      <button type="button" id="tnc-button" class="tnc-button" data-en="T&C" data-es="TyC"
-        data-en-msg="Interacting with the chatbot authorizes us to gather behavioral data."
-        data-es-msg="Interactuar con el chatbot autoriza la recopilación de datos de comportamiento.">T&C</button>
+        <button type="button" id="langCtrl" class="pill-btn" aria-pressed="false"
+          aria-label="Toggle language" data-en-label="Toggle language" data-es-label="Cambiar idioma">EN</button>
+
+        <button type="button" id="themeCtrl" class="pill-btn" aria-pressed="false"
+          aria-label="Toggle theme" data-en-label="Toggle theme" data-es-label="Cambiar tema">Dark</button>
+
+        <button type="button" id="speechToggle" class="pill-btn" aria-pressed="false"
+          aria-label="Toggle voice output" data-en-label="Toggle voice output" data-es-label="Activar voz">
+          <span data-en="Voice" data-es="Voz">Voice</span>
+        </button>
+      </nav>
+    </header>
+
+    <main class="panel" role="main">
+      <section class="chat" aria-label="Chat">
+        <div class="chat-head">
+          <div class="status">
+            <span class="dot" id="netDot" aria-hidden="true"></span>
+            <span id="netText" data-en="Ready" data-es="Listo">Ready</span>
+          </div>
+
+          <div class="mini-actions">
+            <button type="button" id="clearChat" class="ghost-btn"
+              aria-label="Clear chat" data-en-label="Clear chat" data-es-label="Borrar chat">
+              <span data-en="Clear" data-es="Borrar">Clear</span>
+            </button>
+
+            <button type="button" id="openTranscript" class="ghost-btn"
+              aria-label="Open transcript" data-en-label="Open transcript" data-es-label="Abrir transcripción">
+              <span data-en="Transcript" data-es="Transcripción">Transcript</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="chat-log" class="chat-log" aria-live="polite" aria-relevant="additions text"></div>
+
+        <div class="composer">
+          <div class="consent-inline" id="inline-consent" role="region" aria-live="polite">
+            <div class="consent-text"
+              data-en="Preferences (language/theme) are stored only if you accept. Messages are sent to the OPS gateway."
+              data-es="Las preferencias (idioma/tema) se guardan solo si aceptas. Los mensajes se envían al gateway de OPS.">
+              Preferences (language/theme) are stored only if you accept. Messages are sent to the OPS gateway.
+            </div>
+            <div class="consent-actions">
+              <button type="button" id="inline-consent-accept" class="link-btn"
+                data-en="Accept" data-es="Aceptar">Accept</button>
+              <button type="button" id="inline-consent-deny" class="link-btn"
+                data-en="Deny" data-es="Rechazar">Deny</button>
+            </div>
+          </div>
+
+          <div class="ctrl-row" aria-label="Input controls">
+            <button type="button" id="listenCtrl" class="mic-btn" aria-pressed="false"
+              aria-label="Start voice input" data-en-label="Start voice input" data-es-label="Comenzar voz">
+              <svg viewBox="0 0 24 24" class="ic" aria-hidden="true">
+                <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zM11 19h2v3h-2z"/>
+              </svg>
+              <span class="mic-label" data-en="Speak" data-es="Hablar">Speak</span>
+            </button>
+
+            <div id="voice-status" class="voice-status" role="status" aria-live="polite"></div>
+
+            <div class="turnstile-wrap" id="turnstile-container" aria-label="Cloudflare Turnstile verification">
+              <div id="turnstile-widget" class="cf-turnstile"
+                data-sitekey="0x4AAAAAACCemZgiIexxcpTR"
+                data-callback="opsTurnstileCallback"
+                data-expired-callback="opsTurnstileExpired"
+                data-error-callback="opsTurnstileErrored"></div>
+            </div>
+          </div>
+
+          <form id="chatbot-input-row" class="input-row" autocomplete="off">
+            <label class="sr-only" for="chatbot-input">Message</label>
+            <input id="chatbot-input" class="input" type="text" maxlength="256" required
+              placeholder="Type your message..."
+              data-en-ph="Type your message..." data-es-ph="Escriba su mensaje..." />
+
+            <!-- Honeypots (bots fill these) -->
+            <div class="hp-wrap" aria-hidden="true">
+              <label>email<input id="hp_email" name="hp_email" type="text" autocomplete="off"></label>
+              <label>website<input id="hp_website" name="hp_website" type="text" autocomplete="off"></label>
+            </div>
+
+            <button id="chatbot-send" class="send-btn" type="submit" aria-label="Send">
+              <svg viewBox="0 0 24 24" class="ic" aria-hidden="true">
+                <path d="M2 21l20-9L2 3v7l14 2L2 14v7z"/>
+              </svg>
+            </button>
+          </form>
+
+          <div class="footnote">
+            <button type="button" id="tnc-button" class="tnc"
+              data-en="T&C" data-es="TyC"
+              data-en-msg="Interacting with the chatbot sends requests to the OPS gateway."
+              data-es-msg="Interactuar con el chatbot envía solicitudes al gateway de OPS.">T&C</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="drawer" id="transcriptDrawer" aria-label="Transcript panel" aria-hidden="true">
+        <div class="drawer-head">
+          <div class="drawer-title" data-en="Transcript" data-es="Transcripción">Transcript</div>
+          <button type="button" id="closeTranscript" class="ghost-btn"
+            aria-label="Close transcript" data-en-label="Close transcript" data-es-label="Cerrar transcripción">
+            <span data-en="Close" data-es="Cerrar">Close</span>
+          </button>
+        </div>
+
+        <pre id="transcript-text" class="transcript" role="region" aria-live="polite"></pre>
+
+        <div class="drawer-actions">
+          <button type="button" id="transcript-copy" class="pill-btn"
+            aria-label="Copy transcript" data-en-label="Copy transcript" data-es-label="Copiar transcripción">
+            <span data-en="Copy" data-es="Copiar">Copy</span>
+          </button>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="footer" role="contentinfo">
+      <span class="muted" data-en="OPS Online Support • Secure by design" data-es="OPS Online Support • Seguro por diseño">
+        OPS Online Support • Secure by design
+      </span>
+    </footer>
+  </div>
+
+  <!-- Consent toast -->
+  <div id="consent-banner" class="toast" role="region" aria-live="polite" aria-hidden="true">
+    <div class="toast-title" data-en="Privacy & consent" data-es="Privacidad y consentimiento">Privacy & consent</div>
+    <div class="toast-body"
+      data-en="We store language/theme only if you accept. Chat requests are sent to the OPS gateway."
+      data-es="Guardamos idioma/tema solo si aceptas. Las solicitudes se envían al gateway de OPS.">
+      We store language/theme only if you accept. Chat requests are sent to the OPS gateway.
+    </div>
+    <div class="toast-actions">
+      <button type="button" id="consent-accept" class="pill-btn" data-en="Accept" data-es="Aceptar">Accept</button>
+      <button type="button" id="consent-deny" class="pill-btn" data-en="Deny" data-es="Rechazar">Deny</button>
     </div>
   </div>
-</div>
-
-<details id="transcript-panel">
-  <summary>
-    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v2H4zm0 7h16v2H4zm0 7h10v2H4z"/></svg>
-    <span data-en="Transcript" data-es="Transcripción">Transcript</span>
-  </summary>
-  <div id="transcript-text" role="region" aria-live="polite"></div>
-  <button id="transcript-copy" type="button">
-    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-    <span data-en="Copy" data-es="Copiar">Copy</span>
-  </button>
-</details>
-
-<div class="footer-links">
-  <a href="https://www.chattia.io/privacy" target="_blank" rel="noopener">Privacy</a>
-  <a href="https://www.chattia.io/terms" target="_blank" rel="noopener">Terms</a>
-</div>
-</div>
-
-<script nonce="ops-inline-asset">
-(() => {
-  const qs  = s => document.querySelector(s);
-  const qsa = s => [...document.querySelectorAll(s)];
-
-  const ASSET_ID = "CAFF600A21B457E5D909FD887AF48018B3CBFDDF6F9746E56238B23AF061F9E2";
-  const GATEWAY_ORIGIN = "https://ops-gateway.grabem-holdem-nuts-right.workers.dev";
-  const TELEMETRY_URL = `${GATEWAY_ORIGIN}/reports/telemetry`;
-
-  // === Accept BOTH sites (GitHub Pages path + chattia.io root) ===
-  const AUTH_RULES = [
-    { origin: "https://chattiavato-a11y.github.io", pathPrefix: "/ops-online-support/" },
-    { origin: "https://www.chattia.io",            pathPrefix: "/" }
-  ];
-
-  function isFullyAuthorized() {
-    const o = self.origin;
-    const p = self.location.pathname || "/";
-    return AUTH_RULES.some(r => (o === r.origin) && p.startsWith(r.pathPrefix));
-  }
-
-  const API_URL = new URL("https://ops-gateway.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat");
-
-  const langCtrl     = qs('#langCtrl');
-  const transNodes   = qsa('[data-en]');
-  const phNodes      = qsa('[data-en-ph]');
-  const ariaNodes    = qsa('[data-en-label]');
-
-  const themeCtrl     = qs('#themeCtrl');
-  const speechToggle  = qs('#speechToggle');
-  const listenCtrl    = qs('#listenCtrl');
-  const consentBanner = qs('#consent-banner');
-  const consentAccept = qs('#consent-accept');
-  const consentDeny   = qs('#consent-deny');
-  const inlineConsent = qs('#inline-consent');
-  const inlineConsentAccept = qs('#inline-consent-accept');
-  const inlineConsentDeny = qs('#inline-consent-deny');
-  const tncButton = qs('#tnc-button');
-
-  const voiceStatus   = qs('#voice-status');
-
-  const log   = qs('#chat-log');
-  const form  = qs('#chatbot-input-row');
-  const input = qs('#chatbot-input');
-  const turnstileWidget = qs('#turnstile-widget');
-  const turnstileContainer = qs('#turnstile-container');
-
-  const hpEmail = qs('#hp_email');
-  const hpWebsite = qs('#hp_website');
-  const transcriptText = qs('#transcript-text');
-  const transcriptCopy = qs('#transcript-copy');
-
-  let turnstileToken = '';
-  let showedAuthWarning = false;
-  let showedTurnstileDown = false;
-  let consentState = 'pending';
-  const transcript = [];
-
-  function addMsg(txt, cls) {
-    const div = document.createElement('div');
-    div.className = 'chat-msg ' + cls;
-    div.textContent = txt;
-    log.appendChild(div);
-    log.scrollTop = log.scrollHeight;
-    recordTranscript(cls, txt);
-    return div;
-  }
-
-  function setVoiceStatus(enText, esText) {
-    if (!voiceStatus) return;
-    voiceStatus.textContent = (currentLang === 'es') ? (esText || enText) : enText;
-  }
-
-  function showAuthWarningOnce() {
-    if (showedAuthWarning) return;
-    showedAuthWarning = true;
-    addMsg(
-      (currentLang === 'es')
-        ? 'Este asistente solo acepta mensajes desde los sitios autorizados.'
-        : 'This assistant only accepts messages from the authorized sites.',
-      'bot'
-    );
-  }
-
-  function markTurnstileCleared() {
-    if (!turnstileContainer) return;
-    turnstileContainer.classList.add('ts-cleared');
-    turnstileContainer.setAttribute('aria-hidden', 'true');
-  }
-
-  function showTurnstileAgain() {
-    if (!turnstileContainer) return;
-    turnstileContainer.classList.remove('ts-cleared');
-    turnstileContainer.removeAttribute('aria-hidden');
-  }
-
-  window.opsTurnstileCallback = (token) => {
-    turnstileToken = (typeof token === 'string') ? token : '';
-    if (turnstileToken) { markTurnstileCleared(); }
-  };
-  window.opsTurnstileExpired = () => {
-    turnstileToken = '';
-    showTurnstileAgain();
-  };
-  window.opsTurnstileErrored = () => {
-    turnstileToken = '';
-    showTurnstileAgain();
-  };
-
-  function getTurnstileToken() {
-    if (turnstileToken) return turnstileToken;
-    if (window.turnstile && typeof window.turnstile.getResponse === 'function') {
-      try {
-        const resp = window.turnstile.getResponse(turnstileWidget);
-        if (resp) { turnstileToken = resp; return resp; }
-      } catch {}
-      try {
-        const resp = window.turnstile.getResponse();
-        if (resp) { turnstileToken = resp; return resp; }
-      } catch {}
-    }
-    return '';
-  }
-
-  function resetTurnstile() {
-    turnstileToken = '';
-    showTurnstileAgain();
-    if (window.turnstile && typeof window.turnstile.reset === 'function') {
-      try { window.turnstile.reset(turnstileWidget); return; } catch {}
-      try { window.turnstile.reset(); } catch {}
-    }
-  }
-
-  // Auto-fallback when Turnstile is unavailable (secure behavior = disable sends)
-  function turnstileUnavailableOnce() {
-    if (showedTurnstileDown) return;
-    showedTurnstileDown = true;
-    sendTelemetry('turnstile_unavailable');
-    addMsg(
-      (currentLang === 'es')
-        ? 'La verificación de seguridad no está disponible ahora. Intenta de nuevo en unos segundos.'
-        : 'Security verification is unavailable right now. Try again in a few seconds.',
-      'bot'
-    );
-  }
-
-  const STORAGE_KEYS = {
-    prefs: 'ops-chat-preferences',
-    consent: 'ops-chat-consent'
-  };
-
-  const memoryPrefs = {};
-
-  function readConsent() {
-    try {
-      return localStorage.getItem(STORAGE_KEYS.consent) || 'pending';
-    } catch {
-      return 'pending';
-    }
-  }
-
-  function persistConsent(value) {
-    try {
-      localStorage.setItem(STORAGE_KEYS.consent, value);
-    } catch {}
-  }
-
-  function loadPrefs() {
-    if (consentState !== 'accepted') return memoryPrefs;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.prefs);
-      return raw ? JSON.parse(raw) : {};
-    } catch {
-      return {};
-    }
-  }
-
-  function savePrefs(next) {
-    const payload = next || {};
-    if (consentState === 'accepted') {
-      try { localStorage.setItem(STORAGE_KEYS.prefs, JSON.stringify(payload)); } catch {}
-    } else {
-      Object.assign(memoryPrefs, payload);
-    }
-  }
-
-  consentState = readConsent();
-  const prefs = loadPrefs();
-  let currentLang = (prefs.lang === 'es') ? 'es' : 'en';
-  if (!prefs.lang) currentLang = document.documentElement.lang === 'es' ? 'es' : 'en';
-  let currentTheme = prefs.theme === 'dark' ? 'dark' : 'light';
-
-  const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = Recognition ? new Recognition() : null;
-
-  const speechSupported = !!synth;
-  const recognitionSupported = !!recognition;
-
-  let listening = false;
-  let speechEnabled = false;
-  const telemetrySampleRate = 0.35;
-
-  function normalizeUserText(s) {
-    let out = String(s || '');
-    out = out.replace(/[\u0000-\u001F\u007F]/g, ' ');
-    out = out.replace(/\s+/g, ' ').trim();
-    if (out.length > 256) out = out.slice(0, 256);
-    return out;
-  }
-
-  function cleanForSpeech(s) {
-    let out = String(s || '');
-    out = out.replace(/`{3}[\s\S]*?`{3}/g, ' ');
-    out = out.replace(/`([^`]+)`/g, '$1');
-    out = out.replace(/[*_~]+/g, '');
-    out = out.replace(/^-\s+/gm, '');
-    out = out.replace(/\s+/g, ' ').trim();
-    return out;
-  }
-
-  function looksSuspicious(s) {
-    const t = String(s || '').toLowerCase();
-    const bad = [
-      "<script", "</script", "javascript:",
-      "<img", "onerror", "onload",
-      "<iframe", "<object", "<embed",
-      "<svg", "<link", "<meta", "<style",
-      "document.cookie",
-      "onmouseover", "onmouseenter",
-      "<form", "<input", "<textarea"
-    ];
-    return bad.some(p => t.includes(p));
-  }
-
-  function updateSpeechToggleUI() {
-    speechToggle.classList.toggle('active', speechEnabled);
-    speechToggle.setAttribute('aria-pressed', speechEnabled ? 'true' : 'false');
-  }
-  function updateListenUI() {
-    listenCtrl.classList.toggle('active', listening);
-    listenCtrl.setAttribute('aria-pressed', listening ? 'true' : 'false');
-  }
-
-  function recordTranscript(role, text) {
-    if (!text) return;
-    transcript.push({ role, text, ts: Date.now() });
-    if (transcriptText) {
-      const cleaned = transcript.map(item => `${item.role.toUpperCase()}: ${item.text}`).join('\n');
-      transcriptText.textContent = cleaned;
-    }
-  }
-
-  function copyTranscript() {
-    if (!navigator?.clipboard || !transcriptText) return;
-    navigator.clipboard.writeText(transcriptText.textContent || '').catch(() => {});
-  }
-
-  function showTncDetails() {
-    if (!tncButton) return;
-    const msg = currentLang === 'es'
-      ? (tncButton.dataset.esMsg || tncButton.dataset.enMsg || '')
-      : (tncButton.dataset.enMsg || tncButton.dataset.esMsg || '');
-    if (!msg) return;
-    addMsg(msg, 'bot');
-    speak(msg, currentLang);
-  }
-
-  function sendTelemetry(eventType, detail = {}) {
-    if (Math.random() > telemetrySampleRate) return;
-    try {
-      const payload = {
-        event: eventType,
-        lang: currentLang,
-        ts: Date.now(),
-        detail
-      };
-      fetch(TELEMETRY_URL, {
-        method: 'POST',
-        mode: 'cors',
-        cache: 'no-store',
-        credentials: 'omit',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).catch(() => {});
-    } catch {}
-  }
-
-  function applyConsentUI() {
-    const hide = consentState === 'accepted' || consentState === 'denied';
-    if (consentBanner) {
-      consentBanner.style.display = hide ? 'none' : 'block';
-      consentBanner.setAttribute('aria-hidden', hide ? 'true' : 'false');
-    }
-    if (inlineConsent) {
-      inlineConsent.style.display = hide ? 'none' : 'grid';
-      inlineConsent.setAttribute('aria-hidden', hide ? 'true' : 'false');
-    }
-  }
-
-  function handleConsent(next) {
-    consentState = next;
-    persistConsent(next);
-    if (next === 'accepted') {
-      savePrefs({ lang: currentLang, theme: currentTheme });
-    } else if (next === 'denied') {
-      try { localStorage.removeItem(STORAGE_KEYS.prefs); } catch {}
-    }
-    applyConsentUI();
-  }
-
-  if (consentAccept) {
-    consentAccept.onclick = () => handleConsent('accepted');
-  }
-
-  if (consentDeny) {
-    consentDeny.onclick = () => handleConsent('denied');
-  }
-
-  if (inlineConsentAccept) {
-    inlineConsentAccept.onclick = () => handleConsent('accepted');
-  }
-
-  if (inlineConsentDeny) {
-    inlineConsentDeny.onclick = () => handleConsent('denied');
-  }
-  applyConsentUI();
-
-  function persistPrefs() { savePrefs({ lang: currentLang, theme: currentTheme }); }
-
-  function setLanguage(lang) {
-    const toES = lang === 'es';
-    currentLang = toES ? 'es' : 'en';
-    document.documentElement.lang = currentLang;
-
-    langCtrl.textContent = toES ? 'ES' : 'EN';
-    langCtrl.setAttribute('aria-pressed', toES ? 'true' : 'false');
-    langCtrl.classList.toggle('active', toES);
-
-    transNodes.forEach(node => { node.textContent = toES ? node.dataset.es : node.dataset.en; });
-    phNodes.forEach(node => { node.placeholder = toES ? node.dataset.esPh : node.dataset.enPh; });
-    ariaNodes.forEach(node => { node.setAttribute('aria-label', toES ? node.dataset.esLabel : node.dataset.enLabel); });
-
-    if (recognition) recognition.lang = toES ? 'es-ES' : 'en-US';
-    persistPrefs();
-    setVoiceStatus('', '');
-  }
-  langCtrl.addEventListener('click', () => setLanguage(currentLang === 'es' ? 'en' : 'es'));
-
-  function setTheme(mode) {
-    currentTheme = mode === 'dark' ? 'dark' : 'light';
-    document.body.classList.toggle('dark', currentTheme === 'dark');
-    themeCtrl.textContent = currentTheme === 'dark' ? 'Light' : 'Dark';
-    themeCtrl.setAttribute('aria-pressed', currentTheme === 'dark' ? 'true' : 'false');
-    persistPrefs();
-  }
-  themeCtrl.onclick = () => setTheme(currentTheme === 'dark' ? 'light' : 'dark');
-
-  function getVoiceForLang(langCode) {
-    if (!synth) return null;
-    const voices = synth.getVoices();
-    const want = langCode === 'es' ? ['es-', 'es_'] : ['en-', 'en_'];
-    const preferred = voices
-      .filter(v => want.some(p => (v.lang || '').toLowerCase().startsWith(p)))
-      .sort((a,b)=>((b.localService?2:0)+(/google|microsoft|natural/i.test(b.name)?1:0))-((a.localService?2:0)+(/google|microsoft|natural/i.test(a.name)?1:0)));
-    return preferred[0] || null;
-  }
-
-  function speak(text, langOverride) {
-    if (!synth || !speechEnabled) return;
-    const clean = cleanForSpeech(normalizeUserText(text));
-    if (!clean) return;
-    const langForReply = langOverride === 'es' ? 'es' : (langOverride === 'en' ? 'en' : currentLang);
-    synth.cancel();
-    const u = new SpeechSynthesisUtterance(clean);
-    u.lang = langForReply === 'es' ? 'es-ES' : 'en-US';
-    const v = getVoiceForLang(langForReply); if (v) u.voice = v;
-    if (langForReply === 'en') { u.rate = 1.03; u.pitch = 1.02; }
-    synth.speak(u);
-  }
-  if (synth) synth.onvoiceschanged = () => getVoiceForLang(currentLang);
-
-  if (recognition) {
-    recognition.continuous = false; recognition.interimResults = false;
-    recognition.lang = currentLang === 'es' ? 'es-ES' : 'en-US';
-    recognition.onstart = () => { listening = true; updateListenUI(); };
-    recognition.onresult = e => {
-      const transcript = e.results?.[0]?.[0]?.transcript || '';
-      const cleaned = normalizeUserText(transcript);
-      if (cleaned) {
-        input.value = cleaned;
-        input.focus();
-        if (isFullyAuthorized()) {
-          form.requestSubmit();
-        } else {
-          showAuthWarningOnce();
-        }
-      }
-    };
-    recognition.onerror = () => { listening = false; updateListenUI(); };
-    recognition.onend   = () => { listening = false; updateListenUI(); };
-  }
-
-  function startListening(){
-    if (!recognition) return;
-    recognition.lang = currentLang==='es'?'es-ES':'en-US';
-    listening=true;
-    updateListenUI();
-    recognition.start();
-  }
-
-  speechToggle.onclick = () => {
-    if (!synth) { addMsg(currentLang==='es'?'La síntesis de voz no está disponible.':'Speech synthesis is not available.','bot'); return; }
-    speechEnabled = !speechEnabled; updateSpeechToggleUI();
-  };
-
-  listenCtrl.onclick = () => {
-    if (!recognition) { addMsg(currentLang==='es'?'Entrada por voz no disponible en este navegador.' : 'Voice input is not available in this browser.','bot'); return; }
-    if (listening) { recognition.stop(); return; }
-    startListening();
-  };
-
-  if (transcriptCopy) transcriptCopy.onclick = copyTranscript;
-  if (tncButton) tncButton.onclick = showTncDetails;
-
-  setLanguage(currentLang);
-  setTheme(currentTheme);
-  updateSpeechToggleUI();
-  updateListenUI();
-
-  function ensureWelcome() {
-    if (!log || log.dataset.welcomed) return;
-    const welcome = currentLang === 'es'
-      ? 'Chattia para OPS está listo. Usa el botón de micrófono o escribe para chatear.'
-      : 'Chattia for OPS is ready. Use the mic button or type to chat.';
-    addMsg(welcome, 'bot');
-    log.dataset.welcomed = 'true';
-  }
-  ensureWelcome();
-
-  form.onsubmit = async e => {
-    e.preventDefault();
-
-    const requestLang = currentLang;
-    const msg = normalizeUserText(input.value);
-    if (!msg) return;
-
-    if (!isFullyAuthorized()) {
-      showAuthWarningOnce();
-      sendTelemetry('auth_block', { reason: 'origin' });
-      return;
-    }
-
-    if (looksSuspicious(msg)) {
-      const warn = requestLang === 'es'
-        ? 'Mensaje bloqueado por seguridad. Escribe sin etiquetas o scripts.'
-        : 'Message blocked for security. Please write without tags or scripts.';
-      addMsg(warn, 'bot'); speak(warn, requestLang);
-      sendTelemetry('client_suspicious');
-      return;
-    }
-
-    // Honeypots
-    const hp1 = normalizeUserText(hpEmail?.value || '');
-    const hp2 = normalizeUserText(hpWebsite?.value || '');
-
-    // Turnstile availability / token (session-aware reuse: DO NOT force reset after success)
-    const activeTurnstileToken = getTurnstileToken();
-    if (!activeTurnstileToken) {
-      // Turnstile may still be initializing or unavailable
-      if (!window.turnstile) {
-        turnstileUnavailableOnce();
-      } else {
-        const warn = requestLang === 'es'
-          ? 'Completa la verificación de seguridad para continuar.'
-          : 'Please complete the security check to continue.';
-        addMsg(warn, 'bot'); speak(warn, requestLang);
-      }
-      sendTelemetry('turnstile_missing');
-      return;
-    }
-
-    addMsg(msg, 'user');
-    input.value = '';
-
-    const botDiv = addMsg('…', 'bot');
-
-    try {
-      const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 15000);
-
-      const res = await fetch(API_URL.href, {
-        method: 'POST',
-        mode: 'cors',
-        cache: 'no-store',
-        credentials: 'omit',
-        redirect: 'error',
-        referrerPolicy: 'no-referrer',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Ops-Asset-Id': ASSET_ID
-        },
-        body: JSON.stringify({
-          message: msg,
-          lang: requestLang,
-          v: 1,
-          turnstileToken: activeTurnstileToken,
-          hp_email: hp1,
-          hp_website: hp2
-        }),
-        signal: ctrl.signal
-      });
-
-      clearTimeout(to);
-
-      const text = await res.text();
-      let data = null; try { data = JSON.parse(text); } catch {}
-
-      if (!res.ok) {
-        const fallback = requestLang==='es' ? 'Error del gateway de OPS.' : 'OPS gateway error.';
-        const errMsg = (data && (data.error || data.public_error)) ? (data.error || data.public_error) : (text || fallback);
-        botDiv.textContent = errMsg;
-        speak(errMsg, requestLang);
-        sendTelemetry('api_error', { status: res.status, type: 'gateway' });
-
-        // If Turnstile failed, reset ONLY then
-        if (res.status === 403 && /turnstile/i.test(errMsg)) {
-          resetTurnstile();
-        }
-        return;
-      }
-
-      if (!data || typeof data !== 'object') {
-        const fallback = requestLang==='es' ? 'Respuesta no válida del gateway.' : 'Invalid response from gateway.';
-        botDiv.textContent = fallback; speak(fallback, requestLang);
-        sendTelemetry('api_error', { status: res.status, type: 'invalid_json' });
-        return;
-      }
-
-      if (data.error || data.public_error) {
-        const err = data.error || data.public_error;
-        botDiv.textContent = err; speak(err, requestLang);
-        sendTelemetry('api_error', { status: res.status, type: 'error_field' });
-
-        if (res.status === 403 && /turnstile/i.test(err)) {
-          resetTurnstile();
-        }
-        return;
-      }
-
-      const replyLang = data.lang === 'es' ? 'es' : requestLang;
-      const reply = (typeof data.reply === 'string' && data.reply.trim())
-        ? data.reply.trim()
-        : (requestLang==='es' ? 'Sin respuesta.' : 'No reply.');
-      botDiv.textContent = reply;
-      speak(reply, replyLang);
-
-      // IMPORTANT: no reset here (pre-clearance + reuse = clean UX)
-    } catch {
-      const fallback = requestLang==='es' ? 'No puedo conectar con el asistente OPS.' : 'Can’t reach OPS assistant.';
-      botDiv.textContent = fallback; speak(fallback, requestLang);
-      sendTelemetry('network_error');
-    }
-  };
-})();
-</script>
 </body>
 </html>
