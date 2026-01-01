@@ -12,7 +12,7 @@
 
 ## Frontend (GitHub Pages)
 - **CSP (meta):** Mirrors the worker allowlists, adds `frame-ancestors 'none'`, and reports to `https://ops-gateway.grabem-holdem-nuts-right.workers.dev/reports/csp`.
-- **HTTP-equivalent headers (meta):** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=15552000; includeSubDomains; preload`, `Referrer-Policy: strict-origin-when-cross-origin` (also set via `<meta name=\"referrer\">`), `Permissions-Policy: accelerometer=(), camera=(), display-capture=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), bluetooth=()`, `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`.
+- **HTTP-equivalent headers (meta):** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=15552000; includeSubDomains; preload`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: accelerometer=(), camera=(), display-capture=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), bluetooth=()`, `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`.
 - **Assets with SRI:**  
   - `assets/styles.css` — `sha384-Kuw+CpXG3kB2wy3CGC3Z+lpHtDAhAiEPN/roIeIFlyD/BNIC5EM/9lYE7y/5EMsy`  
   - `https://challenges.cloudflare.com/turnstile/v0/api.js` — `sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb`
