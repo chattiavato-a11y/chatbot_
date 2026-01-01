@@ -22,19 +22,73 @@ const MAX_MSG_CHARS = 256;
 
 const REPO_URL  = "https://github.com/chattiavato-a11y/ops-online-support";
 const BRAIN_URL = "https://ops-online-assistant.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat";
+const GATEWAY_ORIGIN = "https://ops-gateway.grabem-holdem-nuts-right.workers.dev";
+
+const CSP_REPORT_PATH = "/reports/csp";
+const TELEMETRY_REPORT_PATH = "/reports/telemetry";
+
+const REPORTING_ENDPOINTS = {
+  csp: {
+    group: "csp-endpoint",
+    max_age: 86400,
+    endpoints: [{ url: `${GATEWAY_ORIGIN}${CSP_REPORT_PATH}` }]
+  },
+  telemetry: {
+    group: "telemetry",
+    max_age: 86400,
+    endpoints: [{ url: `${GATEWAY_ORIGIN}${TELEMETRY_REPORT_PATH}` }]
+  }
+};
+
+const PERMISSIONS_POLICY = [
+  "accelerometer=()",
+  "camera=()",
+  "display-capture=()",
+  "fullscreen=()",
+  "geolocation=()",
+  "gyroscope=()",
+  "magnetometer=()",
+  "microphone=()",
+  "payment=()",
+  "usb=()",
+  "bluetooth=()"
+].join(", ");
+
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'none'",
+  "base-uri 'none'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "form-action 'self'",
+  "frame-src https://challenges.cloudflare.com",
+  "script-src 'self' https://challenges.cloudflare.com 'nonce-ops-inline-asset'",
+  "style-src 'self'",
+  "img-src 'self' data:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev https://challenges.cloudflare.com",
+  "worker-src 'self'",
+  "manifest-src 'self'",
+  "media-src 'self'",
+  `report-to ${REPORTING_ENDPOINTS.csp.group}`,
+  `report-uri ${GATEWAY_ORIGIN}${CSP_REPORT_PATH}`
+].join("; ");
 
 /* -------------------- Headers -------------------- */
 
 function securityHeaders() {
   return {
-    "Content-Security-Policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none';",
+    "Content-Security-Policy": CONTENT_SECURITY_POLICY,
     "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
-    "Cross-Origin-Resource-Policy": "cross-origin",
-    "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=(), usb=(), bluetooth=(), gyroscope=(), magnetometer=(), accelerometer=()",
-    "Strict-Transport-Security": "max-age=15552000; includeSubDomains",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "Permissions-Policy": PERMISSIONS_POLICY,
+    "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
     "Cache-Control": "no-store",
-    "X-Frame-Options": "DENY"
+    "X-Frame-Options": "DENY",
+    "Report-To": JSON.stringify(Object.values(REPORTING_ENDPOINTS)),
+    "Reporting-Endpoints": Object.values(REPORTING_ENDPOINTS)
+      .map((e) => `${e.group}=\"${e.endpoints[0].url}\"`)
+      .join(", ")
   };
 }
 
@@ -177,6 +231,14 @@ export default {
 
     const isChatPath = pathname === "/api/ops-online-chat";
     const isRoot = pathname === "/" || pathname === "/ping";
+    const isCspReport = pathname === CSP_REPORT_PATH;
+    const isTelemetryReport = pathname === TELEMETRY_REPORT_PATH;
+
+    if (url.protocol === "http:") {
+      const redirectUrl = new URL(request.url);
+      redirectUrl.protocol = "https:";
+      return Response.redirect(redirectUrl.toString(), 308);
+    }
 
     if (isRoot) {
       return json(origin, 200, {
@@ -185,6 +247,52 @@ export default {
         usage: "POST /api/ops-online-chat with X-Ops-Asset-Id header",
         repo: REPO_URL
       });
+    }
+
+    if ((isCspReport || isTelemetryReport) && request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: { ...securityHeaders(), ...corsHeaders(origin) }
+      });
+    }
+
+    if (isCspReport || isTelemetryReport) {
+      if (origin && origin !== ALLOWED_ORIGIN) {
+        await logEvent(ctx, env, { type: "REPORT_ORIGIN_BLOCK", ip: clientIp });
+        return json(origin, 403, { error: "Origin not allowed." });
+      }
+
+      if (request.method !== "POST") {
+        return json(origin, 405, { error: "POST only." });
+      }
+
+      const ct = (request.headers.get("content-type") || "").toLowerCase();
+      if (!ct.includes("application/json")) {
+        return json(origin, 415, { error: "JSON only." });
+      }
+
+      const bodyText = await readBodyLimited(request);
+      if (!bodyText) {
+        return json(origin, 400, { error: "Empty report." });
+      }
+
+      let data = {};
+      try { data = JSON.parse(bodyText); } catch {}
+
+      const event = {
+        type: isCspReport ? "CSP_REPORT" : "TELEMETRY",
+        ip: clientIp,
+        ua: request.headers.get("User-Agent") || "",
+        sample: Math.random(),
+        report: data
+      };
+
+      // Basic sampling + size guard (already limited by readBodyLimited)
+      if (event.sample <= 0.9) {
+        await logEvent(ctx, env, event);
+      }
+
+      return json(origin, 202, { ok: true });
     }
 
     // CORS preflight
