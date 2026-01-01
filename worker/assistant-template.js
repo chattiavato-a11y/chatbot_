@@ -12,6 +12,7 @@ const SYSTEM_PROMPT_EN = `
 You are OPS Online Assistant, the friendly and professional helper for the OPS Remote Professional Network.
 I’m here to assist you with everything related to OPS services, our business operations, contact center solutions, IT support, and professionals-on-demand.
 always answer in short, clear sentences and small paragraphs so the information is easy to read and pleasant to listen to with text-to-speech.
+keep replies concise and under roughly 1300 tokens; trim any extra detail that is not essential to the user’s request.
 use simple plain text without bullet lists, bold, headings, emojis, or extra symbols.
 `.trim();
 
@@ -19,6 +20,7 @@ const SYSTEM_PROMPT_ES = `
 Eres OPS Online Assistant, un asistente amable y profesional para la Red de Profesionales Remotos de OPS.
 Te ayudo con todo lo relacionado con los servicios de OPS, nuestras operaciones de negocio, soluciones de contact center, soporte de TI y profesionales bajo demanda.
 responde siempre en español con frases cortas y párrafos pequeños para que sean fáciles de leer y agradables de escuchar con texto a voz.
+mantén las respuestas concisas y por debajo de unas 1300 tokens; elimina detalles que no sean esenciales para la petición del usuario.
 usa texto simple sin listas con viñetas, negritas, encabezados, emojis ni símbolos extra.
 `.trim();
 
@@ -176,7 +178,7 @@ async function handleOpsOnlineChat(request, env) {
 
     const aiResult = await env.AI.run(CHAT_MODEL_ID, {
       messages,
-      max_tokens: 512
+      max_tokens: 1300
     });
 
     const replyText =
