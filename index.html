@@ -53,7 +53,6 @@
     <span id="title" data-en="OPS Online Support" data-es="Soporte en línea OPS">OPS Online Support</span>
     <span id="policy-links" aria-label="Policies">
       <a href="https://www.chattia.io/privacy" target="_blank" rel="noopener">Privacy</a>
-      <a href="https://www.chattia.io/terms" target="_blank" rel="noopener">Terms</a>
     </span>
   </div>
 
@@ -114,8 +113,9 @@
     </form>
 
     <div id="tnc-footnote">
-      <a href="https://www.chattia.io/terms" target="_blank" rel="noopener" data-en="Terms & Conditions" data-es="Términos y Condiciones">Terms & Conditions</a>
-      <span data-en="Interacting with the chatbot authorizes us to gather behavioral data." data-es="Al interactuar con el chatbot autorizas la recopilación de datos de comportamiento.">Interacting with the chatbot authorizes us to gather behavioral data.</span>
+      <button type="button" id="tnc-button" class="tnc-button" data-en="T&C" data-es="TyC"
+        data-en-msg="Interacting with the chatbot authorizes us to gather behavioral data."
+        data-es-msg="Interactuar con el chatbot autoriza la recopilación de datos de comportamiento.">T&C</button>
     </div>
   </div>
 </div>
@@ -134,7 +134,6 @@
 
 <div class="footer-links">
   <a href="https://www.chattia.io/privacy" target="_blank" rel="noopener">Privacy</a>
-  <a href="https://www.chattia.io/terms" target="_blank" rel="noopener">Terms</a>
 </div>
 </div>
 
@@ -176,6 +175,7 @@
   const inlineConsent = qs('#inline-consent');
   const inlineConsentAccept = qs('#inline-consent-accept');
   const inlineConsentDeny = qs('#inline-consent-deny');
+  const tncButton = qs('#tnc-button');
 
   const voiceStatus   = qs('#voice-status');
 
@@ -398,6 +398,16 @@
     navigator.clipboard.writeText(transcriptText.textContent || '').catch(() => {});
   }
 
+  function showTncDetails() {
+    if (!tncButton) return;
+    const msg = currentLang === 'es'
+      ? (tncButton.dataset.esMsg || tncButton.dataset.enMsg || '')
+      : (tncButton.dataset.enMsg || tncButton.dataset.esMsg || '');
+    if (!msg) return;
+    addMsg(msg, 'bot');
+    speak(msg, currentLang);
+  }
+
   function sendTelemetry(eventType, detail = {}) {
     if (Math.random() > telemetrySampleRate) return;
     try {
@@ -578,6 +588,7 @@
   };
 
   if (transcriptCopy) transcriptCopy.onclick = copyTranscript;
+  if (tncButton) tncButton.onclick = showTncDetails;
 
   setLanguage(currentLang);
   setTheme(currentTheme);
