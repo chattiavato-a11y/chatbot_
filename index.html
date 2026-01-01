@@ -38,9 +38,9 @@
 <div id="page-shell">
 <div id="consent-banner" role="region" aria-live="polite">
   <h2 data-en="Privacy & consent" data-es="Privacidad y consentimiento">Privacy & consent</h2>
-  <p data-en="We store your language/theme preference in localStorage and send API requests to the OPS gateway. Choose how you want us to handle your preferences."
-     data-es="Guardamos tu preferencia de idioma/tema en localStorage y enviamos solicitudes API al gateway OPS. Elige cómo quieres que manejemos tus preferencias.">
-    We store your language/theme preference in localStorage and send API requests to the OPS gateway. Choose how you want us to handle your preferences.
+  <p data-en="We store your language/theme preference in localStorage and send API requests to the OPS gateway. By interacting with the chatbot you authorize the collection of behavioral data. Choose how you want us to handle your preferences."
+     data-es="Guardamos tu preferencia de idioma/tema en localStorage y enviamos solicitudes API al gateway OPS. Al interactuar con el chatbot autorizas la recopilación de datos de comportamiento. Elige cómo quieres que manejemos tus preferencias.">
+    We store your language/theme preference in localStorage and send API requests to the OPS gateway. By interacting with the chatbot you authorize the collection of behavioral data. Choose how you want us to handle your preferences.
   </p>
   <div id="consent-actions">
     <button type="button" id="consent-accept" class="link-button" data-en="Accept" data-es="Aceptar">Accept</button>
@@ -58,6 +58,16 @@
   </div>
 
   <div id="chat-log" aria-live="polite"></div>
+
+  <div id="inline-consent" role="region" aria-live="polite">
+    <div class="inline-consent-text" data-en="Interacting with the chatbot authorizes us to gather behavioral data for service quality. Review your preference." data-es="Interactuar con el chatbot nos autoriza a recopilar datos de comportamiento para la calidad del servicio. Revisa tu preferencia.">
+      Interacting with the chatbot authorizes us to gather behavioral data for service quality. Review your preference.
+    </div>
+    <div class="inline-consent-actions">
+      <button type="button" id="inline-consent-accept" class="link-button" data-en="Accept" data-es="Aceptar">Accept</button>
+      <button type="button" id="inline-consent-deny" class="link-button" data-en="Deny" data-es="Rechazar">Deny</button>
+    </div>
+  </div>
 
   <div id="chatbot-form-container">
     <div id="control-row" class="ctrl-group" aria-label="Language, theme, and speech controls">
@@ -102,6 +112,11 @@
         </svg>
       </button>
     </form>
+
+    <div id="tnc-footnote">
+      <a href="https://www.chattia.io/terms" target="_blank" rel="noopener" data-en="Terms & Conditions" data-es="Términos y Condiciones">Terms & Conditions</a>
+      <span data-en="Interacting with the chatbot authorizes us to gather behavioral data." data-es="Al interactuar con el chatbot autorizas la recopilación de datos de comportamiento.">Interacting with the chatbot authorizes us to gather behavioral data.</span>
+    </div>
   </div>
 </div>
 
@@ -158,6 +173,9 @@
   const consentBanner = qs('#consent-banner');
   const consentAccept = qs('#consent-accept');
   const consentDeny   = qs('#consent-deny');
+  const inlineConsent = qs('#inline-consent');
+  const inlineConsentAccept = qs('#inline-consent-accept');
+  const inlineConsentDeny = qs('#inline-consent-deny');
 
   const voiceStatus   = qs('#voice-status');
 
@@ -401,27 +419,42 @@
   }
 
   function applyConsentUI() {
-    if (!consentBanner) return;
     const hide = consentState === 'accepted' || consentState === 'denied';
-    consentBanner.style.display = hide ? 'none' : 'block';
+    if (consentBanner) {
+      consentBanner.style.display = hide ? 'none' : 'block';
+      consentBanner.setAttribute('aria-hidden', hide ? 'true' : 'false');
+    }
+    if (inlineConsent) {
+      inlineConsent.style.display = hide ? 'none' : 'grid';
+      inlineConsent.setAttribute('aria-hidden', hide ? 'true' : 'false');
+    }
+  }
+
+  function handleConsent(next) {
+    consentState = next;
+    persistConsent(next);
+    if (next === 'accepted') {
+      savePrefs({ lang: currentLang, theme: currentTheme, reduceMotion });
+    } else if (next === 'denied') {
+      try { localStorage.removeItem(STORAGE_KEYS.prefs); } catch {}
+    }
+    applyConsentUI();
   }
 
   if (consentAccept) {
-    consentAccept.onclick = () => {
-      consentState = 'accepted';
-      persistConsent('accepted');
-      savePrefs({ lang: currentLang, theme: currentTheme, reduceMotion });
-      applyConsentUI();
-    };
+    consentAccept.onclick = () => handleConsent('accepted');
   }
 
   if (consentDeny) {
-    consentDeny.onclick = () => {
-      consentState = 'denied';
-      persistConsent('denied');
-      try { localStorage.removeItem(STORAGE_KEYS.prefs); } catch {}
-      applyConsentUI();
-    };
+    consentDeny.onclick = () => handleConsent('denied');
+  }
+
+  if (inlineConsentAccept) {
+    inlineConsentAccept.onclick = () => handleConsent('accepted');
+  }
+
+  if (inlineConsentDeny) {
+    inlineConsentDeny.onclick = () => handleConsent('denied');
   }
   applyConsentUI();
 
