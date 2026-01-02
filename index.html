@@ -1,64 +1,50 @@
 <!-- index.html -->
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+
   <title>Chattia for OPS</title>
   <meta name="description" content="Chattia for OPS — secure, fast, accessible assistant UI." />
+  <link rel="canonical" href="https://www.chattia.io/" />
+
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <meta name="color-scheme" content="light dark" />
+  <meta name="robots" content="index,follow" />
 
   <!-- Fallback CSP (best-effort on static hosts).
-       For A+ scores, set these as REAL HTTP response headers at the edge. -->
-  <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self';
-    base-uri 'none';
-    object-src 'none';
-    frame-ancestors 'none';
-    form-action 'self';
-    img-src 'self' data:;
-    font-src 'self' data:;
-    style-src 'self';
-    script-src 'self' https://challenges.cloudflare.com;
-    connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev;
-    frame-src https://challenges.cloudflare.com;
-    worker-src 'self';
-    manifest-src 'self';
-    media-src 'self';
-    upgrade-insecure-requests;
-    report-uri https://ops-gateway.grabem-holdem-nuts-right.workers.dev/reports/csp;
-  ">
-
-  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <meta http-equiv="X-Frame-Options" content="DENY" />
-  <meta http-equiv="Strict-Transport-Security" content="max-age=15552000; includeSubDomains; preload" />
-  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
-  <meta http-equiv="Permissions-Policy" content="accelerometer=(), camera=(), display-capture=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), bluetooth=()" />
-  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin" />
-  <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp" />
+       For real enforcement, set CSP + security headers at the edge (Cloudflare). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self'; script-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; worker-src 'self'; manifest-src 'self'; media-src 'self'; upgrade-insecure-requests; block-all-mixed-content" />
 
   <link rel="preconnect" href="https://challenges.cloudflare.com" crossorigin />
   <link rel="preconnect" href="https://ops-gateway.grabem-holdem-nuts-right.workers.dev" crossorigin />
 
-  <link rel="stylesheet"
+  <!-- App CSS -->
+  <link
+    rel="stylesheet"
     href="assets/chattia-ui.css"
     integrity="sha384-K4H4aXkah+rRusGU11JzeaaUTA41ciYKMqM2qvIiOaL9HmphSsVcwoG2wacd2KfZ"
-    crossorigin="anonymous" />
-
-  <!-- Cloudflare Turnstile -->
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-    defer
     crossorigin="anonymous"
-    integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb"></script>
+  />
 
-  <!-- App -->
-  <script src="assets/chattia-ui.js"
+  <!-- Cloudflare Turnstile (no SRI: remote script can change) -->
+  <script
+    src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+    defer
+    crossorigin="anonymous"></script>
+
+  <!-- App JS -->
+  <script
+    src="assets/chattia-ui.js"
     defer
     integrity="sha384-1AbXKn/wcjZgNr8YQjXV7jkiWJHptlWRIAcpEFN5dG5xCcfCbZW7KNOdKDtz6b9H"
     crossorigin="anonymous"></script>
 </head>
+
 <body>
+  <a class="sr-only" href="#chat-root">Skip to chat</a>
+
   <noscript>
     <div class="noscript">
       This app requires JavaScript to run.
@@ -87,21 +73,39 @@
 
         <div class="divider" aria-hidden="true"></div>
 
-        <button type="button" id="langCtrl" class="pill-btn" aria-pressed="false"
-          aria-label="Toggle language" data-en-label="Toggle language" data-es-label="Cambiar idioma">EN</button>
+        <button
+          type="button"
+          id="langCtrl"
+          class="pill-btn"
+          aria-pressed="false"
+          aria-label="Toggle language"
+          data-en-label="Toggle language"
+          data-es-label="Cambiar idioma">EN</button>
 
-        <button type="button" id="themeCtrl" class="pill-btn" aria-pressed="false"
-          aria-label="Toggle theme" data-en-label="Toggle theme" data-es-label="Cambiar tema">Dark</button>
+        <button
+          type="button"
+          id="themeCtrl"
+          class="pill-btn"
+          aria-pressed="false"
+          aria-label="Toggle theme"
+          data-en-label="Toggle theme"
+          data-es-label="Cambiar tema">Dark</button>
 
-        <button type="button" id="speechToggle" class="pill-btn" aria-pressed="false"
-          aria-label="Toggle voice output" data-en-label="Toggle voice output" data-es-label="Activar voz">
+        <button
+          type="button"
+          id="speechToggle"
+          class="pill-btn"
+          aria-pressed="false"
+          aria-label="Toggle voice output"
+          data-en-label="Toggle voice output"
+          data-es-label="Activar voz">
           <span data-en="Voice" data-es="Voz">Voice</span>
         </button>
       </nav>
     </header>
 
-    <main class="panel" role="main">
-      <section class="chat" aria-label="Chat">
+    <main class="panel" role="main" id="chat-root">
+      <section class="chat" aria-label="Chat" id="chat">
         <div class="chat-head">
           <div class="status">
             <span class="dot" id="netDot" aria-hidden="true"></span>
@@ -109,13 +113,23 @@
           </div>
 
           <div class="mini-actions">
-            <button type="button" id="clearChat" class="ghost-btn"
-              aria-label="Clear chat" data-en-label="Clear chat" data-es-label="Borrar chat">
+            <button
+              type="button"
+              id="clearChat"
+              class="ghost-btn"
+              aria-label="Clear chat"
+              data-en-label="Clear chat"
+              data-es-label="Borrar chat">
               <span data-en="Clear" data-es="Borrar">Clear</span>
             </button>
 
-            <button type="button" id="openTranscript" class="ghost-btn"
-              aria-label="Open transcript" data-en-label="Open transcript" data-es-label="Abrir transcripción">
+            <button
+              type="button"
+              id="openTranscript"
+              class="ghost-btn"
+              aria-label="Open transcript"
+              data-en-label="Open transcript"
+              data-es-label="Abrir transcripción">
               <span data-en="Transcript" data-es="Transcripción">Transcript</span>
             </button>
           </div>
@@ -124,23 +138,28 @@
         <div id="chat-log" class="chat-log" aria-live="polite" aria-relevant="additions text"></div>
 
         <div class="composer">
-          <div class="consent-inline" id="inline-consent" role="region" aria-live="polite">
-            <div class="consent-text"
+          <div class="consent-inline" id="inline-consent" role="region" aria-live="polite" aria-hidden="true">
+            <div
+              class="consent-text"
               data-en="Preferences (language/theme) are stored only if you accept. Messages are sent to the OPS gateway."
               data-es="Las preferencias (idioma/tema) se guardan solo si aceptas. Los mensajes se envían al gateway de OPS.">
               Preferences (language/theme) are stored only if you accept. Messages are sent to the OPS gateway.
             </div>
             <div class="consent-actions">
-              <button type="button" id="inline-consent-accept" class="link-btn"
-                data-en="Accept" data-es="Aceptar">Accept</button>
-              <button type="button" id="inline-consent-deny" class="link-btn"
-                data-en="Deny" data-es="Rechazar">Deny</button>
+              <button type="button" id="inline-consent-accept" class="link-btn" data-en="Accept" data-es="Aceptar">Accept</button>
+              <button type="button" id="inline-consent-deny" class="link-btn" data-en="Deny" data-es="Rechazar">Deny</button>
             </div>
           </div>
 
           <div class="ctrl-row" aria-label="Input controls">
-            <button type="button" id="listenCtrl" class="mic-btn" aria-pressed="false"
-              aria-label="Start voice input" data-en-label="Start voice input" data-es-label="Comenzar voz">
+            <button
+              type="button"
+              id="listenCtrl"
+              class="mic-btn"
+              aria-pressed="false"
+              aria-label="Start voice input"
+              data-en-label="Start voice input"
+              data-es-label="Comenzar voz">
               <svg viewBox="0 0 24 24" class="ic" aria-hidden="true">
                 <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zM11 19h2v3h-2z"/>
               </svg>
@@ -150,7 +169,9 @@
             <div id="voice-status" class="voice-status" role="status" aria-live="polite"></div>
 
             <div class="turnstile-wrap" id="turnstile-container" aria-label="Cloudflare Turnstile verification">
-              <div id="turnstile-widget" class="cf-turnstile"
+              <div
+                id="turnstile-widget"
+                class="cf-turnstile"
                 data-sitekey="0x4AAAAAACCemZgiIexxcpTR"
                 data-callback="opsTurnstileCallback"
                 data-expired-callback="opsTurnstileExpired"
@@ -158,16 +179,30 @@
             </div>
           </div>
 
-          <form id="chatbot-input-row" class="input-row" autocomplete="off">
+          <form id="chatbot-input-row" class="input-row" autocomplete="off" novalidate>
             <label class="sr-only" for="chatbot-input">Message</label>
-            <input id="chatbot-input" class="input" type="text" maxlength="256" required
+            <input
+              id="chatbot-input"
+              class="input"
+              type="text"
+              maxlength="256"
+              required
+              spellcheck="false"
+              autocapitalize="off"
+              autocomplete="off"
+              inputmode="text"
               placeholder="Type your message..."
-              data-en-ph="Type your message..." data-es-ph="Escriba su mensaje..." />
+              data-en-ph="Type your message..."
+              data-es-ph="Escriba su mensaje..." />
 
-            <!-- Honeypots (bots fill these) -->
+            <!-- Honeypots (bots fill these). Keep focus out of tab order. -->
             <div class="hp-wrap" aria-hidden="true">
-              <label>email<input id="hp_email" name="hp_email" type="text" autocomplete="off"></label>
-              <label>website<input id="hp_website" name="hp_website" type="text" autocomplete="off"></label>
+              <label>email
+                <input id="hp_email" name="hp_email" type="text" autocomplete="off" tabindex="-1" />
+              </label>
+              <label>website
+                <input id="hp_website" name="hp_website" type="text" autocomplete="off" tabindex="-1" />
+              </label>
             </div>
 
             <button id="chatbot-send" class="send-btn" type="submit" aria-label="Send">
@@ -178,10 +213,14 @@
           </form>
 
           <div class="footnote">
-            <button type="button" id="tnc-button" class="tnc"
-              data-en="T&C" data-es="TyC"
+            <button
+              type="button"
+              id="tnc-button"
+              class="tnc"
+              data-en="T&amp;C"
+              data-es="TyC"
               data-en-msg="Interacting with the chatbot sends requests to the OPS gateway."
-              data-es-msg="Interactuar con el chatbot envía solicitudes al gateway de OPS.">T&C</button>
+              data-es-msg="Interactuar con el chatbot envía solicitudes al gateway de OPS.">T&amp;C</button>
           </div>
         </div>
       </section>
@@ -189,8 +228,13 @@
       <aside class="drawer" id="transcriptDrawer" aria-label="Transcript panel" aria-hidden="true">
         <div class="drawer-head">
           <div class="drawer-title" data-en="Transcript" data-es="Transcripción">Transcript</div>
-          <button type="button" id="closeTranscript" class="ghost-btn"
-            aria-label="Close transcript" data-en-label="Close transcript" data-es-label="Cerrar transcripción">
+          <button
+            type="button"
+            id="closeTranscript"
+            class="ghost-btn"
+            aria-label="Close transcript"
+            data-en-label="Close transcript"
+            data-es-label="Cerrar transcripción">
             <span data-en="Close" data-es="Cerrar">Close</span>
           </button>
         </div>
@@ -198,8 +242,13 @@
         <pre id="transcript-text" class="transcript" role="region" aria-live="polite"></pre>
 
         <div class="drawer-actions">
-          <button type="button" id="transcript-copy" class="pill-btn"
-            aria-label="Copy transcript" data-en-label="Copy transcript" data-es-label="Copiar transcripción">
+          <button
+            type="button"
+            id="transcript-copy"
+            class="pill-btn"
+            aria-label="Copy transcript"
+            data-en-label="Copy transcript"
+            data-es-label="Copiar transcripción">
             <span data-en="Copy" data-es="Copiar">Copy</span>
           </button>
         </div>
@@ -215,8 +264,9 @@
 
   <!-- Consent toast -->
   <div id="consent-banner" class="toast" role="region" aria-live="polite" aria-hidden="true">
-    <div class="toast-title" data-en="Privacy & consent" data-es="Privacidad y consentimiento">Privacy & consent</div>
-    <div class="toast-body"
+    <div class="toast-title" data-en="Privacy &amp; consent" data-es="Privacidad y consentimiento">Privacy &amp; consent</div>
+    <div
+      class="toast-body"
       data-en="We store language/theme only if you accept. Chat requests are sent to the OPS gateway."
       data-es="Guardamos idioma/tema solo si aceptas. Las solicitudes se envían al gateway de OPS.">
       We store language/theme only if you accept. Chat requests are sent to the OPS gateway.
