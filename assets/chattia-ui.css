@@ -1,5 +1,6 @@
 /* assets/chattia-ui.css */
 
+/* -------------------- Base tokens -------------------- */
 :root{
   color-scheme: light dark;
 
@@ -36,6 +37,10 @@
 
   --danger: #ff3b8f;
   --ok: #2cf2a2;
+
+  /* Layout/behavior */
+  --topbar-h: 64px;
+  --safe-focus: var(--ring);
 }
 
 [data-theme="dark"]{
@@ -53,8 +58,9 @@
   --bot: rgba(18, 214, 223, .18);
 }
 
-*{box-sizing:border-box}
-html,body{height:100%}
+/* -------------------- Resets -------------------- */
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
 body{
   margin:0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -66,7 +72,12 @@ body{
 }
 
 a{ color: inherit; }
-a:focus-visible{ box-shadow: var(--ring); outline: none; }
+a:focus-visible{ box-shadow: var(--safe-focus); outline: none; }
+
+:focus-visible{
+  outline: none;
+  box-shadow: var(--safe-focus);
+}
 
 .sr-only{
   position:absolute!important;
@@ -84,6 +95,23 @@ a:focus-visible{ box-shadow: var(--ring); outline: none; }
   border: 1px solid rgba(255, 59, 143, .35);
 }
 
+/* Skip link (keyboard) */
+.skip-link{
+  position:absolute;
+  top:10px; left:10px;
+  padding:10px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.85);
+  border: 1px solid var(--border);
+  color: var(--text);
+  transform: translateY(-120%);
+  transition: transform .12s ease;
+  z-index: 100;
+}
+.skip-link:focus{ transform: translateY(0); }
+[data-theme="dark"] .skip-link{ background: rgba(10,12,26,.85); }
+
+/* -------------------- Background -------------------- */
 .bg{
   position:fixed;
   inset:-20%;
@@ -111,6 +139,7 @@ a:focus-visible{ box-shadow: var(--ring); outline: none; }
   .send-btn, .mic-btn, .pill-btn, .pill-link, .ghost-btn{ transition: none; }
 }
 
+/* -------------------- Layout -------------------- */
 .shell{
   max-width: var(--maxw);
   margin: 0 auto;
@@ -179,6 +208,7 @@ a:focus-visible{ box-shadow: var(--ring); outline: none; }
   grid-template-columns: 1fr;
 }
 
+/* -------------------- Chat -------------------- */
 .chat{
   min-height: 70vh;
   display:flex;
@@ -223,6 +253,8 @@ a:focus-visible{ box-shadow: var(--ring); outline: none; }
   flex: 1 1 auto;
   min-height: 320px;
   max-height: clamp(380px, 62vh, 760px);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .msg{
@@ -257,6 +289,7 @@ a:focus-visible{ box-shadow: var(--ring); outline: none; }
   color: var(--muted);
 }
 
+/* -------------------- Composer -------------------- */
 .composer{
   border-top: 1px solid var(--border);
   padding: 14px 16px 16px;
@@ -308,6 +341,7 @@ a:focus-visible{ box-shadow: var(--ring); outline: none; }
 }
 .turnstile-wrap.ts-cleared{ display:none; }
 
+/* Input row */
 .input-row{
   display:flex;
   gap:10px;
@@ -326,6 +360,16 @@ a:focus-visible{ box-shadow: var(--ring); outline: none; }
 }
 [data-theme="dark"] .input{
   background: rgba(10, 12, 26, .42);
+}
+
+/* Hide honeypots but keep in DOM for bots */
+.hp-wrap{
+  position:absolute;
+  left:-9999px;
+  top:auto;
+  width:1px;
+  height:1px;
+  overflow:hidden;
 }
 
 .ic{ width:18px;height:18px; fill: currentColor; }
@@ -440,7 +484,7 @@ a:focus-visible{ box-shadow: var(--ring); outline: none; }
 }
 .muted{ color: var(--muted); font-size: 12px; }
 
-/* Transcript drawer */
+/* -------------------- Transcript drawer -------------------- */
 .drawer{
   position:absolute;
   inset: 0 0 0 auto;
@@ -485,7 +529,7 @@ a:focus-visible{ box-shadow: var(--ring); outline: none; }
   justify-content:flex-end;
 }
 
-/* Toast consent */
+/* -------------------- Toast consent -------------------- */
 .toast{
   position: fixed;
   left: 16px;
@@ -522,12 +566,7 @@ a:focus-visible{ box-shadow: var(--ring); outline: none; }
   justify-content:flex-end;
 }
 
-/* Focus */
-:focus-visible{
-  outline: none;
-  box-shadow: var(--ring);
-}
-
+/* -------------------- Responsive -------------------- */
 @media (max-width: 720px){
   .shell{ padding: 16px 10px 26px; }
   .topbar{ flex-direction:column; align-items:flex-start; }
