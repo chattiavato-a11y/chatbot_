@@ -1,20 +1,31 @@
 /* assets/chattia-ui.js */
+/* OPS UI — v3 (repo-coordinated with ops-gateway v2 + Turnstile) */
 (() => {
+  "use strict";
+
   const qs  = (s) => document.querySelector(s);
   const qsa = (s) => [...document.querySelectorAll(s)];
 
   // === CONFIG ===
+  // Keep ASSET_ID in sync with Gateway env: OPS_ASSET_IDS (or ASSET_ID)
   const ASSET_ID = "CAFF600A21B457E5D909FD887AF48018B3CBFDDF6F9746E56238B23AF061F9E2";
+
   const GATEWAY_ORIGIN = "https://ops-gateway.grabem-holdem-nuts-right.workers.dev";
   const API_URL = `${GATEWAY_ORIGIN}/api/ops-online-chat`;
   const TELEMETRY_URL = `${GATEWAY_ORIGIN}/reports/telemetry`;
 
   // Optional extra client-side allowlist (gateway still enforces Origin)
   const AUTH_RULES = [
-    { origin: "https://chattiavato-a11y.github.io", pathPrefix: "/ops-online-support/" },
-    { origin: "https://www.chattia.io", pathPrefix: "/" },
-    { origin: "https://chattia.io", pathPrefix: "/" }
+    { origin: "https://chattiavato-a11y.github.io", pathPrefixes: ["/ops-online-support", "/ops-online-support/"] },
+    { origin: "https://www.chattia.io", pathPrefixes: ["/"] },
+    { origin: "https://chattia.io", pathPrefixes: ["/"] }
   ];
+
+  const MAX_INPUT_CHARS = 256;
+
+  // Turnstile tokens are typically short-lived and single-use.
+  // Always refresh after a submit attempt to avoid “already consumed” failures.
+  const TURNSTILE_MAX_AGE_MS = 110_000;
 
   // === ELEMENTS ===
   const log = qs("#chat-log");
@@ -94,13 +105,13 @@
   }
 
   function applyConsentUI() {
-    const hide = consentState === "accepted" || consentState === "denied";
-    // toast
+    const hide = (consentState === "accepted" || consentState === "denied");
+
     if (consentBanner) {
       consentBanner.style.display = hide ? "none" : "block";
       consentBanner.setAttribute("aria-hidden", hide ? "true" : "false");
     }
-    // inline panel
+
     if (inlineConsent) {
       inlineConsent.style.display = hide ? "none" : "flex";
       inlineConsent.setAttribute("aria-hidden", hide ? "true" : "false");
@@ -110,6 +121,7 @@
   function handleConsent(next) {
     consentState = next;
     persistConsent(next);
+
     if (next === "accepted") {
       savePrefs({ lang: currentLang, theme: currentTheme });
     } else if (next === "denied") {
@@ -128,33 +140,42 @@
   let currentTheme = (prefs.theme === "dark") ? "dark" : "light";
 
   function setLanguage(lang) {
-    const toES = lang === "es";
+    const toES = (lang === "es");
     currentLang = toES ? "es" : "en";
     document.documentElement.lang = currentLang;
 
-    langCtrl.textContent = toES ? "ES" : "EN";
-    langCtrl.setAttribute("aria-pressed", toES ? "true" : "false");
-    langCtrl.classList.toggle("active", toES);
+    if (langCtrl) {
+      langCtrl.textContent = toES ? "ES" : "EN";
+      langCtrl.setAttribute("aria-pressed", toES ? "true" : "false");
+      langCtrl.classList.toggle("active", toES);
+    }
 
     transNodes.forEach((node) => { node.textContent = toES ? node.dataset.es : node.dataset.en; });
     phNodes.forEach((node) => { node.placeholder = toES ? node.dataset.esPh : node.dataset.enPh; });
     ariaNodes.forEach((node) => { node.setAttribute("aria-label", toES ? node.dataset.esLabel : node.dataset.enLabel); });
 
     if (recognition) recognition.lang = toES ? "es-ES" : "en-US";
+
     savePrefs({ lang: currentLang, theme: currentTheme });
     setVoiceStatus("", "");
+    setNet(navigator.onLine, "Ready", "Listo");
   }
 
   function setTheme(mode) {
     currentTheme = (mode === "dark") ? "dark" : "light";
     document.documentElement.setAttribute("data-theme", currentTheme);
-    themeCtrl.textContent = (currentTheme === "dark") ? "Light" : "Dark";
-    themeCtrl.setAttribute("aria-pressed", currentTheme === "dark" ? "true" : "false");
+
+    if (themeCtrl) {
+      themeCtrl.textContent = (currentTheme === "dark") ? "Light" : "Dark";
+      themeCtrl.setAttribute("aria-pressed", currentTheme === "dark" ? "true" : "false");
+    }
+
     savePrefs({ lang: currentLang, theme: currentTheme });
   }
 
   // === TURNSTILE ===
   let turnstileToken = "";
+  let turnstileTokenTs = 0;
   let showedTurnstileDown = false;
 
   function markTurnstileCleared() {
@@ -162,35 +183,51 @@
     turnstileContainer.classList.add("ts-cleared");
     turnstileContainer.setAttribute("aria-hidden", "true");
   }
+
   function showTurnstileAgain() {
     if (!turnstileContainer) return;
     turnstileContainer.classList.remove("ts-cleared");
     turnstileContainer.removeAttribute("aria-hidden");
   }
 
+  // Global callbacks used by the Turnstile widget data-* attributes
   window.opsTurnstileCallback = (token) => {
     turnstileToken = (typeof token === "string") ? token : "";
+    turnstileTokenTs = Date.now();
     if (turnstileToken) markTurnstileCleared();
   };
   window.opsTurnstileExpired = () => {
     turnstileToken = "";
+    turnstileTokenTs = 0;
     showTurnstileAgain();
   };
   window.opsTurnstileErrored = () => {
     turnstileToken = "";
+    turnstileTokenTs = 0;
     showTurnstileAgain();
   };
 
   function getTurnstileToken() {
-    if (turnstileToken) return turnstileToken;
+    if (turnstileToken && (Date.now() - turnstileTokenTs) <= TURNSTILE_MAX_AGE_MS) return turnstileToken;
+
+    // Try asking the Turnstile API directly (works when there is a single widget)
     if (window.turnstile && typeof window.turnstile.getResponse === "function") {
       try {
-        const resp = window.turnstile.getResponse(turnstileWidget);
-        if (resp) { turnstileToken = resp; return resp; }
-      } catch {}
-      try {
         const resp = window.turnstile.getResponse();
-        if (resp) { turnstileToken = resp; return resp; }
+        if (resp) {
+          turnstileToken = String(resp);
+          turnstileTokenTs = Date.now();
+          return turnstileToken;
+        }
+      } catch {}
+      // Best-effort fallback (some builds accept an element reference)
+      try {
+        const resp = window.turnstile.getResponse(turnstileWidget);
+        if (resp) {
+          turnstileToken = String(resp);
+          turnstileTokenTs = Date.now();
+          return turnstileToken;
+        }
       } catch {}
     }
     return "";
@@ -198,9 +235,10 @@
 
   function resetTurnstile() {
     turnstileToken = "";
+    turnstileTokenTs = 0;
     showTurnstileAgain();
+
     if (window.turnstile && typeof window.turnstile.reset === "function") {
-      try { window.turnstile.reset(turnstileWidget); return; } catch {}
       try { window.turnstile.reset(); } catch {}
     }
   }
@@ -220,7 +258,7 @@
     let out = String(s || "");
     out = out.replace(/[\u0000-\u001F\u007F]/g, " ");
     out = out.replace(/\s+/g, " ").trim();
-    if (out.length > 256) out = out.slice(0, 256);
+    if (out.length > MAX_INPUT_CHARS) out = out.slice(0, MAX_INPUT_CHARS);
     return out;
   }
 
@@ -239,15 +277,18 @@
   }
 
   function isFullyAuthorized() {
-    const o = self.origin;
-    const p = self.location.pathname || "/";
-    return AUTH_RULES.some((r) => (o === r.origin) && p.startsWith(r.pathPrefix));
+    const o = window.location.origin;
+    const p = window.location.pathname || "/";
+    return AUTH_RULES.some((r) =>
+      (o === r.origin) && r.pathPrefixes.some((pref) => p.startsWith(pref))
+    );
   }
 
   // === TELEMETRY (light sampling) ===
   const telemetrySampleRate = 0.25;
   function sendTelemetry(eventType, detail = {}) {
     if (Math.random() > telemetrySampleRate) return;
+
     try {
       fetch(TELEMETRY_URL, {
         method: "POST",
@@ -255,7 +296,12 @@
         cache: "no-store",
         credentials: "omit",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ event: eventType, lang: currentLang, ts: Date.now(), detail })
+        body: JSON.stringify({
+          event: String(eventType || ""),
+          lang: currentLang,
+          ts: Date.now(),
+          detail: detail && typeof detail === "object" ? detail : {}
+        })
       }).catch(() => {});
     } catch {}
   }
@@ -290,26 +336,34 @@
 
   function speak(text, langOverride) {
     if (!synth || !speechEnabled) return;
+
     const clean = cleanForSpeech(normalizeUserText(text));
     if (!clean) return;
 
     const langForReply = (langOverride === "es") ? "es" : (langOverride === "en" ? "en" : currentLang);
-    synth.cancel();
+
+    try { synth.cancel(); } catch {}
+
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = (langForReply === "es") ? "es-ES" : "en-US";
     const v = getVoiceForLang(langForReply);
     if (v) u.voice = v;
-    synth.speak(u);
+
+    try { synth.speak(u); } catch {}
   }
 
   function updateSpeechToggleUI() {
+    if (!speechToggle) return;
     speechToggle.classList.toggle("active", speechEnabled);
     speechToggle.setAttribute("aria-pressed", speechEnabled ? "true" : "false");
   }
+
   function updateListenUI() {
+    if (!listenCtrl) return;
     listenCtrl.classList.toggle("active", listening);
     listenCtrl.setAttribute("aria-pressed", listening ? "true" : "false");
   }
+
   function setVoiceStatus(enText, esText) {
     if (!voiceStatus) return;
     voiceStatus.textContent = (currentLang === "es") ? (esText || enText) : enText;
@@ -319,11 +373,18 @@
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = (currentLang === "es") ? "es-ES" : "en-US";
-    recognition.onstart = () => { listening = true; updateListenUI(); setVoiceStatus("Listening…", "Escuchando…"); };
+
+    recognition.onstart = () => {
+      listening = true;
+      updateListenUI();
+      setVoiceStatus("Listening…", "Escuchando…");
+    };
+
     recognition.onresult = (e) => {
       const t = e.results?.[0]?.[0]?.transcript || "";
       const cleaned = normalizeUserText(t);
       if (!cleaned) return;
+
       input.value = cleaned;
       input.focus();
 
@@ -334,8 +395,18 @@
         : "This assistant only accepts messages from authorized sites."
       );
     };
-    recognition.onerror = () => { listening = false; updateListenUI(); setVoiceStatus("Voice error.", "Error de voz."); };
-    recognition.onend = () => { listening = false; updateListenUI(); setVoiceStatus("", ""); };
+
+    recognition.onerror = () => {
+      listening = false;
+      updateListenUI();
+      setVoiceStatus("Voice error.", "Error de voz.");
+    };
+
+    recognition.onend = () => {
+      listening = false;
+      updateListenUI();
+      setVoiceStatus("", "");
+    };
   }
 
   function startListening() {
@@ -349,22 +420,44 @@
   function recordTranscript(role, text) {
     if (!text) return;
     transcript.push({ role, text, ts: Date.now() });
+
     if (!transcriptText) return;
     transcriptText.textContent = transcript
-      .map(item => `${item.role.toUpperCase()}: ${item.text}`)
+      .map(item => `${String(item.role || "").toUpperCase()}: ${item.text}`)
       .join("\n");
   }
 
   function copyTranscript() {
-    if (!navigator?.clipboard || !transcriptText) return;
-    navigator.clipboard.writeText(transcriptText.textContent || "").catch(() => {});
+    if (!transcriptText) return;
+    const txt = transcriptText.textContent || "";
+
+    // Prefer clipboard API; fallback to textarea copy
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(txt).catch(() => {});
+      return;
+    }
+
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = txt;
+      ta.setAttribute("readonly", "true");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch {}
   }
 
   function openTranscript() {
+    if (!transcriptDrawer) return;
     transcriptDrawer.classList.add("open");
     transcriptDrawer.setAttribute("aria-hidden", "false");
   }
+
   function closeTranscript() {
+    if (!transcriptDrawer) return;
     transcriptDrawer.classList.remove("open");
     transcriptDrawer.setAttribute("aria-hidden", "true");
   }
@@ -405,6 +498,7 @@
     log.textContent = "";
     transcript.length = 0;
     if (transcriptText) transcriptText.textContent = "";
+    log.dataset.welcomed = "false";
     ensureWelcome();
   }
 
@@ -418,6 +512,7 @@
   }
 
   function showTncDetails() {
+    if (!tncButton) return;
     const msg = (currentLang === "es")
       ? (tncButton.dataset.esMsg || tncButton.dataset.enMsg || "")
       : (tncButton.dataset.enMsg || tncButton.dataset.esMsg || "");
@@ -432,32 +527,37 @@
   if (inlineConsentAccept) inlineConsentAccept.onclick = () => handleConsent("accepted");
   if (inlineConsentDeny) inlineConsentDeny.onclick = () => handleConsent("denied");
 
-  langCtrl.addEventListener("click", () => setLanguage(currentLang === "es" ? "en" : "es"));
-  themeCtrl.addEventListener("click", () => setTheme(currentTheme === "dark" ? "light" : "dark"));
+  if (langCtrl) langCtrl.addEventListener("click", () => setLanguage(currentLang === "es" ? "en" : "es"));
+  if (themeCtrl) themeCtrl.addEventListener("click", () => setTheme(currentTheme === "dark" ? "light" : "dark"));
 
-  speechToggle.addEventListener("click", () => {
-    if (!synth) {
-      addBotLine(currentLang === "es"
-        ? "La síntesis de voz no está disponible en este navegador."
-        : "Speech synthesis is not available in this browser."
-      );
-      return;
-    }
-    speechEnabled = !speechEnabled;
-    updateSpeechToggleUI();
-  });
+  if (speechToggle) {
+    speechToggle.addEventListener("click", () => {
+      if (!synth) {
+        addBotLine(currentLang === "es"
+          ? "La síntesis de voz no está disponible en este navegador."
+          : "Speech synthesis is not available in this browser."
+        );
+        return;
+      }
+      speechEnabled = !speechEnabled;
+      updateSpeechToggleUI();
+      savePrefs({ lang: currentLang, theme: currentTheme }); // no voice stored (by design)
+    });
+  }
 
-  listenCtrl.addEventListener("click", () => {
-    if (!recognition) {
-      addBotLine(currentLang === "es"
-        ? "Entrada por voz no disponible en este navegador."
-        : "Voice input is not available in this browser."
-      );
-      return;
-    }
-    if (listening) { try { recognition.stop(); } catch {} return; }
-    startListening();
-  });
+  if (listenCtrl) {
+    listenCtrl.addEventListener("click", () => {
+      if (!recognition) {
+        addBotLine(currentLang === "es"
+          ? "Entrada por voz no disponible en este navegador."
+          : "Voice input is not available in this browser."
+        );
+        return;
+      }
+      if (listening) { try { recognition.stop(); } catch {} return; }
+      startListening();
+    });
+  }
 
   if (clearChatBtn) clearChatBtn.onclick = clearChat;
 
@@ -472,9 +572,20 @@
     if (e.key === "Escape") closeTranscript();
   });
 
+  // Stop listening if tab is hidden
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && listening && recognition) {
+      try { recognition.stop(); } catch {}
+    }
+  });
+
   // === SEND ===
+  let inFlight = false;
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+
+    if (inFlight) return;
 
     const msg = normalizeUserText(input.value);
     if (!msg) return;
@@ -485,11 +596,11 @@
         ? "Este asistente solo acepta mensajes desde sitios autorizados."
         : "This assistant only accepts messages from authorized sites."
       );
-      sendTelemetry("auth_block", { reason: "origin" });
+      sendTelemetry("auth_block", { reason: "origin_or_path" });
       return;
     }
 
-    // Fast local block for obvious injection attempts
+    // Local block for obvious injection attempts
     if (looksSuspicious(msg)) {
       const warn = (currentLang === "es")
         ? "Mensaje bloqueado por seguridad. Escribe sin etiquetas o scripts."
@@ -500,7 +611,7 @@
       return;
     }
 
-    // Honeypots
+    // Honeypots (bots fill these)
     const hp1 = normalizeUserText(hpEmail?.value || "");
     const hp2 = normalizeUserText(hpWebsite?.value || "");
 
@@ -519,19 +630,24 @@
       return;
     }
 
+    // UI commit
     addUserLine(msg);
     input.value = "";
+    input.focus();
 
-    setNet(true, "Sending…", "Enviando…");
-    sendBtn.disabled = true;
+    setNet(navigator.onLine, "Sending…", "Enviando…");
+    if (sendBtn) sendBtn.disabled = true;
+    inFlight = true;
 
     const botBubble = addBotLine("…");
+
+    let res = null;
 
     try {
       const ctrl = new AbortController();
       const timeout = setTimeout(() => ctrl.abort(), 15000);
 
-      const res = await fetch(API_URL, {
+      res = await fetch(API_URL, {
         method: "POST",
         mode: "cors",
         cache: "no-store",
@@ -561,14 +677,18 @@
       if (!res.ok) {
         const fallback = (currentLang === "es") ? "Error del gateway de OPS." : "OPS gateway error.";
         const errMsg = (data && (data.error || data.public_error))
-          ? (data.error || data.public_error)
+          ? String(data.error || data.public_error)
           : (text || fallback);
 
         botBubble.textContent = errMsg;
         speak(errMsg, currentLang);
         sendTelemetry("api_error", { status: res.status });
 
-        if (res.status === 403 && /turnstile/i.test(errMsg)) resetTurnstile();
+        // If Turnstile was rejected/consumed, reset to obtain a fresh token
+        if (res.status === 403 && /turnstile/i.test(errMsg)) {
+          resetTurnstile();
+        }
+
         setNet(false, "Error", "Error");
         return;
       }
@@ -599,10 +719,14 @@
         : "Can’t reach OPS assistant.";
       botBubble.textContent = fallback;
       speak(fallback, currentLang);
-      sendTelemetry("network_error");
+      sendTelemetry("network_error", { online: !!navigator.onLine });
       setNet(false, "Offline", "Sin conexión");
     } finally {
-      sendBtn.disabled = false;
+      // Turnstile tokens are often single-use; refresh after any submit attempt.
+      resetTurnstile();
+
+      if (sendBtn) sendBtn.disabled = false;
+      inFlight = false;
     }
   });
 
@@ -620,14 +744,7 @@
   updateListenUI();
 
   applyConsentUI();
-
   ensureWelcome();
-
-  // Show consent toast when pending
-  if (consentState === "pending") {
-    consentBanner.style.display = "block";
-    consentBanner.setAttribute("aria-hidden", "false");
-  }
 
   // Basic online/offline indicator
   const updateOnline = () => setNet(navigator.onLine, "Ready", "Listo");
