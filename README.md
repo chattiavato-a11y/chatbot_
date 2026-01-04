@@ -14,8 +14,8 @@
 - **CSP (meta):** Mirrors the worker allowlists, adds `frame-ancestors 'none'`, and reports to `https://ops-gateway.grabem-holdem-nuts-right.workers.dev/reports/csp`.
 - **HTTP-equivalent headers (meta):** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=15552000; includeSubDomains; preload`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: accelerometer=(), camera=(), display-capture=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), bluetooth=()`, `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`.
 - **Assets with SRI:**  
-  - `assets/chattia-ui.css` — `sha384-K4H4aXkah+rRusGU11JzeaaUTA41ciYKMqM2qvIiOaL9HmphSsVcwoG2wacd2KfZ`  
-  - `assets/chattia-ui.js` — `sha384-1AbXKn/wcjZgNr8YQjXV7jkiWJHptlWRIAcpEFN5dG5xCcfCbZW7KNOdKDtz6b9H`  
+  - `assets/chattia-ui.css` — `sha384-ddeJpiFgcjiio0rWqbFyYJGrSXym1sr/fm76mmvdBbd7Z17Gcj1N07LNwnW/IrDR`  
+  - `assets/chattia-ui.js` — `sha384-8FbBbuvR122F1Nq0rKr2Im55ekR9tulYthyjg+sRs95FN3yYkJWBgRFrSWKkAmBb`  
   - `https://challenges.cloudflare.com/turnstile/v0/api.js` — `sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb`
 - **Privacy & consent:** Banner explains localStorage use; preferences persist only after acceptance. Decline keeps preferences in-memory only.
 - **Accessibility:** Focus-visible outlines, transcript panel with copy, voice transcript logging, reduced-motion toggle honoring `prefers-reduced-motion`, ARIA labels for controls.
