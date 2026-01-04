@@ -14,7 +14,7 @@
 - **CSP (meta):** Mirrors the worker allowlists, adds `frame-ancestors 'none'`, and reports to `https://ops-gateway.grabem-holdem-nuts-right.workers.dev/reports/csp`.
 - **HTTP-equivalent headers (meta):** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=15552000; includeSubDomains; preload`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: accelerometer=(), camera=(), display-capture=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), bluetooth=()`, `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`.
 - **Privacy & consent:** Banner explains localStorage use; preferences persist only after acceptance. Decline keeps preferences in-memory only.
-- **Accessibility:** Focus-visible outlines, transcript panel with copy, voice transcript logging, reduced-motion toggle honoring `prefers-reduced-motion`, ARIA labels for controls.
+- **Accessibility:** Focus-visible outlines, transcript panel with copy, voice transcript logging, reduced-motion toggle honoring `prefers-reduced-motion`, ARIA labels for controls, and a skip link for keyboard users to jump directly to chat.
 
 ## Local validation
 - Inspect headers (replace host if using a tunnel):  

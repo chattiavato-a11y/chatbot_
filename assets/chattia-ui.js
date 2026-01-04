@@ -57,6 +57,7 @@
 
   const clearChatBtn = qs("#clearChat");
   const openTranscriptBtn = qs("#openTranscript");
+  const closeTranscriptInlineBtn = qs("#closeTranscriptInline");
   const transcriptDrawer = qs("#transcriptDrawer");
   const closeTranscriptBtn = qs("#closeTranscript");
   const transcriptText = qs("#transcript-text");
@@ -467,12 +468,14 @@
     if (!transcriptDrawer) return;
     transcriptDrawer.classList.add("open");
     transcriptDrawer.setAttribute("aria-hidden", "false");
+    if (closeTranscriptInlineBtn) closeTranscriptInlineBtn.hidden = false;
   }
 
   function closeTranscript() {
     if (!transcriptDrawer) return;
     transcriptDrawer.classList.remove("open");
     transcriptDrawer.setAttribute("aria-hidden", "true");
+    if (closeTranscriptInlineBtn) closeTranscriptInlineBtn.hidden = true;
   }
 
   // === CHAT UI ===
@@ -575,6 +578,7 @@
   if (clearChatBtn) clearChatBtn.onclick = clearChat;
 
   if (openTranscriptBtn) openTranscriptBtn.onclick = openTranscript;
+  if (closeTranscriptInlineBtn) closeTranscriptInlineBtn.onclick = closeTranscript;
   if (closeTranscriptBtn) closeTranscriptBtn.onclick = closeTranscript;
 
   if (transcriptCopy) transcriptCopy.onclick = copyTranscript;
