@@ -1,6 +1,6 @@
 <!-- index.html -->
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
@@ -23,10 +23,7 @@
   <!-- App CSS -->
   <link
     rel="stylesheet"
-    href="assets/chattia-ui.css"
-    integrity="sha384-ddeJpiFgcjiio0rWqbFyYJGrSXym1sr/fm76mmvdBbd7Z17Gcj1N07LNwnW/IrDR"
-    crossorigin="anonymous"
-  />
+    href="assets/chattia-ui.css" />
 
   <!-- Cloudflare Turnstile (no SRI: remote script can change) -->
   <script
@@ -37,9 +34,7 @@
   <!-- App JS -->
   <script
     src="assets/chattia-ui.js"
-    defer
-    integrity="sha384-mafSio8SVzvDqU8colzclxIRpzDJx3Xf+FRpLQbV9mqPArHtAyfztPBQc0wAMdW2"
-    crossorigin="anonymous"></script>
+    defer></script>
 </head>
 
 <body>
@@ -51,9 +46,7 @@
     </div>
   </noscript>
 
-  <div class="bg" aria-hidden="true"></div>
-
-  <div class="shell">
+  <div class="shell app-shell">
     <header class="topbar" aria-label="Page controls">
       <div class="brand brand-inline brand-top">
         <div class="brand-mark" aria-hidden="true"></div>
@@ -64,12 +57,13 @@
       </div>
 
       <div class="top-actions" aria-label="Navigation and display controls">
-        <a class="pill-link" href="https://www.chattia.io/privacy" target="_blank" rel="noopener noreferrer">
+        <button class="pill-btn" type="button" id="privacyTrigger" data-action="privacy">
           <span data-en="Privacy" data-es="Privacidad">Privacy</span>
-        </a>
-        <a class="pill-link" href="https://www.chattia.io/terms" target="_blank" rel="noopener noreferrer">
+        </button>
+        <button class="pill-btn" type="button" id="termsTrigger" data-action="terms">
           <span data-en="Terms" data-es="Términos">Terms</span>
-        </a>
+        </button>
+
         <span class="divider" aria-hidden="true"></span>
 
         <button
@@ -103,183 +97,160 @@
       </div>
     </header>
 
-    <main class="panel" role="main" id="chat-root">
-      <section class="chat" aria-label="Chat" id="chat">
-        <div class="chat-head">
-          <div class="brand brand-inline">
-            <div class="brand-mark" aria-hidden="true"></div>
-            <div class="brand-text">
-              <div class="brand-title" data-en="Chattia for OPS" data-es="Chattia para OPS">Chattia for OPS</div>
-              <div class="brand-sub" data-en="Secure assistant UI" data-es="UI segura del asistente">Secure assistant UI</div>
-            </div>
+    <div class="layout">
+      <aside class="side-menu" aria-label="Navigation">
+        <div class="menu-brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="ic">
+              <path d="M4 4h16v10H7l-3 3V4z" />
+            </svg>
           </div>
-
-          <div class="status status-inline">
-            <span class="dot" id="netDot" aria-hidden="true"></span>
-            <span id="netText" data-en="Ready" data-es="Listo">Ready</span>
-          </div>
-
-          <div class="mini-actions">
-            <button
-              type="button"
-              id="clearChat"
-              class="ghost-btn"
-              aria-label="Clear chat"
-              data-en-label="Clear chat"
-              data-es-label="Borrar chat">
-              <span data-en="Clear" data-es="Borrar">Clear</span>
-            </button>
-
-            <button
-              type="button"
-              id="openTranscript"
-              class="ghost-btn"
-              aria-label="Open transcript"
-              data-en-label="Open transcript"
-              data-es-label="Abrir transcripción">
-              <span data-en="Transcript" data-es="Transcripción">Transcript</span>
-            </button>
-            <button
-              type="button"
-              id="closeTranscriptInline"
-              class="ghost-btn"
-              aria-label="Close transcript"
-              data-en-label="Close transcript"
-              data-es-label="Cerrar transcripción"
-              hidden>
-              <span data-en="Close" data-es="Cerrar">Close</span>
-            </button>
-          </div>
+          <div class="brand-name">Chattia</div>
         </div>
 
-        <div id="chat-log" class="chat-log" aria-live="polite" aria-relevant="additions text"></div>
-
-        <div class="composer">
-          <div class="consent-inline" id="inline-consent" role="region" aria-live="polite" aria-hidden="true">
-            <div
-              class="consent-text"
-              data-en="Preferences (language/theme) are stored only if you accept. Messages are sent to the OPS gateway."
-              data-es="Las preferencias (idioma/tema) se guardan solo si aceptas. Los mensajes se envían al gateway de OPS.">
-              Preferences (language/theme) are stored only if you accept. Messages are sent to the OPS gateway.
-            </div>
-            <div class="consent-actions">
-              <button type="button" id="inline-consent-accept" class="link-btn" data-en="Accept" data-es="Aceptar">Accept</button>
-              <button type="button" id="inline-consent-deny" class="link-btn" data-en="Deny" data-es="Rechazar">Deny</button>
-            </div>
-          </div>
-
-          <div class="ctrl-row" aria-label="Input controls">
-            <button
-              type="button"
-              id="listenCtrl"
-              class="mic-btn"
-              aria-pressed="false"
-              aria-label="Start voice input"
-              data-en-label="Start voice input"
-              data-es-label="Comenzar voz">
-              <svg viewBox="0 0 24 24" class="ic" aria-hidden="true">
-                <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zM11 19h2v3h-2z"/>
-              </svg>
-              <span class="mic-label" data-en="Speak" data-es="Hablar">Speak</span>
-            </button>
-
-            <div id="voice-status" class="voice-status" role="status" aria-live="polite"></div>
-
-            <div class="turnstile-wrap" id="turnstile-container" aria-label="Cloudflare Turnstile verification">
-              <div
-                id="turnstile-widget"
-                class="cf-turnstile"
-                data-sitekey="0x4AAAAAACCemZgiIexxcpTR"
-                data-callback="opsTurnstileCallback"
-                data-expired-callback="opsTurnstileExpired"
-                data-error-callback="opsTurnstileErrored"></div>
-            </div>
-          </div>
-
-          <form id="chatbot-input-row" class="input-row" autocomplete="off" novalidate>
-            <label class="sr-only" for="chatbot-input">Message</label>
-            <input
-              id="chatbot-input"
-              class="input"
-              type="text"
-              maxlength="256"
-              required
-              spellcheck="false"
-              autocapitalize="off"
-              autocomplete="off"
-              inputmode="text"
-              placeholder="Type your message..."
-              data-en-ph="Type your message..."
-              data-es-ph="Escriba su mensaje..." />
-
-            <!-- Honeypots (bots fill these). Keep focus out of tab order. -->
-            <div class="hp-wrap" aria-hidden="true">
-              <label>email
-                <input id="hp_email" name="hp_email" type="text" autocomplete="off" tabindex="-1" />
-              </label>
-              <label>website
-                <input id="hp_website" name="hp_website" type="text" autocomplete="off" tabindex="-1" />
-              </label>
-            </div>
-
-            <button id="chatbot-send" class="send-btn" type="submit" aria-label="Send">
-              <svg viewBox="0 0 24 24" class="ic" aria-hidden="true">
-                <path d="M2 21l20-9L2 3v7l14 2L2 14v7z"/>
-              </svg>
-            </button>
-          </form>
-
-          <div class="footnote">
-            <div class="policy-links" aria-label="Policy links">
-              <a class="pill-link" href="https://www.chattia.io/privacy" target="_blank" rel="noopener noreferrer">
-                <span data-en="Privacy" data-es="Privacidad">Privacy</span>
-              </a>
-              <a class="pill-link" href="https://www.chattia.io/terms" target="_blank" rel="noopener noreferrer">
-                <span data-en="Terms" data-es="Términos">Terms</span>
-              </a>
-            </div>
-
-            <button
-              type="button"
-              id="tnc-button"
-              class="tnc"
-              data-en="T&amp;C"
-              data-es="TyC"
-              data-en-msg="Interacting with the chatbot sends requests to the OPS gateway."
-              data-es-msg="Interactuar con el chatbot envía solicitudes al gateway de OPS.">T&amp;C</button>
-          </div>
-        </div>
-      </section>
-
-      <aside class="drawer" id="transcriptDrawer" aria-label="Transcript panel" aria-hidden="true">
-        <div class="drawer-head">
-          <div class="drawer-title" data-en="Transcript" data-es="Transcripción">Transcript</div>
+        <nav class="menu-links" aria-label="Primary">
+          <button class="menu-item active" type="button">
+            <span class="menu-icon" aria-hidden="true">💬</span>
+            <span data-en="Chat" data-es="Chat">Chat</span>
+          </button>
           <button
             type="button"
-            id="closeTranscript"
-            class="ghost-btn"
-            aria-label="Close transcript"
-            data-en-label="Close transcript"
-            data-es-label="Cerrar transcripción">
-            <span data-en="Close" data-es="Cerrar">Close</span>
+            id="openTranscript"
+            class="menu-item linkish"
+            aria-label="Open transcript"
+            data-en-label="Open transcript"
+            data-es-label="Abrir transcripción">
+            <span data-en="Transcript" data-es="Transcripción">Transcript</span>
           </button>
-        </div>
-
-        <pre id="transcript-text" class="transcript" role="region" aria-live="polite"></pre>
-
-        <div class="drawer-actions">
-          <button
-            type="button"
-            id="transcript-copy"
-            class="pill-btn"
-            aria-label="Copy transcript"
-            data-en-label="Copy transcript"
-            data-es-label="Copiar transcripción">
-            <span data-en="Copy" data-es="Copiar">Copy</span>
-          </button>
-        </div>
+        </nav>
       </aside>
-    </main>
+
+      <main class="panel" role="main" id="chat-root">
+        <section class="chat chat-panel" aria-label="Chat" id="chat">
+          <div class="chat-head">
+            <div class="brand brand-inline">
+              <div class="brand-mark" aria-hidden="true"></div>
+              <div class="brand-text">
+                <div class="brand-title" data-en="Chattia" data-es="Chattia">Chattia</div>
+                <div class="brand-sub" data-en="Chat" data-es="Chat">Chat</div>
+              </div>
+            </div>
+
+            <div class="status status-inline">
+              <span class="dot" id="netDot" aria-hidden="true"></span>
+              <span id="netText" data-en="Ready" data-es="Listo">Ready</span>
+            </div>
+
+            <div class="mini-actions">
+              <button
+                type="button"
+                id="clearChat"
+                class="ghost-btn"
+                aria-label="Clear chat"
+                data-en-label="Clear chat"
+                data-es-label="Borrar chat">
+                <span data-en="Clear" data-es="Borrar">Clear</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="chat-log" class="chat-log" aria-live="polite" aria-relevant="additions text"></div>
+
+          <div class="composer">
+            <form id="chatbot-input-row" class="input-row" autocomplete="off" novalidate>
+              <label class="input-label" for="chatbot-input" data-en="Chat" data-es="Chat">Chat</label>
+              <div class="input-shell">
+                <input
+                  id="chatbot-input"
+                  class="input"
+                  type="text"
+                  maxlength="256"
+                  required
+                  spellcheck="false"
+                  autocapitalize="off"
+                  autocomplete="off"
+                  inputmode="text"
+                  placeholder="Type Your Message"
+                  data-en-ph="Type Your Message"
+                  data-es-ph="Escriba su mensaje" />
+
+                <!-- Honeypots (bots fill these). Keep focus out of tab order. -->
+                <div class="hp-wrap" aria-hidden="true">
+                  <label>email
+                    <input id="hp_email" name="hp_email" type="text" autocomplete="off" tabindex="-1" />
+                  </label>
+                  <label>website
+                    <input id="hp_website" name="hp_website" type="text" autocomplete="off" tabindex="-1" />
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  id="listenCtrl"
+                  class="mic-inline"
+                  aria-pressed="false"
+                  aria-label="Start voice input"
+                  data-en-label="Start voice input"
+                  data-es-label="Comenzar voz">
+                  <svg viewBox="0 0 24 24" class="ic" aria-hidden="true">
+                    <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zM11 19h2v3h-2z"/>
+                  </svg>
+                </button>
+              </div>
+
+              <button id="chatbot-send" class="send-btn" type="submit" aria-label="Send">
+                <svg viewBox="0 0 24 24" class="ic" aria-hidden="true">
+                  <path d="M2 21l20-9L2 3v7l14 2L2 14v7z"/>
+                </svg>
+              </button>
+            </form>
+
+            <div class="composer-meta">
+              <div id="voice-status" class="voice-status" role="status" aria-live="polite"></div>
+              <div class="turnstile-wrap" id="turnstile-container" aria-label="Cloudflare Turnstile verification">
+                <div
+                  id="turnstile-widget"
+                  class="cf-turnstile"
+                  data-sitekey="0x4AAAAAACCemZgiIexxcpTR"
+                  data-callback="opsTurnstileCallback"
+                  data-expired-callback="opsTurnstileExpired"
+                  data-error-callback="opsTurnstileErrored"></div>
+              </div>
+            </div>
+
+            <div id="consent-note" class="consent-note" role="status" aria-live="polite" hidden>
+              Consent is required to use the chat. Open Privacy to accept.
+            </div>
+
+            <div class="footnote">
+              <div class="policy-links" aria-label="Policy links">
+                <a class="pill-link" href="https://www.chattia.io/contact" target="_blank" rel="noopener noreferrer">
+                  <span data-en="Contact Us" data-es="Contáctanos">Contact Us</span>
+                </a>
+                <a class="pill-link" href="https://www.chattia.io/support" target="_blank" rel="noopener noreferrer">
+                  <span data-en="Support" data-es="Soporte">Support</span>
+                </a>
+                <a class="pill-link" href="https://www.chattia.io/about" target="_blank" rel="noopener noreferrer">
+                  <span data-en="About Us" data-es="Sobre nosotros">About Us</span>
+                </a>
+              </div>
+
+              <div class="footnote-actions">
+                <button
+                  type="button"
+                  id="tnc-button"
+                  class="tnc"
+                  data-en="T&amp;C"
+                  data-es="TyC"
+                  data-en-msg="Interacting with the chatbot sends requests to the OPS gateway."
+                  data-es-msg="Interactuar con el chatbot envía solicitudes al gateway de OPS.">T&amp;C</button>
+                <span class="footer-brand" aria-label="Chattia brand">Chattia © 2026</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
 
     <footer class="footer" role="contentinfo">
       <span class="muted" data-en="OPS Online Support • Secure by design" data-es="OPS Online Support • Seguro por diseño">
@@ -288,19 +259,80 @@
     </footer>
   </div>
 
-  <!-- Consent toast -->
-  <div id="consent-banner" class="toast" role="region" aria-live="polite" aria-hidden="true">
-    <div class="toast-title" data-en="Privacy &amp; consent" data-es="Privacidad y consentimiento">Privacy &amp; consent</div>
-    <div
-      class="toast-body"
-      data-en="We store language/theme only if you accept. Chat requests are sent to the OPS gateway."
-      data-es="Guardamos idioma/tema solo si aceptas. Las solicitudes se envían al gateway de OPS.">
-      We store language/theme only if you accept. Chat requests are sent to the OPS gateway.
+  <div id="drawerOverlay" class="drawer-overlay" aria-hidden="true"></div>
+  <aside id="transcriptDrawer" class="drawer" aria-label="Transcript drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="drawer-title" data-en="Transcript" data-es="Transcripción">Transcript</div>
+      <button type="button" id="closeTranscript" class="text-btn">
+        <span data-en="Close" data-es="Cerrar">Close</span>
+      </button>
     </div>
-    <div class="toast-actions">
-      <button type="button" id="consent-accept" class="pill-btn" data-en="Accept" data-es="Aceptar">Accept</button>
-      <button type="button" id="consent-deny" class="pill-btn" data-en="Deny" data-es="Rechazar">Deny</button>
+    <div class="drawer-body">
+      <div class="drawer-actions">
+        <button
+          type="button"
+          id="transcript-copy"
+          class="pill-btn"
+          aria-label="Copy transcript"
+          data-en-label="Copy transcript"
+          data-es-label="Copiar transcripción">
+          <span data-en="Copy" data-es="Copiar">Copy</span>
+        </button>
+        <button
+          type="button"
+          id="clearTranscript"
+          class="pill-btn accent"
+          aria-label="Clear transcript">
+          <span data-en="Clear Transcript" data-es="Limpiar transcripción">Clear Transcript</span>
+        </button>
+      </div>
+      <div id="transcriptList" class="transcript-list" role="region" aria-live="polite"></div>
     </div>
-  </div>
+  </aside>
+
+  <div id="privacyOverlay" class="modal-overlay" aria-hidden="true"></div>
+  <section id="privacyModal" class="modal card" role="dialog" aria-modal="true" aria-label="Privacy and consent" hidden>
+    <h2>Privacy &amp; Consent</h2>
+    <p>
+      Chat interactions may be used to improve and train the chatbot experience. Please do not enter sensitive personal information.
+    </p>
+    <p>
+      <strong>No PII collection:</strong> Chattia and OPS do not intentionally collect personally identifiable information (PII).
+      If you choose to share PII, it may be processed as part of your conversation.
+    </p>
+    <p>If you deny consent, chat will be disabled until you accept.</p>
+    <div class="modal-actions">
+      <button class="btn" id="btnDenyPrivacy" type="button">Deny</button>
+      <button class="btn btn-primary" id="btnAcceptPrivacy" type="button">Accept</button>
+    </div>
+  </section>
+
+  <div id="termsOverlay" class="modal-overlay" aria-hidden="true"></div>
+  <section id="termsModal" class="modal card" role="dialog" aria-modal="true" aria-label="Terms and conditions" hidden>
+    <h2>Terms &amp; Conditions</h2>
+    <h3>Privacy &amp; Consent</h3>
+    <ul>
+      <li>Messages may be used to improve or train the chatbot.</li>
+      <li>Chattia and OPS do not intentionally collect PII. Please avoid sharing PII.</li>
+      <li>If you enter PII, it may be processed as part of the chat text.</li>
+    </ul>
+    <h3>Fair Use</h3>
+    <ul>
+      <li>No abuse, harassment, or illegal content.</li>
+      <li>No attempts to exploit, bypass security, or spam.</li>
+    </ul>
+    <h3>Availability &amp; Accuracy</h3>
+    <ul>
+      <li>Chatbot responses may be incorrect; use at your own risk.</li>
+      <li>Service is provided “as-is” without warranties.</li>
+    </ul>
+    <h3>Security</h3>
+    <ul>
+      <li>Anti-abuse verification (e.g., Cloudflare Turnstile) may be used.</li>
+    </ul>
+    <div class="modal-actions">
+      <button class="btn" id="btnCloseTerms" type="button">Close</button>
+    </div>
+  </section>
 </body>
 </html>

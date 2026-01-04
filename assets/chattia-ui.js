@@ -45,9 +45,7 @@
   const consentBanner = qs("#consent-banner");
   const consentAccept = qs("#consent-accept");
   const consentDeny = qs("#consent-deny");
-  const inlineConsent = qs("#inline-consent");
-  const inlineConsentAccept = qs("#inline-consent-accept");
-  const inlineConsentDeny = qs("#inline-consent-deny");
+  const consentNote = qs("#consent-note");
 
   const hpEmail = qs("#hp_email");
   const hpWebsite = qs("#hp_website");
@@ -57,13 +55,24 @@
 
   const clearChatBtn = qs("#clearChat");
   const openTranscriptBtn = qs("#openTranscript");
-  const closeTranscriptInlineBtn = qs("#closeTranscriptInline");
   const transcriptDrawer = qs("#transcriptDrawer");
   const closeTranscriptBtn = qs("#closeTranscript");
-  const transcriptText = qs("#transcript-text");
+  const drawerOverlay = qs("#drawerOverlay");
+  const transcriptList = qs("#transcriptList");
   const transcriptCopy = qs("#transcript-copy");
+  const clearTranscriptBtn = qs("#clearTranscript");
 
   const tncButton = qs("#tnc-button");
+
+  const privacyTrigger = qs("#privacyTrigger");
+  const termsTrigger = qs("#termsTrigger");
+  const privacyOverlay = qs("#privacyOverlay");
+  const privacyModal = qs("#privacyModal");
+  const termsOverlay = qs("#termsOverlay");
+  const termsModal = qs("#termsModal");
+  const privacyAcceptBtn = qs("#btnAcceptPrivacy");
+  const privacyDenyBtn = qs("#btnDenyPrivacy");
+  const termsCloseBtn = qs("#btnCloseTerms");
 
   // === I18N NODES ===
   const transNodes = qsa("[data-en]");
@@ -78,6 +87,14 @@
 
   let consentState = "pending"; // pending | accepted | denied
   const memoryPrefs = {}; // used when denied/pending
+
+  function setChatEnabled(enabled) {
+    if (input) input.disabled = !enabled;
+    if (sendBtn) sendBtn.disabled = !enabled;
+    if (listenCtrl) listenCtrl.disabled = !enabled;
+
+    if (consentNote) consentNote.hidden = enabled;
+  }
 
   function readConsent() {
     try { return localStorage.getItem(STORAGE_KEYS.consent) || "pending"; }
@@ -112,11 +129,6 @@
       consentBanner.style.display = hide ? "none" : "block";
       consentBanner.setAttribute("aria-hidden", hide ? "true" : "false");
     }
-
-    if (inlineConsent) {
-      inlineConsent.style.display = hide ? "none" : "flex";
-      inlineConsent.setAttribute("aria-hidden", hide ? "true" : "false");
-    }
   }
 
   function handleConsent(next) {
@@ -125,10 +137,50 @@
 
     if (next === "accepted") {
       savePrefs({ lang: currentLang, theme: currentTheme });
+      setChatEnabled(true);
     } else if (next === "denied") {
       try { localStorage.removeItem(STORAGE_KEYS.prefs); } catch {}
+      setChatEnabled(false);
     }
     applyConsentUI();
+  }
+
+  function openPrivacyModal() {
+    if (!privacyModal || !privacyOverlay) return;
+    privacyModal.hidden = false;
+    privacyOverlay.classList.add("open");
+    privacyOverlay.setAttribute("aria-hidden", "false");
+  }
+
+  function closePrivacyModal() {
+    if (!privacyModal || !privacyOverlay) return;
+    privacyModal.hidden = true;
+    privacyOverlay.classList.remove("open");
+    privacyOverlay.setAttribute("aria-hidden", "true");
+  }
+
+  function acceptPrivacy() {
+    handleConsent("accepted");
+    closePrivacyModal();
+  }
+
+  function denyPrivacy() {
+    handleConsent("denied");
+    closePrivacyModal();
+  }
+
+  function openTermsModal() {
+    if (!termsModal || !termsOverlay) return;
+    termsModal.hidden = false;
+    termsOverlay.classList.add("open");
+    termsOverlay.setAttribute("aria-hidden", "false");
+  }
+
+  function closeTermsModal() {
+    if (!termsModal || !termsOverlay) return;
+    termsModal.hidden = true;
+    termsOverlay.classList.remove("open");
+    termsOverlay.setAttribute("aria-hidden", "true");
   }
 
   // === THEME + LANGUAGE ===
@@ -152,6 +204,8 @@
   }
 
   let currentTheme = detectInitialTheme();
+  setChatEnabled(consentState !== "denied");
+  applyConsentUI();
 
   function setLanguage(lang) {
     const toES = (lang === "es");
@@ -434,16 +488,14 @@
   function recordTranscript(role, text) {
     if (!text) return;
     transcript.push({ role, text, ts: Date.now() });
-
-    if (!transcriptText) return;
-    transcriptText.textContent = transcript
-      .map(item => `${String(item.role || "").toUpperCase()}: ${item.text}`)
-      .join("\n");
+    renderTranscriptList();
   }
 
   function copyTranscript() {
-    if (!transcriptText) return;
-    const txt = transcriptText.textContent || "";
+    if (!transcriptList) return;
+    const txt = transcript
+      .map(item => `${item.role === "user" ? "End User" : "Chatbot"}: ${item.text}`)
+      .join("\n\n");
 
     // Prefer clipboard API; fallback to textarea copy
     if (navigator?.clipboard?.writeText) {
@@ -464,18 +516,50 @@
     } catch {}
   }
 
+  function clearTranscriptOnly() {
+    transcript.length = 0;
+    renderTranscriptList();
+  }
+
+  function renderTranscriptList() {
+    if (!transcriptList) return;
+    transcriptList.innerHTML = "";
+    transcript.forEach((item) => {
+      const wrap = document.createElement("div");
+      wrap.className = "transcript-item";
+
+      const role = document.createElement("div");
+      role.className = "transcript-role";
+      role.textContent = item.role === "user" ? "End User" : "Chatbot";
+
+      const text = document.createElement("div");
+      text.textContent = item.text || "";
+
+      wrap.appendChild(role);
+      wrap.appendChild(text);
+      transcriptList.appendChild(wrap);
+    });
+  }
+
   function openTranscript() {
     if (!transcriptDrawer) return;
     transcriptDrawer.classList.add("open");
     transcriptDrawer.setAttribute("aria-hidden", "false");
-    if (closeTranscriptInlineBtn) closeTranscriptInlineBtn.hidden = false;
+    if (drawerOverlay) {
+      drawerOverlay.classList.add("open");
+      drawerOverlay.setAttribute("aria-hidden", "false");
+    }
+    renderTranscriptList();
   }
 
   function closeTranscript() {
     if (!transcriptDrawer) return;
     transcriptDrawer.classList.remove("open");
     transcriptDrawer.setAttribute("aria-hidden", "true");
-    if (closeTranscriptInlineBtn) closeTranscriptInlineBtn.hidden = true;
+    if (drawerOverlay) {
+      drawerOverlay.classList.remove("open");
+      drawerOverlay.setAttribute("aria-hidden", "true");
+    }
   }
 
   // === CHAT UI ===
@@ -513,7 +597,7 @@
   function clearChat() {
     log.textContent = "";
     transcript.length = 0;
-    if (transcriptText) transcriptText.textContent = "";
+    renderTranscriptList();
     log.dataset.welcomed = "false";
     ensureWelcome();
   }
@@ -540,8 +624,6 @@
   // === EVENTS ===
   if (consentAccept) consentAccept.onclick = () => handleConsent("accepted");
   if (consentDeny) consentDeny.onclick = () => handleConsent("denied");
-  if (inlineConsentAccept) inlineConsentAccept.onclick = () => handleConsent("accepted");
-  if (inlineConsentDeny) inlineConsentDeny.onclick = () => handleConsent("denied");
 
   if (langCtrl) langCtrl.addEventListener("click", () => setLanguage(currentLang === "es" ? "en" : "es"));
   if (themeCtrl) themeCtrl.addEventListener("click", () => setTheme(currentTheme === "dark" ? "light" : "dark"));
@@ -578,15 +660,28 @@
   if (clearChatBtn) clearChatBtn.onclick = clearChat;
 
   if (openTranscriptBtn) openTranscriptBtn.onclick = openTranscript;
-  if (closeTranscriptInlineBtn) closeTranscriptInlineBtn.onclick = closeTranscript;
   if (closeTranscriptBtn) closeTranscriptBtn.onclick = closeTranscript;
+  if (drawerOverlay) drawerOverlay.onclick = closeTranscript;
 
   if (transcriptCopy) transcriptCopy.onclick = copyTranscript;
+  if (clearTranscriptBtn) clearTranscriptBtn.onclick = clearTranscriptOnly;
   if (tncButton) tncButton.onclick = showTncDetails;
+
+  if (privacyTrigger) privacyTrigger.onclick = openPrivacyModal;
+  if (termsTrigger) termsTrigger.onclick = openTermsModal;
+  if (privacyOverlay) privacyOverlay.onclick = closePrivacyModal;
+  if (termsOverlay) termsOverlay.onclick = closeTermsModal;
+  if (privacyAcceptBtn) privacyAcceptBtn.onclick = acceptPrivacy;
+  if (privacyDenyBtn) privacyDenyBtn.onclick = denyPrivacy;
+  if (termsCloseBtn) termsCloseBtn.onclick = closeTermsModal;
 
   // Close drawer on Escape
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeTranscript();
+    if (e.key === "Escape") {
+      closeTranscript();
+      closePrivacyModal();
+      closeTermsModal();
+    }
   });
 
   // Stop listening if tab is hidden
