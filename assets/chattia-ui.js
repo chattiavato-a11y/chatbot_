@@ -134,10 +134,23 @@
   consentState = readConsent();
   const prefs = loadPrefs();
 
-  let currentLang = (prefs.lang === "es") ? "es" : "en";
-  if (!prefs.lang) currentLang = (document.documentElement.lang === "es") ? "es" : "en";
+  const initialDocLang = (document.documentElement.lang === "es") ? "es" : "en";
+  let currentLang = (prefs.lang === "es") ? "es" : initialDocLang;
 
-  let currentTheme = (prefs.theme === "dark") ? "dark" : "light";
+  function detectInitialTheme() {
+    if (prefs.theme === "dark" || prefs.theme === "light") return prefs.theme;
+
+    const attrTheme = document.documentElement.getAttribute("data-theme");
+    if (attrTheme === "dark" || attrTheme === "light") return attrTheme;
+
+    if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark";
+    }
+
+    return "light";
+  }
+
+  let currentTheme = detectInitialTheme();
 
   function setLanguage(lang) {
     const toES = (lang === "es");
