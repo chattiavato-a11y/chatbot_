@@ -15,7 +15,7 @@
 - **HTTP-equivalent headers (meta):** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=15552000; includeSubDomains; preload`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: accelerometer=(), camera=(), display-capture=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), bluetooth=()`, `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`.
 - **Assets with SRI:**  
   - `assets/chattia-ui.css` — `sha384-ddeJpiFgcjiio0rWqbFyYJGrSXym1sr/fm76mmvdBbd7Z17Gcj1N07LNwnW/IrDR`  
-  - `assets/chattia-ui.js` — `sha384-8FbBbuvR122F1Nq0rKr2Im55ekR9tulYthyjg+sRs95FN3yYkJWBgRFrSWKkAmBb`  
+  - `assets/chattia-ui.js` — `sha384-mafSio8SVzvDqU8colzclxIRpzDJx3Xf+FRpLQbV9mqPArHtAyfztPBQc0wAMdW2`  
   - `https://challenges.cloudflare.com/turnstile/v0/api.js` — `sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb`
 - **Privacy & consent:** Banner explains localStorage use; preferences persist only after acceptance. Decline keeps preferences in-memory only.
 - **Accessibility:** Focus-visible outlines, transcript panel with copy, voice transcript logging, reduced-motion toggle honoring `prefers-reduced-motion`, ARIA labels for controls.
