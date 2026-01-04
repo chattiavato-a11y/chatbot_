@@ -217,7 +217,7 @@ a:focus-visible{ box-shadow: var(--safe-focus); outline: none; }
 .chat-head{
   display:flex;
   align-items:center;
-  justify-content:space-between;
+  justify-content:flex-start;
   gap:12px;
   flex-wrap:wrap;
   padding: 14px 16px;
@@ -225,20 +225,8 @@ a:focus-visible{ box-shadow: var(--safe-focus); outline: none; }
   background: linear-gradient(to bottom, var(--bg2), transparent);
 }
 
-.chat-head-left{
-  display:flex;
-  align-items:center;
-  gap:14px;
-  flex: 1 1 auto;
-  min-width: 280px;
-}
-
 .brand-inline{ flex: 1 1 auto; min-width: 240px; }
-.brand-compact{
-  display:flex;
-  align-items:center;
-  gap:10px;
-}
+.status-inline{ flex-shrink:0; }
 
 .status{
   display:flex;
@@ -258,7 +246,7 @@ a:focus-visible{ box-shadow: var(--safe-focus); outline: none; }
   display:flex;
   align-items:center;
   gap:10px;
-  flex-shrink:0;
+  margin-left:auto;
 }
 
 .chat-log{
