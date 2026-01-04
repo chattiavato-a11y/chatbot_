@@ -57,6 +57,7 @@
 
   const clearChatBtn = qs("#clearChat");
   const openTranscriptBtn = qs("#openTranscript");
+  const closeTranscriptInlineBtn = qs("#closeTranscriptInline");
   const transcriptDrawer = qs("#transcriptDrawer");
   const closeTranscriptBtn = qs("#closeTranscript");
   const transcriptText = qs("#transcript-text");
@@ -134,10 +135,23 @@
   consentState = readConsent();
   const prefs = loadPrefs();
 
-  let currentLang = (prefs.lang === "es") ? "es" : "en";
-  if (!prefs.lang) currentLang = (document.documentElement.lang === "es") ? "es" : "en";
+  const initialDocLang = (document.documentElement.lang === "es") ? "es" : "en";
+  let currentLang = (prefs.lang === "es") ? "es" : initialDocLang;
 
-  let currentTheme = (prefs.theme === "dark") ? "dark" : "light";
+  function detectInitialTheme() {
+    if (prefs.theme === "dark" || prefs.theme === "light") return prefs.theme;
+
+    const attrTheme = document.documentElement.getAttribute("data-theme");
+    if (attrTheme === "dark" || attrTheme === "light") return attrTheme;
+
+    if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark";
+    }
+
+    return "light";
+  }
+
+  let currentTheme = detectInitialTheme();
 
   function setLanguage(lang) {
     const toES = (lang === "es");
@@ -454,12 +468,14 @@
     if (!transcriptDrawer) return;
     transcriptDrawer.classList.add("open");
     transcriptDrawer.setAttribute("aria-hidden", "false");
+    if (closeTranscriptInlineBtn) closeTranscriptInlineBtn.hidden = false;
   }
 
   function closeTranscript() {
     if (!transcriptDrawer) return;
     transcriptDrawer.classList.remove("open");
     transcriptDrawer.setAttribute("aria-hidden", "true");
+    if (closeTranscriptInlineBtn) closeTranscriptInlineBtn.hidden = true;
   }
 
   // === CHAT UI ===
@@ -562,6 +578,7 @@
   if (clearChatBtn) clearChatBtn.onclick = clearChat;
 
   if (openTranscriptBtn) openTranscriptBtn.onclick = openTranscript;
+  if (closeTranscriptInlineBtn) closeTranscriptInlineBtn.onclick = closeTranscript;
   if (closeTranscriptBtn) closeTranscriptBtn.onclick = closeTranscript;
 
   if (transcriptCopy) transcriptCopy.onclick = copyTranscript;

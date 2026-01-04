@@ -38,12 +38,13 @@
   <script
     src="assets/chattia-ui.js"
     defer
-    integrity="sha384-8FbBbuvR122F1Nq0rKr2Im55ekR9tulYthyjg+sRs95FN3yYkJWBgRFrSWKkAmBb"
+    integrity="sha384-AV0VfM6ezfXdyaGsfUjcmM6uMETT4mqAmE5KQ3qzyY/rA76KiOyt71TYc5ubMGnD"
     crossorigin="anonymous"></script>
 </head>
 
 <body>
-  <a class="sr-only" href="#chat-root">Skip to chat</a>
+  <!-- Skip link: lets keyboard/screen-reader users jump directly to the chat panel -->
+  <a class="skip-link" href="#chat-root">Skip to chat</a>
 
   <noscript>
     <div class="noscript">
@@ -89,6 +90,16 @@
               data-en-label="Open transcript"
               data-es-label="Abrir transcripción">
               <span data-en="Transcript" data-es="Transcripción">Transcript</span>
+            </button>
+            <button
+              type="button"
+              id="closeTranscriptInline"
+              class="ghost-btn"
+              aria-label="Close transcript"
+              data-en-label="Close transcript"
+              data-es-label="Cerrar transcripción"
+              hidden>
+              <span data-en="Close" data-es="Cerrar">Close</span>
             </button>
           </div>
         </div>
