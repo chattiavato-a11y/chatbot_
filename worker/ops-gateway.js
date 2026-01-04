@@ -107,16 +107,22 @@ function originAllowed(origin) {
   return !!origin && ALLOWED_ORIGINS.includes(origin);
 }
 
-function corsHeaders(origin) {
+function corsHeaders(origin, requestedHeadersRaw = "") {
   const h = {
     Vary: "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
   };
 
   if (!originAllowed(origin)) return h;
 
+  const requestedHeaders = (requestedHeadersRaw || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(", ");
+
   h["Access-Control-Allow-Origin"] = origin;
   h["Access-Control-Allow-Methods"] = "POST, OPTIONS";
-  h["Access-Control-Allow-Headers"] = "Content-Type, X-Ops-Asset-Id";
+  h["Access-Control-Allow-Headers"] = requestedHeaders || "Content-Type, X-Ops-Asset-Id";
   h["Access-Control-Max-Age"] = "600";
   return h;
 }
@@ -338,16 +344,23 @@ export default {
 
       // Validate preflight method/header hints (fail closed)
       const acrm = (request.headers.get("Access-Control-Request-Method") || "").toUpperCase();
-      const acrh = (request.headers.get("Access-Control-Request-Headers") || "").toLowerCase();
+      const acrhRaw = request.headers.get("Access-Control-Request-Headers") || "";
+      const acrh = acrhRaw.toLowerCase();
+      const allowedHeaders = ["content-type", "x-ops-asset-id"];
 
       if (acrm && acrm !== "POST") return json(origin, 403, { error: "Preflight rejected." });
-      if (acrh && !acrh.split(",").map(s => s.trim()).every(h => ["content-type", "x-ops-asset-id"].includes(h))) {
-        return json(origin, 403, { error: "Preflight rejected." });
+      if (acrh) {
+        const requested = acrh.split(",").map((s) => s.trim()).filter(Boolean);
+        const disallowed = requested.filter((h) => !allowedHeaders.includes(h));
+        if (disallowed.length) {
+          await logEvent(ctx, env, { type: "PREFLIGHT_REJECT", ip: clientIp, headers: requested });
+          return json(origin, 403, { error: "Preflight rejected.", details: { disallowed } });
+        }
       }
 
       return new Response(null, {
         status: 204,
-        headers: { ...securityHeaders(), ...corsHeaders(origin) }
+        headers: { ...securityHeaders(), ...corsHeaders(origin, acrhRaw) }
       });
     }
 
