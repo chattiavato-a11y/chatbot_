@@ -151,7 +151,28 @@ a:focus-visible{ box-shadow: var(--safe-focus); outline: none; }
   align-items:center;
   justify-content:space-between;
   gap:14px;
-  padding: 10px 6px 16px;
+  padding: 12px 14px 10px;
+  border-radius: var(--radius-xl);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-1);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  margin-bottom: 16px;
+}
+.brand-top .brand-title{ font-size: 18px; }
+.brand-top .brand-sub{ font-size: 13px; }
+.top-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.divider{
+  width:1px;height:18px;
+  background: var(--border);
+  margin: 0 2px;
 }
 
 .brand{
@@ -599,6 +620,7 @@ a:focus-visible{ box-shadow: var(--safe-focus); outline: none; }
 /* -------------------- Responsive -------------------- */
 @media (max-width: 720px){
   .shell{ padding: 16px 10px 26px; }
+  .topbar{ flex-direction:column; align-items:flex-start; }
   .chat-head{ align-items:flex-start; gap:10px; }
   .chat-log{ max-height: none; min-height: 260px; }
   .drawer{ width: 100%; }

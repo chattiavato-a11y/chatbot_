@@ -54,6 +54,55 @@
   <div class="bg" aria-hidden="true"></div>
 
   <div class="shell">
+    <header class="topbar" aria-label="Page controls">
+      <div class="brand brand-inline brand-top">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div class="brand-text">
+          <div class="brand-title" data-en="Chattia for OPS" data-es="Chattia para OPS">Chattia for OPS</div>
+          <div class="brand-sub" data-en="Secure assistant UI" data-es="UI segura del asistente">Secure assistant UI</div>
+        </div>
+      </div>
+
+      <div class="top-actions" aria-label="Navigation and display controls">
+        <a class="pill-link" href="https://www.chattia.io/privacy" target="_blank" rel="noopener noreferrer">
+          <span data-en="Privacy" data-es="Privacidad">Privacy</span>
+        </a>
+        <a class="pill-link" href="https://www.chattia.io/terms" target="_blank" rel="noopener noreferrer">
+          <span data-en="Terms" data-es="Términos">Terms</span>
+        </a>
+        <span class="divider" aria-hidden="true"></span>
+
+        <button
+          type="button"
+          id="langCtrl"
+          class="pill-btn"
+          aria-pressed="false"
+          aria-label="Toggle language"
+          data-en-label="Toggle language"
+          data-es-label="Cambiar idioma">EN</button>
+
+        <button
+          type="button"
+          id="themeCtrl"
+          class="pill-btn"
+          aria-pressed="false"
+          aria-label="Toggle theme"
+          data-en-label="Toggle theme"
+          data-es-label="Cambiar tema">Dark</button>
+
+        <button
+          type="button"
+          id="speechToggle"
+          class="pill-btn"
+          aria-pressed="false"
+          aria-label="Toggle voice output"
+          data-en-label="Toggle voice output"
+          data-es-label="Activar voz">
+          <span data-en="Voice" data-es="Voz">Voice</span>
+        </button>
+      </div>
+    </header>
+
     <main class="panel" role="main" id="chat-root">
       <section class="chat" aria-label="Chat" id="chat">
         <div class="chat-head">
@@ -123,37 +172,6 @@
               </svg>
               <span class="mic-label" data-en="Speak" data-es="Hablar">Speak</span>
             </button>
-
-            <div class="quick-toggles" aria-label="Display and language controls">
-              <button
-                type="button"
-                id="langCtrl"
-                class="pill-btn"
-                aria-pressed="false"
-                aria-label="Toggle language"
-                data-en-label="Toggle language"
-                data-es-label="Cambiar idioma">EN</button>
-
-              <button
-                type="button"
-                id="themeCtrl"
-                class="pill-btn"
-                aria-pressed="false"
-                aria-label="Toggle theme"
-                data-en-label="Toggle theme"
-                data-es-label="Cambiar tema">Dark</button>
-
-              <button
-                type="button"
-                id="speechToggle"
-                class="pill-btn"
-                aria-pressed="false"
-                aria-label="Toggle voice output"
-                data-en-label="Toggle voice output"
-                data-es-label="Activar voz">
-                <span data-en="Voice" data-es="Voz">Voice</span>
-              </button>
-            </div>
 
             <div id="voice-status" class="voice-status" role="status" aria-live="polite"></div>
 
