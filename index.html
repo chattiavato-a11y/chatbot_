@@ -47,56 +47,6 @@
   </noscript>
 
   <div class="shell app-shell">
-    <header class="topbar" aria-label="Page controls">
-      <div class="brand brand-inline brand-top">
-        <div class="brand-mark" aria-hidden="true"></div>
-        <div class="brand-text">
-          <div class="brand-title" data-en="Chattia for OPS" data-es="Chattia para OPS">Chattia for OPS</div>
-          <div class="brand-sub" data-en="Secure assistant UI" data-es="UI segura del asistente">Secure assistant UI</div>
-        </div>
-      </div>
-
-      <div class="top-actions" aria-label="Navigation and display controls">
-        <button class="pill-btn" type="button" id="privacyTrigger" data-action="privacy">
-          <span data-en="Privacy" data-es="Privacidad">Privacy</span>
-        </button>
-        <button class="pill-btn" type="button" id="termsTrigger" data-action="terms">
-          <span data-en="Terms" data-es="Términos">Terms</span>
-        </button>
-
-        <span class="divider" aria-hidden="true"></span>
-
-        <button
-          type="button"
-          id="langCtrl"
-          class="pill-btn"
-          aria-pressed="false"
-          aria-label="Toggle language"
-          data-en-label="Toggle language"
-          data-es-label="Cambiar idioma">EN</button>
-
-        <button
-          type="button"
-          id="themeCtrl"
-          class="pill-btn"
-          aria-pressed="false"
-          aria-label="Toggle theme"
-          data-en-label="Toggle theme"
-          data-es-label="Cambiar tema">Dark</button>
-
-        <button
-          type="button"
-          id="speechToggle"
-          class="pill-btn"
-          aria-pressed="false"
-          aria-label="Toggle voice output"
-          data-en-label="Toggle voice output"
-          data-es-label="Activar voz">
-          <span data-en="Voice" data-es="Voz">Voice</span>
-        </button>
-      </div>
-    </header>
-
     <div class="layout">
       <aside class="side-menu" aria-label="Navigation">
         <div class="menu-brand">
@@ -223,7 +173,7 @@
             </div>
 
             <div class="footnote">
-              <div class="policy-links" aria-label="Policy links">
+              <div class="policy-links" aria-label="Navigation and controls">
                 <a class="pill-link" href="https://www.chattia.io/contact" target="_blank" rel="noopener noreferrer">
                   <span data-en="Contact Us" data-es="Contáctanos">Contact Us</span>
                 </a>
@@ -233,6 +183,38 @@
                 <a class="pill-link" href="https://www.chattia.io/about" target="_blank" rel="noopener noreferrer">
                   <span data-en="About Us" data-es="Sobre nosotros">About Us</span>
                 </a>
+                <button class="policy-link-btn" type="button" id="privacyTrigger" data-action="privacy">
+                  <span data-en="Privacy" data-es="Privacidad">Privacy</span>
+                </button>
+                <button class="policy-link-btn" type="button" id="termsTrigger" data-action="terms">
+                  <span data-en="Terms" data-es="Términos">Terms</span>
+                </button>
+                <button
+                  type="button"
+                  id="langCtrl"
+                  class="policy-link-btn"
+                  aria-pressed="false"
+                  aria-label="Toggle language"
+                  data-en-label="Toggle language"
+                  data-es-label="Cambiar idioma">EN</button>
+                <button
+                  type="button"
+                  id="themeCtrl"
+                  class="policy-link-btn"
+                  aria-pressed="false"
+                  aria-label="Toggle theme"
+                  data-en-label="Toggle theme"
+                  data-es-label="Cambiar tema">Dark</button>
+                <button
+                  type="button"
+                  id="speechToggle"
+                  class="policy-link-btn"
+                  aria-pressed="false"
+                  aria-label="Toggle voice output"
+                  data-en-label="Toggle voice output"
+                  data-es-label="Activar voz">
+                  <span data-en="Voice" data-es="Voz">Voice</span>
+                </button>
               </div>
 
               <div class="footnote-actions">
