@@ -86,8 +86,13 @@
 
   function applyTheme() {
     document.documentElement.setAttribute("data-theme", state.theme);
-    document.documentElement.classList.toggle("dark-cycle", state.theme === "dark");
-    document.body?.classList.toggle("dark-cycle", state.theme === "dark");
+    const isDark = state.theme === "dark";
+    document.documentElement.classList.toggle("dark-cycle", isDark);
+    document.body?.classList.toggle("dark-cycle", isDark);
+
+    // Light theme gets its own subtle motion class (watermark-like background).
+    document.documentElement.classList.toggle("light-cycle", !isDark);
+    document.body?.classList.toggle("light-cycle", !isDark);
 
     if (themeCtrl) {
       themeCtrl.textContent = (state.theme === "dark") ? "Light" : "Dark";
