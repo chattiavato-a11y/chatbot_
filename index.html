@@ -23,6 +23,9 @@
   <!-- App CSS -->
   <link
     rel="stylesheet"
+    href="assets/chattia-theme.css" />
+  <link
+    rel="stylesheet"
     href="assets/chattia-ui.css" />
 
   <!-- Cloudflare Turnstile (no SRI: remote script can change) -->
@@ -32,6 +35,9 @@
     crossorigin="anonymous"></script>
 
   <!-- App JS -->
+  <script
+    src="assets/chattia-preferences.js"
+    defer></script>
   <script
     src="assets/chattia-ui.js"
     defer></script>
@@ -92,16 +98,37 @@
                 </div>
               </details>
 
-              <div class="mini-actions">
-                <button
-                  type="button"
-                  id="clearChat"
-                  class="ghost-btn"
-                  aria-label="Clear chat"
-                  data-en-label="Clear chat"
-                  data-es-label="Borrar chat">
-                  <span data-en="Clear" data-es="Borrar">Clear</span>
-                </button>
+              <div class="chat-utility-stack">
+                <div class="quick-toggles" aria-label="Theme and language controls">
+                  <button
+                    type="button"
+                    id="langCtrl"
+                    class="quick-toggle"
+                    aria-pressed="false"
+                    aria-label="Toggle language"
+                    data-en-label="Toggle language"
+                    data-es-label="Cambiar idioma">EN</button>
+                  <button
+                    type="button"
+                    id="themeCtrl"
+                    class="quick-toggle"
+                    aria-pressed="false"
+                    aria-label="Toggle theme"
+                    data-en-label="Toggle theme"
+                    data-es-label="Cambiar tema">Dark</button>
+                </div>
+
+                <div class="mini-actions">
+                  <button
+                    type="button"
+                    id="clearChat"
+                    class="ghost-btn"
+                    aria-label="Clear chat"
+                    data-en-label="Clear chat"
+                    data-es-label="Borrar chat">
+                    <span data-en="Clear" data-es="Borrar">Clear</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -176,37 +203,24 @@
 
             <div class="footnote">
               <div class="policy-links" aria-label="Navigation and controls">
-                <a class="pill-link" href="https://www.chattia.io/contact" target="_blank" rel="noopener noreferrer">
+                <a class="pill-link" href="pages/contact.html">
                   <span data-en="Contact Us" data-es="Contáctanos">Contact Us</span>
                 </a>
-                <a class="pill-link" href="https://www.chattia.io/support" target="_blank" rel="noopener noreferrer">
-                  <span data-en="Support" data-es="Soporte">Support</span>
-                </a>
-                <a class="pill-link" href="https://www.chattia.io/about" target="_blank" rel="noopener noreferrer">
+                <a class="pill-link" href="pages/about.html">
                   <span data-en="About Us" data-es="Sobre nosotros">About Us</span>
                 </a>
-                <button class="policy-link-btn" type="button" id="privacyTrigger" data-action="privacy">
+                <a class="pill-link" href="pages/policies.html#privacy">
                   <span data-en="Privacy" data-es="Privacidad">Privacy</span>
+                </a>
+                <a class="pill-link" href="pages/policies.html#terms">
+                  <span data-en="Terms" data-es="Términos">Terms</span>
+                </a>
+                <button class="policy-link-btn" type="button" id="privacyTrigger" data-action="privacy">
+                  <span data-en="Consent" data-es="Consentimiento">Consent</span>
                 </button>
                 <button class="policy-link-btn" type="button" id="termsTrigger" data-action="terms">
-                  <span data-en="Terms" data-es="Términos">Terms</span>
+                  <span data-en="In-App T&amp;C" data-es="TyC en la app">In-App T&amp;C</span>
                 </button>
-                <button
-                  type="button"
-                  id="langCtrl"
-                  class="policy-link-btn"
-                  aria-pressed="false"
-                  aria-label="Toggle language"
-                  data-en-label="Toggle language"
-                  data-es-label="Cambiar idioma">EN</button>
-                <button
-                  type="button"
-                  id="themeCtrl"
-                  class="policy-link-btn"
-                  aria-pressed="false"
-                  aria-label="Toggle theme"
-                  data-en-label="Toggle theme"
-                  data-es-label="Cambiar tema">Dark</button>
                 <button
                   type="button"
                   id="speechToggle"

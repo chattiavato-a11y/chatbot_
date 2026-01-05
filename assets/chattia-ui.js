@@ -4,7 +4,6 @@
   "use strict";
 
   const qs  = (s) => document.querySelector(s);
-  const qsa = (s) => [...document.querySelectorAll(s)];
 
   // === CONFIG ===
   // Keep ASSET_ID in sync with Gateway env: OPS_ASSET_IDS (or ASSET_ID)
@@ -33,8 +32,6 @@
   const input = qs("#chatbot-input");
   const sendBtn = qs("#chatbot-send");
 
-  const langCtrl = qs("#langCtrl");
-  const themeCtrl = qs("#themeCtrl");
   const speechToggle = qs("#speechToggle");
   const listenCtrl = qs("#listenCtrl");
   const voiceStatus = qs("#voice-status");
@@ -71,19 +68,16 @@
   const privacyDenyBtn = qs("#btnDenyPrivacy");
   const termsCloseBtn = qs("#btnCloseTerms");
 
-  // === I18N NODES ===
-  const transNodes = qsa("[data-en]");
-  const phNodes = qsa("[data-en-ph]");
-  const ariaNodes = qsa("[data-en-label]");
-
   // === CONSENT + PREFS ===
+  const prefsApi = window.opsUiPrefs || null;
+
   const STORAGE_KEYS = {
-    prefs: "ops-chat-preferences",
     consent: "ops-chat-consent"
   };
 
+  let currentLang = prefsApi?.getLang?.() || (document.documentElement.lang === "es" ? "es" : "en");
+  let currentTheme = prefsApi?.getTheme?.() || (document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
   let consentState = "pending"; // pending | accepted | denied
-  const memoryPrefs = {}; // used when denied/pending
 
   function setChatEnabled(enabled) {
     if (input) input.disabled = !enabled;
@@ -102,23 +96,6 @@
     try { localStorage.setItem(STORAGE_KEYS.consent, value); } catch {}
   }
 
-  function loadPrefs() {
-    if (consentState !== "accepted") return memoryPrefs;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEYS.prefs);
-      return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
-  }
-
-  function savePrefs(next) {
-    const payload = next || {};
-    if (consentState === "accepted") {
-      try { localStorage.setItem(STORAGE_KEYS.prefs, JSON.stringify(payload)); } catch {}
-    } else {
-      Object.assign(memoryPrefs, payload);
-    }
-  }
-
   function applyConsentUI() {
     const hide = (consentState === "accepted" || consentState === "denied");
 
@@ -133,10 +110,10 @@
     persistConsent(next);
 
     if (next === "accepted") {
-      savePrefs({ lang: currentLang, theme: currentTheme });
+      prefsApi?.setPersistenceAllowed(true);
       setChatEnabled(true);
     } else if (next === "denied") {
-      try { localStorage.removeItem(STORAGE_KEYS.prefs); } catch {}
+      prefsApi?.setPersistenceAllowed(false);
       setChatEnabled(false);
     }
     applyConsentUI();
@@ -182,64 +159,13 @@
 
   // === THEME + LANGUAGE ===
   consentState = readConsent();
-  const prefs = loadPrefs();
+  if (consentState === "accepted") prefsApi?.setPersistenceAllowed(true);
+  if (consentState === "denied") prefsApi?.setPersistenceAllowed(false);
 
-  const initialDocLang = (document.documentElement.lang === "es") ? "es" : "en";
-  let currentLang = (prefs.lang === "es") ? "es" : initialDocLang;
-
-  function detectInitialTheme() {
-    if (prefs.theme === "dark" || prefs.theme === "light") return prefs.theme;
-
-    const attrTheme = document.documentElement.getAttribute("data-theme");
-    if (attrTheme === "dark" || attrTheme === "light") return attrTheme;
-
-    if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      return "dark";
-    }
-
-    return "light";
-  }
-
-  let currentTheme = detectInitialTheme();
+  currentLang = prefsApi?.getLang?.() || currentLang;
+  currentTheme = prefsApi?.getTheme?.() || currentTheme;
   setChatEnabled(consentState !== "denied");
   applyConsentUI();
-
-  function setLanguage(lang) {
-    const toES = (lang === "es");
-    currentLang = toES ? "es" : "en";
-    document.documentElement.lang = currentLang;
-
-    if (langCtrl) {
-      langCtrl.textContent = toES ? "ES" : "EN";
-      langCtrl.setAttribute("aria-pressed", toES ? "true" : "false");
-      langCtrl.classList.toggle("active", toES);
-    }
-
-    transNodes.forEach((node) => { node.textContent = toES ? node.dataset.es : node.dataset.en; });
-    phNodes.forEach((node) => { node.placeholder = toES ? node.dataset.esPh : node.dataset.enPh; });
-    ariaNodes.forEach((node) => { node.setAttribute("aria-label", toES ? node.dataset.esLabel : node.dataset.enLabel); });
-
-    if (recognition) recognition.lang = toES ? "es-ES" : "en-US";
-
-    savePrefs({ lang: currentLang, theme: currentTheme });
-    setVoiceStatus("", "");
-    setNet(navigator.onLine, "Ready", "Listo");
-  }
-
-  function setTheme(mode) {
-    currentTheme = (mode === "dark") ? "dark" : "light";
-    document.documentElement.setAttribute("data-theme", currentTheme);
-
-    if (themeCtrl) {
-      themeCtrl.textContent = (currentTheme === "dark") ? "Light" : "Dark";
-      themeCtrl.setAttribute("aria-pressed", currentTheme === "dark" ? "true" : "false");
-    }
-
-    document.documentElement.classList.toggle("dark-cycle", currentTheme === "dark");
-    document.body?.classList.toggle("dark-cycle", currentTheme === "dark");
-
-    savePrefs({ lang: currentLang, theme: currentTheme });
-  }
 
   // === TURNSTILE ===
   let turnstileToken = "";
@@ -600,12 +526,20 @@
     speak(msg, currentLang);
   }
 
+  document.addEventListener("ops:language-change", (event) => {
+    currentLang = (event?.detail?.lang === "es") ? "es" : "en";
+    if (recognition) recognition.lang = (currentLang === "es") ? "es-ES" : "en-US";
+    setVoiceStatus("", "");
+    setNet(navigator.onLine, "Ready", "Listo");
+  });
+
+  document.addEventListener("ops:theme-change", (event) => {
+    currentTheme = (event?.detail?.theme === "dark") ? "dark" : "light";
+  });
+
   // === EVENTS ===
   if (consentAccept) consentAccept.onclick = () => handleConsent("accepted");
   if (consentDeny) consentDeny.onclick = () => handleConsent("denied");
-
-  if (langCtrl) langCtrl.addEventListener("click", () => setLanguage(currentLang === "es" ? "en" : "es"));
-  if (themeCtrl) themeCtrl.addEventListener("click", () => setTheme(currentTheme === "dark" ? "light" : "dark"));
 
   if (speechToggle) {
     speechToggle.addEventListener("click", () => {
@@ -618,7 +552,6 @@
       }
       speechEnabled = !speechEnabled;
       updateSpeechToggleUI();
-      savePrefs({ lang: currentLang, theme: currentTheme }); // no voice stored (by design)
     });
   }
 
@@ -827,10 +760,8 @@
     document.documentElement.setAttribute("data-theme", currentTheme);
   }
 
-  setLanguage(currentLang);
-  setTheme(currentTheme);
-
   if (synth) synth.onvoiceschanged = () => getVoiceForLang(currentLang);
+  if (recognition) recognition.lang = (currentLang === "es") ? "es-ES" : "en-US";
 
   updateSpeechToggleUI();
   updateListenUI();
