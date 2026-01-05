@@ -53,13 +53,11 @@
 
   const privacyTrigger = qs("#privacyTrigger");
   const termsTrigger = qs("#termsTrigger");
-  const privacyOverlay = qs("#privacyOverlay");
-  const privacyModal = qs("#privacyModal");
-  const termsOverlay = qs("#termsOverlay");
-  const termsModal = qs("#termsModal");
+  const policyOverlay = qs("#policyOverlay");
+  const policyModal = qs("#policyModal");
   const privacyAcceptBtn = qs("#btnAcceptPrivacy");
   const privacyDenyBtn = qs("#btnDenyPrivacy");
-  const termsCloseBtn = qs("#btnCloseTerms");
+  const policyCloseBtn = qs("#btnClosePolicy");
 
   // === CONSENT + PREFS ===
   const prefsApi = window.opsUiPrefs || null;
@@ -112,42 +110,28 @@
     applyConsentUI();
   }
 
-  function openPrivacyModal() {
-    if (!privacyModal || !privacyOverlay) return;
-    privacyModal.hidden = false;
-    privacyOverlay.classList.add("open");
-    privacyOverlay.setAttribute("aria-hidden", "false");
+  function openPolicyModal() {
+    if (!policyModal || !policyOverlay) return;
+    policyModal.hidden = false;
+    policyOverlay.classList.add("open");
+    policyOverlay.setAttribute("aria-hidden", "false");
   }
 
-  function closePrivacyModal() {
-    if (!privacyModal || !privacyOverlay) return;
-    privacyModal.hidden = true;
-    privacyOverlay.classList.remove("open");
-    privacyOverlay.setAttribute("aria-hidden", "true");
+  function closePolicyModal() {
+    if (!policyModal || !policyOverlay) return;
+    policyModal.hidden = true;
+    policyOverlay.classList.remove("open");
+    policyOverlay.setAttribute("aria-hidden", "true");
   }
 
   function acceptPrivacy() {
     handleConsent("accepted");
-    closePrivacyModal();
+    closePolicyModal();
   }
 
   function denyPrivacy() {
     handleConsent("denied");
-    closePrivacyModal();
-  }
-
-  function openTermsModal() {
-    if (!termsModal || !termsOverlay) return;
-    termsModal.hidden = false;
-    termsOverlay.classList.add("open");
-    termsOverlay.setAttribute("aria-hidden", "false");
-  }
-
-  function closeTermsModal() {
-    if (!termsModal || !termsOverlay) return;
-    termsModal.hidden = true;
-    termsOverlay.classList.remove("open");
-    termsOverlay.setAttribute("aria-hidden", "true");
+    closePolicyModal();
   }
 
   // === THEME + LANGUAGE ===
@@ -531,19 +515,17 @@
     });
   }
 
-  if (privacyTrigger) privacyTrigger.onclick = openPrivacyModal;
-  if (termsTrigger) termsTrigger.onclick = openTermsModal;
-  if (privacyOverlay) privacyOverlay.onclick = closePrivacyModal;
-  if (termsOverlay) termsOverlay.onclick = closeTermsModal;
+  if (privacyTrigger) privacyTrigger.onclick = openPolicyModal;
+  if (termsTrigger) termsTrigger.onclick = openPolicyModal;
+  if (policyOverlay) policyOverlay.onclick = closePolicyModal;
   if (privacyAcceptBtn) privacyAcceptBtn.onclick = acceptPrivacy;
   if (privacyDenyBtn) privacyDenyBtn.onclick = denyPrivacy;
-  if (termsCloseBtn) termsCloseBtn.onclick = closeTermsModal;
+  if (policyCloseBtn) policyCloseBtn.onclick = closePolicyModal;
 
   // Close modals on Escape
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      closePrivacyModal();
-      closeTermsModal();
+      closePolicyModal();
     }
   });
 
