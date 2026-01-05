@@ -62,8 +62,16 @@
   const privacyDenyBtn = qs("#btnDenyPrivacy");
   const policyCloseBtn = qs("#btnClosePolicy");
 
+  function removeSkipLinks() {
+    const selectors = [".skip-link", "a[href=\"#chat-root\"]", "a[href=\"#chat\"]"];
+    selectors.forEach((selector) => {
+      document.querySelectorAll(selector).forEach((node) => node.remove());
+    });
+  }
+
   // === CONSENT + PREFS ===
   const prefsApi = window.opsUiPrefs || null;
+  removeSkipLinks();
 
   const STORAGE_KEYS = {
     consent: "ops-chat-consent"
