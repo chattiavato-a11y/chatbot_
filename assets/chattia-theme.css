@@ -1,5 +1,10 @@
 /* assets/chattia-theme.css */
-/* Theme tokens, gradients, and background surfaces */
+/* Theme tokens + 2026-style “calm motion” background.
+   - Light: watermark-like moving blooms
+   - Dark: richer gradient + soft bloom
+   - No external assets
+   - Respects prefers-reduced-motion */
+
 :root{
   color-scheme: light;
 
@@ -7,21 +12,26 @@
   --text-light: #0b1220;
   --muted: #6f7585;
 
-  /* Dark background gradient only (surface stays neutral) */
+  /* Dark background hues */
   --bgd-1: #0b3b3a;
   --bgd-2: #07121f;
   --bgd-3: #3a1f66;
 
+  /* Surfaces */
   --surface: #ffffff;
   --surface-border: #e5e8f0;
   --surface-soft: #f4f6fa;
 
-  --surface-dark: rgba(10, 16, 28, 0.70);
-  --surface-dark-2: rgba(10, 16, 28, 0.85);
+  --surface-dark: rgba(10, 16, 28, 0.72);
+  --surface-dark-2: rgba(10, 16, 28, 0.88);
   --text-dark: #e7ecff;
   --muted-dark: #a6adc4;
 
-  --border: rgba(0,0,0,0.08);
+  --border-light: rgba(0,0,0,0.08);
+  --border-dark: rgba(255,255,255,0.10);
+
+  /* Active border token (switches by theme) */
+  --border: var(--border-light);
   --shadow: 0 12px 40px rgba(0,0,0,0.18);
 
   --accent-green: #28a745;
@@ -30,14 +40,25 @@
   --accent-purple: #6d3c99;
 
   --radius: 16px;
+
+  /* Background bloom colors */
+  --bloom-a: rgba(13, 99, 178, 0.18);
+  --bloom-b: rgba(245, 130, 32, 0.12);
+  --bloom-c: rgba(109, 60, 153, 0.12);
+  --bloom-d: rgba(40, 167, 69, 0.12);
+
+  --bloom-a-dark: rgba(44, 242, 162, 0.16);
+  --bloom-b-dark: rgba(255, 59, 143, 0.12);
+  --bloom-c-dark: rgba(133, 126, 255, 0.14);
 }
 
-html[data-theme="light"], body[data-theme="light"]{
+html[data-theme="light"]{
   background: var(--bg-light);
   color: var(--text-light);
 }
 
-html[data-theme="dark"], body[data-theme="dark"]{
+html[data-theme="dark"]{
+  --border: var(--border-dark);
   color: var(--text-dark);
   background:
     radial-gradient(1100px 700px at 10% 85%, rgba(11,59,58,0.70) 0%, rgba(11,59,58,0.00) 60%),
@@ -47,16 +68,99 @@ html[data-theme="dark"], body[data-theme="dark"]{
   color-scheme: dark;
 }
 
+/* Bloom layers (fixed, behind everything) */
+body{ background: transparent; }
+
+body::before,
+body::after{
+  content: "";
+  position: fixed;
+  inset: -25%;
+  pointer-events: none;
+  z-index: -2;
+  filter: blur(60px) saturate(1.2);
+  transform: translateZ(0);
+  opacity: 0.0;
+}
+
+html[data-theme="light"] body::before{
+  opacity: 0.55;
+  background:
+    radial-gradient(900px 700px at 15% 20%, var(--bloom-a) 0%, rgba(255,255,255,0) 55%),
+    radial-gradient(900px 700px at 85% 25%, var(--bloom-c) 0%, rgba(255,255,255,0) 55%),
+    radial-gradient(1000px 800px at 50% 90%, var(--bloom-d) 0%, rgba(255,255,255,0) 60%);
+}
+
+html[data-theme="light"] body::after{
+  opacity: 0.30;
+  z-index: -3;
+  filter: blur(80px) saturate(1.25);
+  background:
+    radial-gradient(1000px 900px at 80% 85%, var(--bloom-b) 0%, rgba(255,255,255,0) 60%),
+    radial-gradient(900px 700px at 20% 80%, rgba(13, 99, 178, 0.10) 0%, rgba(255,255,255,0) 55%);
+}
+
+html[data-theme="dark"] body::before{
+  opacity: 0.55;
+  background:
+    radial-gradient(1100px 800px at 15% 75%, var(--bloom-a-dark) 0%, rgba(0,0,0,0) 60%),
+    radial-gradient(900px 700px at 90% 25%, var(--bloom-c-dark) 0%, rgba(0,0,0,0) 60%),
+    radial-gradient(900px 700px at 40% 10%, var(--bloom-b-dark) 0%, rgba(0,0,0,0) 55%);
+}
+
+html[data-theme="dark"] body::after{
+  opacity: 0.35;
+  z-index: -3;
+  filter: blur(90px) saturate(1.15);
+  background:
+    radial-gradient(1100px 800px at 85% 85%, rgba(44, 242, 162, 0.10) 0%, rgba(0,0,0,0) 60%),
+    radial-gradient(900px 700px at 10% 20%, rgba(133, 126, 255, 0.08) 0%, rgba(0,0,0,0) 55%);
+}
+
+@keyframes lightBloomShift{
+  0%   { transform: translate3d(0,0,0) scale(1.00) rotate(0deg); }
+  50%  { transform: translate3d(2.5%, -1.5%, 0) scale(1.03) rotate(8deg); }
+  100% { transform: translate3d(0,0,0) scale(1.00) rotate(0deg); }
+}
+
+@keyframes darkBloomShift{
+  0%   { transform: translate3d(0,0,0) scale(1.00) rotate(0deg); }
+  50%  { transform: translate3d(-2.0%, 1.0%, 0) scale(1.04) rotate(-10deg); }
+  100% { transform: translate3d(0,0,0) scale(1.00) rotate(0deg); }
+}
+
+/* Existing dark gradient motion (45s) */
 @keyframes darkGradientShift{
   0%{ background-position: 0% 50%, 90% 30%, 0% 50%; }
   50%{ background-position: 100% 20%, 10% 70%, 100% 50%; }
   100%{ background-position: 0% 50%, 90% 30%, 0% 50%; }
 }
 
-html[data-theme="dark"].dark-cycle,
-body[data-theme="dark"].dark-cycle{
-  background-size: 220% 220%;
-  animation: darkGradientShift 45s ease-in-out infinite;
+@media (prefers-reduced-motion: no-preference){
+  html[data-theme="light"].light-cycle body::before,
+  body.light-cycle::before{
+    animation: lightBloomShift 45s ease-in-out infinite;
+  }
+  html[data-theme="light"].light-cycle body::after,
+  body.light-cycle::after{
+    animation: lightBloomShift 55s ease-in-out infinite reverse;
+  }
+
+  html[data-theme="dark"].dark-cycle{
+    background-size: 220% 220%;
+    animation: darkGradientShift 45s ease-in-out infinite;
+  }
+  html[data-theme="dark"].dark-cycle body::before{
+    animation: darkBloomShift 45s ease-in-out infinite;
+  }
+  html[data-theme="dark"].dark-cycle body::after{
+    animation: darkBloomShift 60s ease-in-out infinite reverse;
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  html[data-theme="dark"].dark-cycle{ animation: none; background-size: auto; }
+  body::before, body::after{ animation: none; }
 }
 
 a{ color: var(--accent-blue); text-decoration: none; }
