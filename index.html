@@ -20,23 +20,17 @@
   <link rel="preconnect" href="https://ops-gateway.grabem-holdem-nuts-right.workers.dev" crossorigin />
 
   <!-- App CSS -->
-  <link
-    rel="stylesheet"
-    href="assets/chattia-theme.css" />
-  <link
-    rel="stylesheet"
-    href="assets/chattia-ui.css" />
+  <link rel="stylesheet" href="assets/chattia-theme.css" />
+  <link rel="stylesheet" href="assets/chattia-ui.css" />
 
   <!-- App JS -->
-  <script
-    src="assets/chattia-preferences.js"
-    defer></script>
-  <script
-    src="assets/chattia-ui.js"
-    defer></script>
+  <script defer src="assets/chattia-preferences.js"></script>
+  <script defer src="assets/chattia-ui.js"></script>
 </head>
 
 <body>
+  <a class="skip-link" href="#chat" data-en="Skip to chat" data-es="Saltar al chat">Skip to chat</a>
+
   <noscript>
     <div class="noscript">
       This app requires JavaScript to run.
@@ -57,7 +51,7 @@
             </div>
 
             <div class="chat-head-right">
-              <div class="status status-inline">
+              <div class="status" aria-label="Network status">
                 <span class="dot" id="netDot" aria-hidden="true"></span>
                 <span id="netText" data-en="Ready" data-es="Listo">Ready</span>
               </div>
@@ -82,17 +76,43 @@
                     data-es-label="Cambiar tema">Dark</button>
                 </div>
 
-                <div class="mini-actions">
+                <div class="chat-actions" aria-label="Chat actions">
                   <button
                     type="button"
+                    class="pill-btn"
+                    id="listenCtrl"
+                    aria-pressed="false"
+                    aria-label="Voice input"
+                    data-en-label="Voice input"
+                    data-es-label="Voz">
+                    <span class="pill-ic" aria-hidden="true">🎙️</span>
+                    <span data-en="Voice" data-es="Voz">Voice</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="pill-btn"
+                    id="speechToggle"
+                    aria-pressed="false"
+                    aria-label="Speech output"
+                    data-en-label="Speech output"
+                    data-es-label="Lectura">
+                    <span class="pill-ic" aria-hidden="true">🔊</span>
+                    <span data-en="Voice Out" data-es="Voz salida">Voice Out</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="pill-btn accent"
                     id="clearChat"
-                    class="ghost-btn"
                     aria-label="Clear chat"
                     data-en-label="Clear chat"
                     data-es-label="Borrar chat">
                     <span data-en="Clear" data-es="Borrar">Clear</span>
                   </button>
                 </div>
+
+                <div class="voice-status" id="voice-status" aria-live="polite"></div>
               </div>
             </div>
           </div>
@@ -104,10 +124,29 @@
               <span data-en="Chatbot responses may be incorrect" data-es="Las respuestas del chatbot pueden ser incorrectas">
                 Chatbot responses may be incorrect
               </span>
+              •
+              <button class="policy-link-btn" type="button" id="privacyTrigger" data-action="privacy">
+                <span data-en="Privacy" data-es="Privacidad">Privacy</span>
+              </button>
+              •
+              <button class="policy-link-btn" type="button" id="termsTrigger" data-action="terms">
+                <span data-en="Terms" data-es="Términos">Terms</span>
+              </button>
+              •
+              <button class="policy-link-btn" type="button" id="transcriptTrigger" data-action="transcript">
+                <span data-en="Transcript" data-es="Transcripción">Transcript</span>
+              </button>
             </div>
+
             <form id="chatbot-input-row" class="input-row" autocomplete="off" novalidate>
               <label class="input-label" for="chatbot-input" data-en="Chat" data-es="Chat">Chat</label>
+
               <div class="input-shell">
+                <div class="hp-wrap" aria-hidden="true">
+                  <input id="hp_email" type="text" tabindex="-1" autocomplete="off" />
+                  <input id="hp_website" type="text" tabindex="-1" autocomplete="off" />
+                </div>
+
                 <input
                   id="chatbot-input"
                   class="input"
@@ -118,129 +157,58 @@
                   autocapitalize="off"
                   autocomplete="off"
                   inputmode="text"
-                  placeholder="Type Your Message"
-                  data-en-ph="Type Your Message"
-                  data-es-ph="Escriba su mensaje" />
+                  placeholder="Type a message..."
+                  data-en-placeholder="Type a message..."
+                  data-es-placeholder="Escribe un mensaje..." />
 
-                <!-- Honeypots (bots fill these). Keep focus out of tab order. -->
-                <div class="hp-wrap" aria-hidden="true">
-                  <label>email
-                    <input id="hp_email" name="hp_email" type="text" autocomplete="off" tabindex="-1" />
-                  </label>
-                  <label>website
-                    <input id="hp_website" name="hp_website" type="text" autocomplete="off" tabindex="-1" />
-                  </label>
-                </div>
-
-                <button
-                  type="button"
-                  id="listenCtrl"
-                  class="mic-inline"
-                  aria-pressed="false"
-                  aria-label="Start voice input"
-                  data-en-label="Start voice input"
-                  data-es-label="Comenzar voz">
-                  <svg viewBox="0 0 24 24" class="ic" aria-hidden="true">
-                    <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 14 0h-2zM11 19h2v3h-2z"/>
+                <button type="button" class="mic-inline" id="listenInline" aria-label="Voice input">
+                  <svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.93V21h2v-3.07A7 7 0 0 0 19 11h-2Z"></path>
                   </svg>
                 </button>
               </div>
 
               <button id="chatbot-send" class="send-btn" type="submit" aria-label="Send">
-                <svg viewBox="0 0 24 24" class="ic" aria-hidden="true">
-                  <path d="M2 21l20-9L2 3v7l14 2L2 14v7z"/>
-                </svg>
+                <span data-en="Send" data-es="Enviar">Send</span>
               </button>
             </form>
 
-            <div class="composer-meta">
-              <div id="voice-status" class="voice-status" role="status" aria-live="polite"></div>
-            </div>
-
-            <div id="consent-note" class="consent-note" role="status" aria-live="polite" hidden>
-              Consent is required to use the chat. Open Privacy to accept.
-            </div>
-
-            <div class="footnote">
-              <div class="policy-links" aria-label="Navigation and controls">
-                <a class="pill-link" href="pages/contact.html">
-                  <span data-en="Contact Us" data-es="Contáctanos">Contact Us</span>
-                </a>
-                <a class="pill-link" href="pages/about.html">
-                  <span data-en="About Us" data-es="Sobre nosotros">About Us</span>
-                </a>
-                <a class="pill-link" href="pages/policies.html#privacy">
-                  <span data-en="Privacy" data-es="Privacidad">Privacy</span>
-                </a>
-                <a class="pill-link" href="pages/policies.html#terms">
-                  <span data-en="Terms" data-es="Términos">Terms</span>
-                </a>
-                <button class="policy-link-btn" type="button" id="privacyTrigger" data-action="privacy">
-                  <span data-en="Consent" data-es="Consentimiento">Consent</span>
-                </button>
-                <button class="policy-link-btn" type="button" id="termsTrigger" data-action="terms">
-                  <span data-en="In-App T&amp;C" data-es="TyC en la app">In-App T&amp;C</span>
-                </button>
-                <button class="policy-link-btn" type="button" id="transcriptTrigger" data-action="transcript">
-                  <span data-en="Transcript" data-es="Transcripción">Transcript</span>
-                </button>
-                <button
-                  type="button"
-                  id="speechToggle"
-                  class="policy-link-btn"
-                  aria-pressed="false"
-                  aria-label="Toggle voice output"
-                  data-en-label="Toggle voice output"
-                  data-es-label="Activar voz">
-                  <span data-en="Voice" data-es="Voz">Voice</span>
-                </button>
+            <div class="consent-banner" id="consent-banner" role="region" aria-label="Privacy consent">
+              <div class="consent-text">
+                <strong data-en="Privacy & consent" data-es="Privacidad y consentimiento">Privacy & consent</strong>
+                <div id="consent-note" class="consent-note" data-en="Consent is required to use the chat. Open Privacy to accept." data-es="Se requiere consentimiento para usar el chat. Abre Privacidad para aceptar.">
+                  Consent is required to use the chat. Open Privacy to accept.
+                </div>
               </div>
 
-              <div class="footnote-actions">
-                <button
-                  type="button"
-                  id="tnc-button"
-                  class="tnc"
-                  data-en="T&amp;C"
-                  data-es="TyC"
-                  data-en-msg="Interacting with the chatbot sends requests to the OPS gateway."
-                  data-es-msg="Interactuar con el chatbot envía solicitudes al gateway de OPS.">T&amp;C</button>
-                <span class="footer-brand" aria-label="Chattia brand">Chattia © 2026</span>
+              <div class="consent-actions">
+                <button id="consent-deny" class="btn" type="button" data-en="Deny" data-es="Rechazar">Deny</button>
+                <button id="consent-accept" class="btn btn-primary" type="button" data-en="Accept" data-es="Aceptar">Accept</button>
               </div>
             </div>
           </div>
         </section>
       </main>
     </div>
-
-  <footer class="footer" role="contentinfo">
-    <span class="muted" data-en="OPS Online Support • Secure by design" data-es="OPS Online Support • Seguro por diseño">
-      OPS Online Support • Secure by design
-    </span>
-  </footer>
   </div>
 
+  <!-- Transcript drawer -->
   <div id="transcriptOverlay" class="drawer-overlay" aria-hidden="true"></div>
   <aside
     id="transcriptDrawer"
-    class="drawer card"
+    class="drawer"
     role="dialog"
     aria-modal="true"
-    aria-label="Transcript"
+    aria-label="Transcript drawer"
     hidden>
-    <div class="drawer-header">
-      <div class="drawer-title" data-en="Chattia Chat Transcript" data-es="Transcripción del chat Chattia">Chattia Chat Transcript</div>
-      <button
-        type="button"
-        id="transcriptClose"
-        class="pill-btn"
-        aria-label="Close transcript"
-        data-en-label="Close transcript"
-        data-es-label="Cerrar transcripción">
+    <div class="drawer-head">
+      <div class="drawer-title" data-en="Transcript" data-es="Transcripción">Transcript</div>
+      <button id="transcriptClose" class="pill-btn" type="button" aria-label="Close transcript">
         <span data-en="Close" data-es="Cerrar">Close</span>
       </button>
     </div>
-    <div class="drawer-body" role="document">
+
+    <div class="drawer-body">
       <div class="drawer-actions">
         <button
           type="button"
@@ -263,6 +231,7 @@
     </div>
   </aside>
 
+  <!-- Privacy/Terms modal -->
   <div id="policyOverlay" class="modal-overlay" aria-hidden="true"></div>
   <section
     id="policyModal"
@@ -272,27 +241,28 @@
     aria-label="Privacy, consent, and terms"
     hidden>
     <h2 data-en="Privacy, Consent, and Terms" data-es="Privacidad, consentimiento y términos">Privacy, Consent, and Terms</h2>
-    <h3 data-en="Privacy &amp; Consent" data-es="Privacidad y consentimiento">Privacy &amp; Consent</h3>
+
+    <h3 id="policy-privacy" data-en="Privacy &amp; Consent" data-es="Privacidad y consentimiento">Privacy &amp; Consent</h3>
     <p
       data-en="Chat interactions may be used to improve and train the chatbot experience. Please do not enter sensitive personal information."
-      data-es="Las interacciones del chat pueden usarse para mejorar y entrenar la experiencia del chatbot. Por favor, no ingreses información personal sensible.">
+      data-es="Las interacciones de chat pueden usarse para mejorar y entrenar la experiencia del chatbot. Por favor, no ingreses información personal sensible.">
       Chat interactions may be used to improve and train the chatbot experience. Please do not enter sensitive personal information.
     </p>
-    <p>
-      <strong data-en="No PII collection:" data-es="Sin recopilación de PII:">No PII collection:</strong>
-      <span
-        data-en=" Chattia and OPS do not intentionally collect personally identifiable information (PII). If you choose to share PII, it may be processed as part of your conversation."
-        data-es=" Chattia y OPS no recopilan intencionalmente información de identificación personal (PII). Si decides compartir PII, puede procesarse como parte de tu conversación.">
-        Chattia and OPS do not intentionally collect personally identifiable information (PII). If you choose to share PII, it may be processed as part of your conversation.
-      </span>
-    </p>
-    <p
-      data-en="If you deny consent, chat will be disabled until you accept."
-      data-es="Si niegas el consentimiento, el chat se deshabilitará hasta que lo aceptes.">
-      If you deny consent, chat will be disabled until you accept.
-    </p>
 
-    <h3 data-en="Terms &amp; Conditions" data-es="Términos y condiciones">Terms &amp; Conditions</h3>
+    <ul>
+      <li
+        data-en="No PII collection: Chattia and OPS do not intentionally collect personally identifiable information (PII). If you choose to share PII, it may be processed as part of your conversation."
+        data-es="Sin recolección de PII: Chattia y OPS no recopilan intencionalmente información personal identificable (PII). Si decides compartir PII, puede procesarse como parte de tu conversación.">
+        No PII collection: Chattia and OPS do not intentionally collect personally identifiable information (PII). If you choose to share PII, it may be processed as part of your conversation.
+      </li>
+      <li
+        data-en="If you deny consent, chat will be disabled until you accept."
+        data-es="Si rechazas el consentimiento, el chat se deshabilitará hasta que aceptes.">
+        If you deny consent, chat will be disabled until you accept.
+      </li>
+    </ul>
+
+    <h3 id="policy-terms" data-en="Terms &amp; Conditions" data-es="Términos y condiciones">Terms &amp; Conditions</h3>
     <ul>
       <li
         data-en="Messages may be used to improve or train the chatbot."
@@ -310,20 +280,22 @@
         If you enter PII, it may be processed as part of the chat text.
       </li>
     </ul>
-    <h4 data-en="Fair Use" data-es="Uso justo">Fair Use</h4>
+
+    <h3 data-en="Fair Use" data-es="Uso justo">Fair Use</h3>
     <ul>
       <li
         data-en="No abuse, harassment, or illegal content."
-        data-es="No se permite abuso, acoso ni contenido ilegal.">
+        data-es="No abuso, acoso o contenido ilegal.">
         No abuse, harassment, or illegal content.
       </li>
       <li
         data-en="No attempts to exploit, bypass security, or spam."
-        data-es="No se permiten intentos de explotar el servicio, eludir la seguridad o hacer spam.">
+        data-es="No intentes explotar, evadir seguridad o hacer spam.">
         No attempts to exploit, bypass security, or spam.
       </li>
     </ul>
-    <h4 data-en="Availability &amp; Accuracy" data-es="Disponibilidad y exactitud">Availability &amp; Accuracy</h4>
+
+    <h3 data-en="Availability &amp; Accuracy" data-es="Disponibilidad y precisión">Availability &amp; Accuracy</h3>
     <ul>
       <li
         data-en="Chatbot responses may be incorrect; use at your own risk."
@@ -336,7 +308,8 @@
         Service is provided “as-is” without warranties.
       </li>
     </ul>
-    <h4 data-en="Security" data-es="Seguridad">Security</h4>
+
+    <h3 data-en="Security" data-es="Seguridad">Security</h3>
     <ul>
       <li
         data-en="Anti-abuse protections may be used."
