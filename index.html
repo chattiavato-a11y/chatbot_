@@ -241,9 +241,16 @@
   </footer>
   </div>
 
-  <div id="privacyOverlay" class="modal-overlay" aria-hidden="true"></div>
-  <section id="privacyModal" class="modal card" role="dialog" aria-modal="true" aria-label="Privacy and consent" hidden>
-    <h2>Privacy &amp; Consent</h2>
+  <div id="policyOverlay" class="modal-overlay" aria-hidden="true"></div>
+  <section
+    id="policyModal"
+    class="modal card"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Privacy, consent, and terms"
+    hidden>
+    <h2 data-en="Privacy, Consent, and Terms" data-es="Privacidad, consentimiento y términos">Privacy, Consent, and Terms</h2>
+    <h3 data-en="Privacy &amp; Consent" data-es="Privacidad y consentimiento">Privacy &amp; Consent</h3>
     <p>
       Chat interactions may be used to improve and train the chatbot experience. Please do not enter sensitive personal information.
     </p>
@@ -252,37 +259,32 @@
       If you choose to share PII, it may be processed as part of your conversation.
     </p>
     <p>If you deny consent, chat will be disabled until you accept.</p>
-    <div class="modal-actions">
-      <button class="btn" id="btnDenyPrivacy" type="button">Deny</button>
-      <button class="btn btn-primary" id="btnAcceptPrivacy" type="button">Accept</button>
-    </div>
-  </section>
 
-  <div id="termsOverlay" class="modal-overlay" aria-hidden="true"></div>
-  <section id="termsModal" class="modal card" role="dialog" aria-modal="true" aria-label="Terms and conditions" hidden>
-    <h2>Terms &amp; Conditions</h2>
-    <h3>Privacy &amp; Consent</h3>
+    <h3 data-en="Terms &amp; Conditions" data-es="Términos y condiciones">Terms &amp; Conditions</h3>
     <ul>
       <li>Messages may be used to improve or train the chatbot.</li>
       <li>Chattia and OPS do not intentionally collect PII. Please avoid sharing PII.</li>
       <li>If you enter PII, it may be processed as part of the chat text.</li>
     </ul>
-    <h3>Fair Use</h3>
+    <h4>Fair Use</h4>
     <ul>
       <li>No abuse, harassment, or illegal content.</li>
       <li>No attempts to exploit, bypass security, or spam.</li>
     </ul>
-    <h3>Availability &amp; Accuracy</h3>
+    <h4>Availability &amp; Accuracy</h4>
     <ul>
       <li>Chatbot responses may be incorrect; use at your own risk.</li>
       <li>Service is provided “as-is” without warranties.</li>
     </ul>
-    <h3>Security</h3>
+    <h4>Security</h4>
     <ul>
       <li>Anti-abuse protections may be used.</li>
     </ul>
+
     <div class="modal-actions">
-      <button class="btn" id="btnCloseTerms" type="button">Close</button>
+      <button class="btn" id="btnDenyPrivacy" type="button" data-en="Deny" data-es="Rechazar">Deny</button>
+      <button class="btn btn-primary" id="btnAcceptPrivacy" type="button" data-en="Accept" data-es="Aceptar">Accept</button>
+      <button class="btn" id="btnClosePolicy" type="button" data-en="Close" data-es="Cerrar">Close</button>
     </div>
   </section>
 </body>
