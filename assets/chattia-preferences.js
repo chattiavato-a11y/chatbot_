@@ -7,6 +7,7 @@
   const qsa = (s) => [...document.querySelectorAll(s)];
 
   const STORAGE_KEY = "ops-chat-preferences";
+  const SESSION_KEY = "ops-chat-preferences-session";
   const CONSENT_KEY = "ops-chat-consent";
 
   const langCtrl = qs("#langCtrl");
@@ -46,6 +47,21 @@
     }
   }
 
+  function readSessionPrefs() {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function hydrateState(preferences) {
+    if (!preferences || typeof preferences !== "object") return;
+    if (preferences.lang === "es" || preferences.lang === "en") state.lang = preferences.lang;
+    if (preferences.theme === "dark" || preferences.theme === "light") state.theme = preferences.theme;
+  }
+
   function hasStoredConsent() {
     try { return localStorage.getItem(CONSENT_KEY) === "accepted"; }
     catch { return false; }
@@ -53,12 +69,15 @@
 
   function persist() {
     const payload = { lang: state.lang, theme: state.theme };
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload)); } catch {}
     if (persistenceAllowed) {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch {}
     } else {
       Object.assign(memoryPrefs, payload);
     }
   }
+
+  hydrateState(readSessionPrefs());
 
   if (hasStoredConsent()) {
     persistenceAllowed = true;
