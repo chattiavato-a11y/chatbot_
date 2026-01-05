@@ -125,6 +125,9 @@ html[data-theme="dark"] .meta{ color: var(--muted-dark); }
 .composer{ border-top: 1px solid var(--surface-border); padding: 12px; background: var(--surface-soft); }
 html[data-theme="dark"] .composer{ background: var(--surface-dark-2); border-color: var(--border); }
 
+.composer-note{ font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+html[data-theme="dark"] .composer-note{ color: var(--muted-dark); }
+
 .input-row{ display:grid; grid-template-columns: auto 1fr auto; gap:10px; align-items:center; margin-bottom: 10px; }
 .input-label{ color: #5a5d6b; font-weight: 700; font-size: 13px; }
 html[data-theme="dark"] .input-label{ color: var(--text-dark); }
