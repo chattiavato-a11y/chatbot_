@@ -1,5 +1,5 @@
 /* assets/chattia-ui.js */
-/* OPS UI — v3 (repo-coordinated with ops-gateway v2 + Turnstile) */
+/* OPS UI — v3 (repo-coordinated with ops-gateway v2) */
 (() => {
   "use strict";
 
@@ -23,10 +23,6 @@
 
   const MAX_INPUT_CHARS = 256;
 
-  // Turnstile tokens are typically short-lived and single-use.
-  // Always refresh after a submit attempt to avoid “already consumed” failures.
-  const TURNSTILE_MAX_AGE_MS = 110_000;
-
   // === ELEMENTS ===
   const log = qs("#chat-log");
   const form = qs("#chatbot-input-row");
@@ -49,9 +45,6 @@
 
   const hpEmail = qs("#hp_email");
   const hpWebsite = qs("#hp_website");
-
-  const turnstileWidget = qs("#turnstile-widget");
-  const turnstileContainer = qs("#turnstile-container");
 
   const clearChatBtn = qs("#clearChat");
   const transcriptAccordion = qs("#transcriptAccordion");
@@ -239,86 +232,6 @@
     document.body?.classList.toggle("dark-cycle", currentTheme === "dark");
 
     savePrefs({ lang: currentLang, theme: currentTheme });
-  }
-
-  // === TURNSTILE ===
-  let turnstileToken = "";
-  let turnstileTokenTs = 0;
-  let showedTurnstileDown = false;
-
-  function markTurnstileCleared() {
-    if (!turnstileContainer) return;
-    turnstileContainer.classList.add("ts-cleared");
-    turnstileContainer.setAttribute("aria-hidden", "true");
-  }
-
-  function showTurnstileAgain() {
-    if (!turnstileContainer) return;
-    turnstileContainer.classList.remove("ts-cleared");
-    turnstileContainer.removeAttribute("aria-hidden");
-  }
-
-  // Global callbacks used by the Turnstile widget data-* attributes
-  window.opsTurnstileCallback = (token) => {
-    turnstileToken = (typeof token === "string") ? token : "";
-    turnstileTokenTs = Date.now();
-    if (turnstileToken) markTurnstileCleared();
-  };
-  window.opsTurnstileExpired = () => {
-    turnstileToken = "";
-    turnstileTokenTs = 0;
-    showTurnstileAgain();
-  };
-  window.opsTurnstileErrored = () => {
-    turnstileToken = "";
-    turnstileTokenTs = 0;
-    showTurnstileAgain();
-  };
-
-  function getTurnstileToken() {
-    if (turnstileToken && (Date.now() - turnstileTokenTs) <= TURNSTILE_MAX_AGE_MS) return turnstileToken;
-
-    // Try asking the Turnstile API directly (works when there is a single widget)
-    if (window.turnstile && typeof window.turnstile.getResponse === "function") {
-      try {
-        const resp = window.turnstile.getResponse();
-        if (resp) {
-          turnstileToken = String(resp);
-          turnstileTokenTs = Date.now();
-          return turnstileToken;
-        }
-      } catch {}
-      // Best-effort fallback (some builds accept an element reference)
-      try {
-        const resp = window.turnstile.getResponse(turnstileWidget);
-        if (resp) {
-          turnstileToken = String(resp);
-          turnstileTokenTs = Date.now();
-          return turnstileToken;
-        }
-      } catch {}
-    }
-    return "";
-  }
-
-  function resetTurnstile() {
-    turnstileToken = "";
-    turnstileTokenTs = 0;
-    showTurnstileAgain();
-
-    if (window.turnstile && typeof window.turnstile.reset === "function") {
-      try { window.turnstile.reset(); } catch {}
-    }
-  }
-
-  function turnstileUnavailableOnce() {
-    if (showedTurnstileDown) return;
-    showedTurnstileDown = true;
-    sendTelemetry("turnstile_unavailable");
-    addBotLine(currentLang === "es"
-      ? "La verificación no está disponible ahora. Intenta de nuevo en unos segundos."
-      : "Security verification is unavailable right now. Try again in a few seconds."
-    );
   }
 
   // === SAFETY HELPERS ===
@@ -707,21 +620,6 @@
     const hp1 = normalizeUserText(hpEmail?.value || "");
     const hp2 = normalizeUserText(hpWebsite?.value || "");
 
-    // Turnstile token required
-    const ts = getTurnstileToken();
-    if (!ts) {
-      if (!window.turnstile) turnstileUnavailableOnce();
-      else {
-        const warn = (currentLang === "es")
-          ? "Completa la verificación de seguridad para continuar."
-          : "Please complete the security check to continue.";
-        addBotLine(warn);
-        speak(warn, currentLang);
-      }
-      sendTelemetry("turnstile_missing");
-      return;
-    }
-
     // UI commit
     addUserLine(msg);
     input.value = "";
@@ -754,7 +652,6 @@
           message: msg,
           lang: currentLang,
           v: 2,
-          turnstileToken: ts,
           hp_email: hp1,
           hp_website: hp2
         }),
@@ -775,11 +672,6 @@
         botBubble.textContent = errMsg;
         speak(errMsg, currentLang);
         sendTelemetry("api_error", { status: res.status });
-
-        // If Turnstile was rejected/consumed, reset to obtain a fresh token
-        if (res.status === 403 && /turnstile/i.test(errMsg)) {
-          resetTurnstile();
-        }
 
         setNet(false, "Error", "Error");
         return;
@@ -814,9 +706,6 @@
       sendTelemetry("network_error", { online: !!navigator.onLine });
       setNet(false, "Offline", "Sin conexión");
     } finally {
-      // Turnstile tokens are often single-use; refresh after any submit attempt.
-      resetTurnstile();
-
       if (sendBtn) sendBtn.disabled = false;
       inFlight = false;
     }
