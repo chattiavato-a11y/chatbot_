@@ -189,11 +189,14 @@ html[data-theme=\"dark\"] .card{ background: var(--surface-dark); border-color: 
 html[data-theme="dark"] .drawer{ background: var(--surface-dark-2); color: var(--text-dark); border-left: 1px solid var(--border); backdrop-filter: blur(16px); }
 .drawer.open{ transform: translateX(0); }
 .drawer-header{ display:flex; align-items:center; justify-content:space-between; padding: 14px 14px; border-bottom: 1px solid var(--border); }
+.drawer-title{ font-weight: 800; letter-spacing: -0.01em; }
 .drawer-body{ padding: 12px 14px; height: calc(100% - 56px); overflow:auto; display:flex; flex-direction:column; gap:12px; }
 .drawer-actions{ display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; }
 .transcript-list{ display:flex; flex-direction:column; gap:10px; }
 .transcript-item{ padding: 10px 10px; border: 1px solid var(--border); border-radius: 12px; }
 .transcript-role{ font-size: 12px; opacity: 0.8; margin-bottom: 6px; }
+.transcript-empty{ color: var(--muted); font-size: 13px; }
+html[data-theme="dark"] .transcript-empty{ color: var(--muted-dark); }
 
 /* -------------------- Modals -------------------- */
 .modal-overlay{ position: fixed; inset:0; background: rgba(0,0,0,0.45); opacity:0; pointer-events:none; transition: opacity 180ms ease; z-index: 10000; }

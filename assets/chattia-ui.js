@@ -44,10 +44,13 @@
   const hpWebsite = qs("#hp_website");
 
   const clearChatBtn = qs("#clearChat");
-  const transcriptAccordion = qs("#transcriptAccordion");
-  const transcriptList = qs("#transcriptInlineList");
-  const transcriptCopy = qs("#transcript-copy-inline");
-  const clearTranscriptBtn = qs("#clearTranscriptInline");
+  const transcriptTrigger = qs("#transcriptTrigger");
+  const transcriptDrawer = qs("#transcriptDrawer");
+  const transcriptOverlay = qs("#transcriptOverlay");
+  const transcriptClose = qs("#transcriptClose");
+  const transcriptList = qs("#transcriptList");
+  const transcriptCopy = qs("#transcript-copy");
+  const clearTranscriptBtn = qs("#clearTranscript");
 
   const tncButton = qs("#tnc-button");
 
@@ -384,6 +387,15 @@
   function renderTranscriptList() {
     if (!transcriptList) return;
     transcriptList.innerHTML = "";
+    if (!transcript.length) {
+      const empty = document.createElement("div");
+      empty.className = "transcript-empty";
+      empty.dataset.en = "No transcript yet. Start chatting to see history here.";
+      empty.dataset.es = "Aún no hay transcripción. Chatea para ver el historial aquí.";
+      empty.textContent = (currentLang === "es") ? empty.dataset.es : empty.dataset.en;
+      transcriptList.appendChild(empty);
+      return;
+    }
     transcript.forEach((item) => {
       const wrap = document.createElement("div");
       wrap.className = "transcript-item";
@@ -399,6 +411,24 @@
       wrap.appendChild(text);
       transcriptList.appendChild(wrap);
     });
+  }
+
+  function openTranscriptDrawer() {
+    if (!transcriptDrawer || !transcriptOverlay) return;
+    transcriptDrawer.hidden = false;
+    transcriptDrawer.classList.add("open");
+    transcriptOverlay.classList.add("open");
+    transcriptOverlay.setAttribute("aria-hidden", "false");
+    renderTranscriptList();
+    transcriptClose?.focus?.();
+  }
+
+  function closeTranscriptDrawer() {
+    if (!transcriptDrawer || !transcriptOverlay) return;
+    transcriptDrawer.classList.remove("open");
+    transcriptOverlay.classList.remove("open");
+    transcriptOverlay.setAttribute("aria-hidden", "true");
+    window.setTimeout(() => { transcriptDrawer.hidden = true; }, 220);
   }
 
   // === CHAT UI ===
@@ -465,6 +495,7 @@
     if (recognition) recognition.lang = (currentLang === "es") ? "es-ES" : "en-US";
     setVoiceStatus("", "");
     setNet(navigator.onLine, "Ready", "Listo");
+    renderTranscriptList();
   });
 
   document.addEventListener("ops:theme-change", (event) => {
@@ -507,13 +538,10 @@
 
   if (transcriptCopy) transcriptCopy.onclick = copyTranscript;
   if (clearTranscriptBtn) clearTranscriptBtn.onclick = clearTranscriptOnly;
+  if (transcriptTrigger) transcriptTrigger.onclick = openTranscriptDrawer;
+  if (transcriptClose) transcriptClose.onclick = closeTranscriptDrawer;
+  if (transcriptOverlay) transcriptOverlay.onclick = closeTranscriptDrawer;
   if (tncButton) tncButton.onclick = showTncDetails;
-
-  if (transcriptAccordion) {
-    transcriptAccordion.addEventListener("toggle", () => {
-      if (transcriptAccordion.open) renderTranscriptList();
-    });
-  }
 
   if (privacyTrigger) privacyTrigger.onclick = openPolicyModal;
   if (termsTrigger) termsTrigger.onclick = openPolicyModal;
@@ -525,6 +553,7 @@
   // Close modals on Escape
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      closeTranscriptDrawer();
       closePolicyModal();
     }
   });

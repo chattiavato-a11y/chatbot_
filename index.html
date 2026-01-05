@@ -62,33 +62,6 @@
                 <span id="netText" data-en="Ready" data-es="Listo">Ready</span>
               </div>
 
-              <details class="transcript-accordion" id="transcriptAccordion">
-                <summary id="transcriptSummary">
-                  <span class="accordion-title" data-en="Chattia Chat" data-es="Chattia Chat">Chattia Chat</span>
-                </summary>
-                <div class="accordion-panel" role="region" aria-live="polite" aria-label="Transcript">
-                  <div class="drawer-actions">
-                    <button
-                      type="button"
-                      id="transcript-copy-inline"
-                      class="pill-btn"
-                      aria-label="Copy transcript"
-                      data-en-label="Copy transcript"
-                      data-es-label="Copiar transcripción">
-                      <span data-en="Copy" data-es="Copiar">Copy</span>
-                    </button>
-                    <button
-                      type="button"
-                      id="clearTranscriptInline"
-                      class="pill-btn accent"
-                      aria-label="Clear transcript">
-                      <span data-en="Clear Transcript" data-es="Limpiar transcripción">Clear Transcript</span>
-                    </button>
-                  </div>
-                  <div id="transcriptInlineList" class="transcript-list" role="region" aria-live="polite"></div>
-                </div>
-              </details>
-
               <div class="chat-utility-stack">
                 <div class="quick-toggles" aria-label="Theme and language controls">
                   <button
@@ -208,6 +181,9 @@
                 <button class="policy-link-btn" type="button" id="termsTrigger" data-action="terms">
                   <span data-en="In-App T&amp;C" data-es="TyC en la app">In-App T&amp;C</span>
                 </button>
+                <button class="policy-link-btn" type="button" id="transcriptTrigger" data-action="transcript">
+                  <span data-en="Transcript" data-es="Transcripción">Transcript</span>
+                </button>
                 <button
                   type="button"
                   id="speechToggle"
@@ -243,6 +219,49 @@
     </span>
   </footer>
   </div>
+
+  <div id="transcriptOverlay" class="drawer-overlay" aria-hidden="true"></div>
+  <aside
+    id="transcriptDrawer"
+    class="drawer card"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Transcript"
+    hidden>
+    <div class="drawer-header">
+      <div class="drawer-title" data-en="Chattia Chat Transcript" data-es="Transcripción del chat Chattia">Chattia Chat Transcript</div>
+      <button
+        type="button"
+        id="transcriptClose"
+        class="pill-btn"
+        aria-label="Close transcript"
+        data-en-label="Close transcript"
+        data-es-label="Cerrar transcripción">
+        <span data-en="Close" data-es="Cerrar">Close</span>
+      </button>
+    </div>
+    <div class="drawer-body" role="document">
+      <div class="drawer-actions">
+        <button
+          type="button"
+          id="transcript-copy"
+          class="pill-btn"
+          aria-label="Copy transcript"
+          data-en-label="Copy transcript"
+          data-es-label="Copiar transcripción">
+          <span data-en="Copy" data-es="Copiar">Copy</span>
+        </button>
+        <button
+          type="button"
+          id="clearTranscript"
+          class="pill-btn accent"
+          aria-label="Clear transcript">
+          <span data-en="Clear Transcript" data-es="Limpiar transcripción">Clear Transcript</span>
+        </button>
+      </div>
+      <div id="transcriptList" class="transcript-list" role="region" aria-live="polite"></div>
+    </div>
+  </aside>
 
   <div id="policyOverlay" class="modal-overlay" aria-hidden="true"></div>
   <section
