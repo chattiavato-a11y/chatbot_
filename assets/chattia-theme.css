@@ -3,8 +3,8 @@
    - Light: watermark-like moving blooms
    - Dark: richer gradient + soft bloom
    - No external assets
-   - Respects prefers-reduced-motion */
-
+   - Respects prefers-reduced-motion
+*/
 :root{
   color-scheme: light;
 
@@ -32,6 +32,7 @@
 
   /* Active border token (switches by theme) */
   --border: var(--border-light);
+
   --shadow: 0 12px 40px rgba(0,0,0,0.18);
 
   --accent-green: #28a745;
