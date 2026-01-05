@@ -15,21 +15,14 @@
 
   <!-- Fallback CSP (best-effort on static hosts).
        For real enforcement, set CSP + security headers at the edge (Cloudflare). -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self'; script-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; worker-src 'self'; manifest-src 'self'; media-src 'self'; upgrade-insecure-requests; block-all-mixed-content" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev; worker-src 'self'; manifest-src 'self'; media-src 'self'; upgrade-insecure-requests; block-all-mixed-content" />
 
-  <link rel="preconnect" href="https://challenges.cloudflare.com" crossorigin />
   <link rel="preconnect" href="https://ops-gateway.grabem-holdem-nuts-right.workers.dev" crossorigin />
 
   <!-- App CSS -->
   <link
     rel="stylesheet"
     href="assets/chattia-ui.css" />
-
-  <!-- Cloudflare Turnstile (no SRI: remote script can change) -->
-  <script
-    src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-    defer
-    crossorigin="anonymous"></script>
 
   <!-- App JS -->
   <script
@@ -157,15 +150,6 @@
 
             <div class="composer-meta">
               <div id="voice-status" class="voice-status" role="status" aria-live="polite"></div>
-              <div class="turnstile-wrap" id="turnstile-container" aria-label="Cloudflare Turnstile verification">
-                <div
-                  id="turnstile-widget"
-                  class="cf-turnstile"
-                  data-sitekey="0x4AAAAAACCemZgiIexxcpTR"
-                  data-callback="opsTurnstileCallback"
-                  data-expired-callback="opsTurnstileExpired"
-                  data-error-callback="opsTurnstileErrored"></div>
-              </div>
             </div>
 
             <div id="consent-note" class="consent-note" role="status" aria-live="polite" hidden>
@@ -310,7 +294,7 @@
     </ul>
     <h3>Security</h3>
     <ul>
-      <li>Anti-abuse verification (e.g., Cloudflare Turnstile) may be used.</li>
+      <li>Anti-abuse protections may be used.</li>
     </ul>
     <div class="modal-actions">
       <button class="btn" id="btnCloseTerms" type="button">Close</button>

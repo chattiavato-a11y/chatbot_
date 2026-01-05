@@ -161,7 +161,6 @@ html[data-theme="dark"] .input-shell{ background: var(--surface-dark); border-co
 .composer-meta{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom: 8px; color: var(--muted); font-size: 12px; }
 html[data-theme="dark"] .composer-meta{ color: var(--muted-dark); }
 .voice-status{ min-height: 18px; }
-.turnstile-wrap{ display:flex; justify-content:flex-end; align-items:center; }
 
 .consent-note{ font-size: 13px; color: #c0392b; margin-bottom: 8px; }
 
