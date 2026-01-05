@@ -1,0 +1,63 @@
+/* assets/chattia-theme.css */
+/* Theme tokens, gradients, and background surfaces */
+:root{
+  color-scheme: light;
+
+  --bg-light: #ffffff;
+  --text-light: #0b1220;
+  --muted: #6f7585;
+
+  /* Dark background gradient only (surface stays neutral) */
+  --bgd-1: #0b3b3a;
+  --bgd-2: #07121f;
+  --bgd-3: #3a1f66;
+
+  --surface: #ffffff;
+  --surface-border: #e5e8f0;
+  --surface-soft: #f4f6fa;
+
+  --surface-dark: rgba(10, 16, 28, 0.70);
+  --surface-dark-2: rgba(10, 16, 28, 0.85);
+  --text-dark: #e7ecff;
+  --muted-dark: #a6adc4;
+
+  --border: rgba(0,0,0,0.08);
+  --shadow: 0 12px 40px rgba(0,0,0,0.18);
+
+  --accent-green: #28a745;
+  --accent-blue: #0d63b2;
+  --accent-orange: #f58220;
+  --accent-purple: #6d3c99;
+
+  --radius: 16px;
+}
+
+html[data-theme="light"], body[data-theme="light"]{
+  background: var(--bg-light);
+  color: var(--text-light);
+}
+
+html[data-theme="dark"], body[data-theme="dark"]{
+  color: var(--text-dark);
+  background:
+    radial-gradient(1100px 700px at 10% 85%, rgba(11,59,58,0.70) 0%, rgba(11,59,58,0.00) 60%),
+    radial-gradient(900px 600px at 92% 30%, rgba(58,31,102,0.70) 0%, rgba(58,31,102,0.00) 55%),
+    linear-gradient(90deg, var(--bgd-1) 0%, var(--bgd-2) 50%, var(--bgd-3) 100%);
+  background-attachment: fixed;
+  color-scheme: dark;
+}
+
+@keyframes darkGradientShift{
+  0%{ background-position: 0% 50%, 90% 30%, 0% 50%; }
+  50%{ background-position: 100% 20%, 10% 70%, 100% 50%; }
+  100%{ background-position: 0% 50%, 90% 30%, 0% 50%; }
+}
+
+html[data-theme="dark"].dark-cycle,
+body[data-theme="dark"].dark-cycle{
+  background-size: 220% 220%;
+  animation: darkGradientShift 45s ease-in-out infinite;
+}
+
+a{ color: var(--accent-blue); text-decoration: none; }
+a:hover{ text-decoration: underline; }

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>About • OPS Online Support</title>
+  <meta name="description" content="About Chattia for OPS and the design principles behind the assistant experience." />
+  <link rel="canonical" href="https://www.chattia.io/ops-online-support/pages/about.html" />
+
+  <link rel="stylesheet" href="../assets/chattia-theme.css" />
+  <link rel="stylesheet" href="../assets/chattia-ui.css" />
+
+  <script src="../assets/chattia-preferences.js" defer></script>
+</head>
+<body>
+  <div class="content-shell">
+    <header class="content-header">
+      <div>
+        <p class="content-meta">OPS Online Support</p>
+        <h1>About Chattia for OPS</h1>
+        <p class="content-meta">Human-centered, secure-by-design support assistant.</p>
+      </div>
+      <div class="quick-toggles" aria-label="Theme and language controls">
+        <button
+          type="button"
+          id="langCtrl"
+          class="quick-toggle"
+          aria-pressed="false"
+          aria-label="Toggle language"
+          data-en-label="Toggle language"
+          data-es-label="Cambiar idioma">EN</button>
+        <button
+          type="button"
+          id="themeCtrl"
+          class="quick-toggle"
+          aria-pressed="false"
+          aria-label="Toggle theme"
+          data-en-label="Toggle theme"
+          data-es-label="Cambiar tema">Dark</button>
+      </div>
+    </header>
+
+    <div class="content-grid">
+      <section class="content-card">
+        <h2>Mission</h2>
+        <p>Deliver fast, safe, multilingual assistance that respects user privacy while staying aligned to regulatory guardrails.</p>
+        <ul class="content-list">
+          <li>Accessible UX built around WCAG 2.1 AA guidance and responsive layouts.</li>
+          <li>Security-first defaults: CSP, Turnstile, input normalization, and consent-aware preferences.</li>
+          <li>Continuous improvement from telemetry signals while minimizing data collected.</li>
+        </ul>
+      </section>
+
+      <section class="content-card">
+        <h2>What powers the experience</h2>
+        <ul class="content-list">
+          <li>Cloud-native delivery with edge security controls and origin allowlists.</li>
+          <li>Voice input/output readiness through the Web Speech API.</li>
+          <li>Localization toggles for English and Spanish with persistent settings after consent.</li>
+          <li>Modular assets that separate theming (backgrounds and tokens) from UI logic.</li>
+        </ul>
+      </section>
+
+      <section class="content-card">
+        <h2>How to engage</h2>
+        <ul class="content-list">
+          <li>Use the chat for quick answers and operational support.</li>
+          <li>Open the consent and T&amp;C modals from the chat footer for full context.</li>
+          <li>Submit security or privacy questions through the Contact page.</li>
+        </ul>
+        <div class="content-actions">
+          <a class="pill-link" href="../index.html">Back to Chat</a>
+        </div>
+      </section>
+    </div>
+
+    <footer class="content-meta">OPS Online Support • Secure by design</footer>
+  </div>
+</body>
+</html>

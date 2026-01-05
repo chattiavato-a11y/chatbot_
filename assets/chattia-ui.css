@@ -1,64 +1,6 @@
 /* assets/chattia-ui.css */
 
-/* -------------------- Theme tokens -------------------- */
-:root{
-  color-scheme: light;
-
-  --bg-light: #ffffff;
-  --text-light: #0b1220;
-  --muted: #6f7585;
-
-  /* Dark background gradient only (surface stays neutral) */
-  --bgd-1: #0b3b3a;
-  --bgd-2: #07121f;
-  --bgd-3: #3a1f66;
-
-  --surface: #ffffff;
-  --surface-border: #e5e8f0;
-  --surface-soft: #f4f6fa;
-
-  --surface-dark: rgba(10, 16, 28, 0.70);
-  --surface-dark-2: rgba(10, 16, 28, 0.85);
-  --text-dark: #e7ecff;
-  --muted-dark: #a6adc4;
-
-  --border: rgba(0,0,0,0.08);
-  --shadow: 0 12px 40px rgba(0,0,0,0.18);
-
-  --accent-green: #28a745;
-  --accent-blue: #0d63b2;
-  --accent-orange: #f58220;
-  --accent-purple: #6d3c99;
-
-  --radius: 16px;
-}
-
-html[data-theme="light"], body[data-theme="light"]{
-  background: var(--bg-light);
-  color: var(--text-light);
-}
-
-html[data-theme="dark"], body[data-theme="dark"]{
-  color: var(--text-dark);
-  background:
-    radial-gradient(1100px 700px at 10% 85%, rgba(11,59,58,0.70) 0%, rgba(11,59,58,0.00) 60%),
-    radial-gradient(900px 600px at 92% 30%, rgba(58,31,102,0.70) 0%, rgba(58,31,102,0.00) 55%),
-    linear-gradient(90deg, var(--bgd-1) 0%, var(--bgd-2) 50%, var(--bgd-3) 100%);
-  background-attachment: fixed;
-  color-scheme: dark;
-}
-
-@keyframes darkGradientShift{
-  0%{ background-position: 0% 50%, 90% 30%, 0% 50%; }
-  50%{ background-position: 100% 20%, 10% 70%, 100% 50%; }
-  100%{ background-position: 0% 50%, 90% 30%, 0% 50%; }
-}
-
-html[data-theme="dark"].dark-cycle{
-  background-size: 220% 220%;
-  animation: darkGradientShift 45s ease-in-out infinite;
-}
-
+/* -------------------- Base layout -------------------- */
 html, body{ height:100%; }
 body{
   margin:0;
@@ -71,8 +13,6 @@ body{
 }
 
 *{ box-sizing:border-box; }
-a{ color: var(--accent-blue); text-decoration: none; }
-a:hover{ text-decoration: underline; }
 :focus-visible{ outline: none; box-shadow: 0 0 0 3px rgba(13,99,178,.25); }
 
 .sr-only{ position:absolute!important; width:1px;height:1px; padding:0;margin:-1px; overflow:hidden;clip:rect(0,0,0,0); white-space:nowrap;border:0; }
@@ -122,7 +62,7 @@ html[data-theme="dark"] .chat-panel{ background: var(--surface-dark); border-col
 .brand-sub{ font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 html[data-theme="dark"] .brand-sub{ color: var(--muted-dark); }
 
-.chat-head-right{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
+.chat-head-right{ display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
 
 .status{ display:flex; align-items:center; gap:8px; color: var(--muted); font-size: 12px; }
 html[data-theme="dark"] .status{ color: var(--muted-dark); }
@@ -148,6 +88,22 @@ html[data-theme="dark"] .transcript-accordion{ border-color: var(--border); back
 .accordion-title{ font-size: 13px; }
 .accordion-panel{ border-top: 1px solid var(--surface-border); padding: 10px 0 8px; display:flex; flex-direction:column; gap:10px; min-width: 240px; max-height: 220px; overflow:auto; }
 html[data-theme="dark"] .accordion-panel{ border-color: var(--border); }
+
+.chat-utility-stack{ display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+.quick-toggles{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.quick-toggle{
+  min-width: 56px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-soft);
+  color: inherit;
+  cursor: pointer;
+  font-weight: 700;
+}
+html[data-theme="dark"] .quick-toggle{ background: var(--surface-dark); border-color: var(--border); color: var(--text-dark); }
+.quick-toggle:hover{ filter: brightness(1.02); }
 
 .mini-actions{ display:flex; align-items:center; gap:8px; }
 .ghost-btn{ border:0; background:transparent; color: var(--muted); cursor:pointer; padding:4px 6px; }
@@ -255,6 +211,36 @@ html[data-theme="dark"] .modal{ background: var(--surface-dark-2); color: var(--
 .toast-actions{ margin-top: 10px; display:flex; gap:10px; justify-content:flex-end; }
 
 .footer{ padding: 18px 6px 0; text-align:center; color: var(--muted); font-size: 12px; }
+
+/* -------------------- Static content pages -------------------- */
+.content-shell{ max-width: 960px; margin: 0 auto; padding: 28px 16px 40px; }
+.content-header{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom: 14px; }
+.content-card{ background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; }
+html[data-theme="dark"] .content-card{ background: var(--surface-dark); border-color: var(--border); }
+.content-grid{ display:grid; gap:14px; }
+.content-meta{ color: var(--muted); font-size: 13px; }
+html[data-theme="dark"] .content-meta{ color: var(--muted-dark); }
+.content-list{ padding-left: 18px; }
+.content-list li{ margin-bottom: 6px; }
+.form-grid{ display:grid; gap:10px; }
+.form-grid label{ font-weight: 700; font-size: 13px; color: #5a5d6b; }
+html[data-theme="dark"] .form-grid label{ color: var(--text-dark); }
+.form-grid input, .form-grid textarea{
+  width:100%;
+  border: 1px solid var(--surface-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  color: inherit;
+}
+html[data-theme="dark"] .form-grid input,
+html[data-theme="dark"] .form-grid textarea{
+  background: var(--surface-dark);
+  border-color: var(--border);
+  color: var(--text-dark);
+}
+.form-grid textarea{ min-height: 120px; resize: vertical; }
+.content-actions{ display:flex; justify-content:flex-end; margin-top: 12px; }
 
 /* -------------------- Responsive -------------------- */
 @media (max-width: 1024px){
