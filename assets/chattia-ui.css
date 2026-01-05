@@ -48,6 +48,17 @@ html[data-theme="dark"], body[data-theme="dark"]{
   color-scheme: dark;
 }
 
+@keyframes darkGradientShift{
+  0%{ background-position: 0% 50%, 90% 30%, 0% 50%; }
+  50%{ background-position: 100% 20%, 10% 70%, 100% 50%; }
+  100%{ background-position: 0% 50%, 90% 30%, 0% 50%; }
+}
+
+html[data-theme="dark"].dark-cycle{
+  background-size: 220% 220%;
+  animation: darkGradientShift 45s ease-in-out infinite;
+}
+
 html, body{ height:100%; }
 body{
   margin:0;
@@ -74,23 +85,13 @@ a:hover{ text-decoration: underline; }
   padding: 18px 16px 28px;
 }
 
-.layout{ display:grid; grid-template-columns: 170px 1fr; gap:18px; align-items:start; }
+.layout{ display:flex; flex-direction:column; gap:18px; align-items:stretch; }
 
 .topbar{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding: 12px 14px 10px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--surface-border); box-shadow: var(--shadow); margin-bottom: 16px; }
 html[data-theme=\"dark\"] .topbar{ background: var(--surface-dark); border-color: var(--border); }
 .top-actions{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
 .divider{ width:1px; height:18px; background: var(--surface-border); }
 html[data-theme=\"dark\"] .divider{ background: var(--border); }
-
-.side-menu{ display:flex; flex-direction:column; gap:18px; padding-top:6px; }
-.menu-brand{ display:flex; align-items:center; gap:10px; color: #2c9d54; font-weight: 800; font-size: 16px; }
-.brand-mark{ width:40px;height:40px; border-radius: 10px; background: #f2f5f7; border: 1px solid var(--surface-border); display:grid;place-items:center; color: #5c6a7c; }
-.brand-name{ font-weight: 800; letter-spacing: -0.02em; }
-.menu-links{ display:flex; flex-direction:column; gap:10px; }
-.menu-item{ display:flex; align-items:center; gap:10px; border:0; background:transparent; padding:6px 4px; color: inherit; font-size:14px; cursor:pointer; }
-.menu-item.active{ font-weight:700; }
-.menu-item .menu-icon{ font-size:16px; }
-.menu-item.linkish{ color: var(--accent-orange); text-decoration: underline; align-self:flex-start; }
 
 .panel{ display:block; background: transparent; border:0; box-shadow:none; }
 
@@ -112,9 +113,32 @@ html[data-theme="dark"] .chat-panel{ background: var(--surface-dark); border-col
 .brand-sub{ font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 html[data-theme="dark"] .brand-sub{ color: var(--muted-dark); }
 
+.chat-head-right{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
+
 .status{ display:flex; align-items:center; gap:8px; color: var(--muted); font-size: 12px; }
 html[data-theme="dark"] .status{ color: var(--muted-dark); }
 .dot{ width:10px; height:10px; border-radius: 50%; background:#2cbe4e; box-shadow:0 0 0 3px rgba(44,190,78,.18); }
+
+.transcript-accordion{
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  padding: 0 10px;
+}
+html[data-theme="dark"] .transcript-accordion{ border-color: var(--border); background: var(--surface-dark-2); }
+.transcript-accordion summary{
+  list-style:none;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding: 8px 0;
+  font-weight: 700;
+}
+.transcript-accordion summary::-webkit-details-marker{ display:none; }
+.accordion-title{ font-size: 13px; }
+.accordion-panel{ border-top: 1px solid var(--surface-border); padding: 10px 0 8px; display:flex; flex-direction:column; gap:10px; min-width: 240px; max-height: 220px; overflow:auto; }
+html[data-theme="dark"] .accordion-panel{ border-color: var(--border); }
 
 .mini-actions{ display:flex; align-items:center; gap:8px; }
 .ghost-btn{ border:0; background:transparent; color: var(--muted); cursor:pointer; padding:4px 6px; }
@@ -226,9 +250,8 @@ html[data-theme="dark"] .modal{ background: var(--surface-dark-2); color: var(--
 
 /* -------------------- Responsive -------------------- */
 @media (max-width: 1024px){
-  .layout{ grid-template-columns: 1fr; }
-  .side-menu{ flex-direction:row; align-items:center; justify-content:space-between; }
-  .menu-links{ flex-direction:row; flex-wrap:wrap; }
+  .chat-head{ flex-direction:column; align-items:flex-start; gap:12px; }
+  .chat-head-right{ width:100%; justify-content:space-between; }
 }
 
 @media (max-width: 640px){
