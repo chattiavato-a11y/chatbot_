@@ -16,7 +16,7 @@ const ALLOWED_ORIGINS = [
   "https://chattia.io"
 ];
 
-const MAX_BODY_BYTES = 4096; // room for Turnstile token + hp fields
+const MAX_BODY_BYTES = 4096; // small safety limit for JSON payloads
 const MAX_MSG_CHARS = 256;
 
 const REPO_URL = "https://github.com/chattiavato-a11y/ops-online-support";
@@ -431,40 +431,6 @@ export default {
     if (hpEmail || hpWebsite) {
       await logEvent(ctx, env, { type: "HONEYPOT_TRIP", ip: clientIp });
       return json(origin, 400, { error: localizedError(lang, "Request blocked.", "Solicitud bloqueada."), lang });
-    }
-
-    // Turnstile
-    const turnstileToken = typeof payload.turnstileToken === "string" ? payload.turnstileToken : "";
-    const turnstileSecret = (env.TURNSTILE_SECRET || "").toString();
-    if (!turnstileSecret) {
-      return json(origin, 500, { error: localizedError(lang, "Gateway config error (missing TURNSTILE_SECRET).", "Error de configuración del gateway (falta TURNSTILE_SECRET)."), lang });
-    }
-    if (!turnstileToken) {
-      await logEvent(ctx, env, { type: "TURNSTILE_FAIL", ip: clientIp, reason: "missing" });
-      return json(origin, 400, { error: localizedError(lang, "Turnstile verification failed.", "La verificación de Turnstile falló."), lang });
-    }
-
-    let turnstileResult;
-    try {
-      const verificationRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          secret: turnstileSecret,
-          response: turnstileToken,
-          remoteip: clientIp
-        })
-      });
-      turnstileResult = await verificationRes.json();
-    } catch (err) {
-      console.error("Turnstile verification error:", err);
-      await logEvent(ctx, env, { type: "TURNSTILE_FAIL", ip: clientIp, reason: "verify-error" });
-      return json(origin, 502, { error: localizedError(lang, "Turnstile verification failed.", "La verificación de Turnstile falló."), lang });
-    }
-
-    if (!turnstileResult?.success) {
-      await logEvent(ctx, env, { type: "TURNSTILE_FAIL", ip: clientIp, reason: "rejected" });
-      return json(origin, 403, { error: localizedError(lang, "Turnstile verification failed.", "La verificación de Turnstile falló."), lang });
     }
 
     // Message
