@@ -48,33 +48,6 @@
 
   <div class="shell app-shell">
     <div class="layout">
-      <aside class="side-menu" aria-label="Navigation">
-        <div class="menu-brand">
-          <div class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" class="ic">
-              <path d="M4 4h16v10H7l-3 3V4z" />
-            </svg>
-          </div>
-          <div class="brand-name">Chattia</div>
-        </div>
-
-        <nav class="menu-links" aria-label="Primary">
-          <button class="menu-item active" type="button">
-            <span class="menu-icon" aria-hidden="true">💬</span>
-            <span data-en="Chat" data-es="Chat">Chat</span>
-          </button>
-          <button
-            type="button"
-            id="openTranscript"
-            class="menu-item linkish"
-            aria-label="Open transcript"
-            data-en-label="Open transcript"
-            data-es-label="Abrir transcripción">
-            <span data-en="Transcript" data-es="Transcripción">Transcript</span>
-          </button>
-        </nav>
-      </aside>
-
       <main class="panel" role="main" id="chat-root">
         <section class="chat chat-panel" aria-label="Chat" id="chat">
           <div class="chat-head">
@@ -86,21 +59,50 @@
               </div>
             </div>
 
-            <div class="status status-inline">
-              <span class="dot" id="netDot" aria-hidden="true"></span>
-              <span id="netText" data-en="Ready" data-es="Listo">Ready</span>
-            </div>
+            <div class="chat-head-right">
+              <div class="status status-inline">
+                <span class="dot" id="netDot" aria-hidden="true"></span>
+                <span id="netText" data-en="Ready" data-es="Listo">Ready</span>
+              </div>
 
-            <div class="mini-actions">
-              <button
-                type="button"
-                id="clearChat"
-                class="ghost-btn"
-                aria-label="Clear chat"
-                data-en-label="Clear chat"
-                data-es-label="Borrar chat">
-                <span data-en="Clear" data-es="Borrar">Clear</span>
-              </button>
+              <details class="transcript-accordion" id="transcriptAccordion">
+                <summary id="transcriptSummary">
+                  <span class="accordion-title" data-en="Chattia Chat" data-es="Chattia Chat">Chattia Chat</span>
+                </summary>
+                <div class="accordion-panel" role="region" aria-live="polite" aria-label="Transcript">
+                  <div class="drawer-actions">
+                    <button
+                      type="button"
+                      id="transcript-copy-inline"
+                      class="pill-btn"
+                      aria-label="Copy transcript"
+                      data-en-label="Copy transcript"
+                      data-es-label="Copiar transcripción">
+                      <span data-en="Copy" data-es="Copiar">Copy</span>
+                    </button>
+                    <button
+                      type="button"
+                      id="clearTranscriptInline"
+                      class="pill-btn accent"
+                      aria-label="Clear transcript">
+                      <span data-en="Clear Transcript" data-es="Limpiar transcripción">Clear Transcript</span>
+                    </button>
+                  </div>
+                  <div id="transcriptInlineList" class="transcript-list" role="region" aria-live="polite"></div>
+                </div>
+              </details>
+
+              <div class="mini-actions">
+                <button
+                  type="button"
+                  id="clearChat"
+                  class="ghost-btn"
+                  aria-label="Clear chat"
+                  data-en-label="Clear chat"
+                  data-es-label="Borrar chat">
+                  <span data-en="Clear" data-es="Borrar">Clear</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -234,43 +236,12 @@
       </main>
     </div>
 
-    <footer class="footer" role="contentinfo">
-      <span class="muted" data-en="OPS Online Support • Secure by design" data-es="OPS Online Support • Seguro por diseño">
-        OPS Online Support • Secure by design
-      </span>
-    </footer>
+  <footer class="footer" role="contentinfo">
+    <span class="muted" data-en="OPS Online Support • Secure by design" data-es="OPS Online Support • Seguro por diseño">
+      OPS Online Support • Secure by design
+    </span>
+  </footer>
   </div>
-
-  <div id="drawerOverlay" class="drawer-overlay" aria-hidden="true"></div>
-  <aside id="transcriptDrawer" class="drawer" aria-label="Transcript drawer" aria-hidden="true">
-    <div class="drawer-header">
-      <div class="drawer-title" data-en="Transcript" data-es="Transcripción">Transcript</div>
-      <button type="button" id="closeTranscript" class="text-btn">
-        <span data-en="Close" data-es="Cerrar">Close</span>
-      </button>
-    </div>
-    <div class="drawer-body">
-      <div class="drawer-actions">
-        <button
-          type="button"
-          id="transcript-copy"
-          class="pill-btn"
-          aria-label="Copy transcript"
-          data-en-label="Copy transcript"
-          data-es-label="Copiar transcripción">
-          <span data-en="Copy" data-es="Copiar">Copy</span>
-        </button>
-        <button
-          type="button"
-          id="clearTranscript"
-          class="pill-btn accent"
-          aria-label="Clear transcript">
-          <span data-en="Clear Transcript" data-es="Limpiar transcripción">Clear Transcript</span>
-        </button>
-      </div>
-      <div id="transcriptList" class="transcript-list" role="region" aria-live="polite"></div>
-    </div>
-  </aside>
 
   <div id="privacyOverlay" class="modal-overlay" aria-hidden="true"></div>
   <section id="privacyModal" class="modal card" role="dialog" aria-modal="true" aria-label="Privacy and consent" hidden>
