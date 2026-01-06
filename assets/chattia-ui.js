@@ -1,19 +1,14 @@
 /* assets/chattia-ui.js */
-/* OPS UI — v3 (repo-coordinated with ops-gateway v2) */
 (() => {
   "use strict";
 
   const qs  = (s) => document.querySelector(s);
 
-  // === CONFIG ===
-  // Keep ASSET_ID in sync with Gateway env: OPS_ASSET_IDS (or ASSET_ID)
   const ASSET_ID = "CAFF600A21B457E5D909FD887AF48018B3CBFDDF6F9746E56238B23AF061F9E2";
-
   const GATEWAY_ORIGIN = "https://ops-gateway.grabem-holdem-nuts-right.workers.dev";
   const API_URL = `${GATEWAY_ORIGIN}/api/ops-online-chat`;
   const TELEMETRY_URL = `${GATEWAY_ORIGIN}/reports/telemetry`;
 
-  // Optional extra client-side allowlist (gateway still enforces Origin)
   const AUTH_RULES = [
     { origin: "https://chattiavato-a11y.github.io", pathPrefixes: ["/ops-online-support", "/ops-online-support/"] },
     { origin: "https://www.chattia.io", pathPrefixes: ["/"] },
@@ -22,7 +17,6 @@
 
   const MAX_INPUT_CHARS = 256;
 
-  // === ELEMENTS ===
   const log = qs("#chat-log");
   const form = qs("#chatbot-input-row");
   const input = qs("#chatbot-input");
@@ -30,6 +24,7 @@
 
   const speechToggle = qs("#speechToggle");
   const listenCtrl = qs("#listenCtrl");
+  const listenInline = qs("#listenInline");
   const voiceStatus = qs("#voice-status");
 
   const netDot = qs("#netDot");
@@ -44,6 +39,7 @@
   const hpWebsite = qs("#hp_website");
 
   const clearChatBtn = qs("#clearChat");
+
   const transcriptTrigger = qs("#transcriptTrigger");
   const transcriptDrawer = qs("#transcriptDrawer");
   const transcriptOverlay = qs("#transcriptOverlay");
@@ -60,58 +56,41 @@
   const btnAcceptPrivacy = qs("#btnAcceptPrivacy");
   const btnDenyPrivacy = qs("#btnDenyPrivacy");
 
-  const listenInline = qs("#listenInline");
-
-  // Preferences API exposed by assets/chattia-preferences.js
   const prefsApi = window.OPS_PREFS;
 
-  // === STATE ===
-  const STORAGE_KEYS = {
-    consent: "ops-chat-consent"
-  };
-
-  let currentLang = (prefsApi?.getLang?.() || (document.documentElement.lang === "es" ? "es" : "en"));
+  const CONSENT_KEY = "ops-chat-consent";
+  let currentLang = prefsApi?.getLang?.() || (document.documentElement.lang === "es" ? "es" : "en");
   let currentTheme = prefsApi?.getTheme?.() || (document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
-  let consentState = "pending"; // pending | accepted | denied
+  let consentState = "pending";
 
   const transcript = [];
 
-  // === HELPERS ===
   const clamp = (s, n) => (typeof s === "string" ? s.slice(0, n) : "");
   const safeText = (s) => clamp(String(s || ""), MAX_INPUT_CHARS);
 
   function setNet(ok, enText, esText) {
     if (!netDot || !netText) return;
-    netDot.style.background = ok ? "#2cbe4e" : "#d73a49";
+    netDot.style.background = ok ? "rgba(44,242,162,.9)" : "rgba(255,59,143,.9)";
     netText.textContent = (currentLang === "es") ? (esText || enText || "") : (enText || esText || "");
   }
 
   function normalizeUserText(s) {
-    const t = safeText(s).trim();
-    return t;
+    return safeText(s).replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
   }
 
   function looksSuspicious(s) {
-    // simple heuristic client-side block
-    const x = String(s || "");
-    if (/<script\b/i.test(x)) return true;
-    if (/javascript:/i.test(x)) return true;
-    if (/<\/?[a-z][\s\S]*>/i.test(x)) return true;
-    return false;
+    const x = String(s || "").toLowerCase();
+    return [
+      "<script", "</script", "javascript:", "<img", "onerror", "onload", "<iframe", "<object", "<embed",
+      "<svg", "<link", "<meta", "<style", "document.cookie", "onmouseover", "onmouseenter", "<form", "<input", "<textarea"
+    ].some((p) => x.includes(p));
   }
 
   function isFullyAuthorized() {
     try {
       const origin = window.location.origin;
       const path = window.location.pathname || "/";
-
-      for (const r of AUTH_RULES) {
-        if (r.origin !== origin) continue;
-        for (const pref of r.pathPrefixes || ["/"]) {
-          if (path === pref || path.startsWith(pref)) return true;
-        }
-      }
-      return false;
+      return AUTH_RULES.some((r) => r.origin === origin && (r.pathPrefixes || ["/"]).some((pref) => path.startsWith(pref)));
     } catch {
       return false;
     }
@@ -121,24 +100,22 @@
     if (input) input.disabled = !enabled;
     if (sendBtn) sendBtn.disabled = !enabled;
     if (listenCtrl) listenCtrl.disabled = !enabled;
-
     if (consentNote) consentNote.hidden = enabled;
   }
 
   function readConsent() {
-    try { return localStorage.getItem(STORAGE_KEYS.consent) || "pending"; }
+    try { return localStorage.getItem(CONSENT_KEY) || "pending"; }
     catch { return "pending"; }
   }
 
   function persistConsent(value) {
-    try { localStorage.setItem(STORAGE_KEYS.consent, value); } catch {}
+    try { localStorage.setItem(CONSENT_KEY, value); } catch {}
   }
 
   function applyConsentUI() {
     const hide = (consentState === "accepted" || consentState === "denied");
-
     if (consentBanner) {
-      consentBanner.style.display = hide ? "none" : "block";
+      consentBanner.style.display = hide ? "none" : "flex";
       consentBanner.setAttribute("aria-hidden", hide ? "true" : "false");
     }
   }
@@ -154,10 +131,10 @@
       prefsApi?.setPersistenceAllowed(false);
       setChatEnabled(false);
     }
+
     applyConsentUI();
   }
 
-  // === ACCESSIBILITY HELPERS (focus trap for modals/drawers) ===
   let releasePolicyTrap = null;
   let releaseTranscriptTrap = null;
   let lastFocusPolicy = null;
@@ -165,7 +142,6 @@
 
   function trapFocus(container) {
     if (!container) return () => {};
-
     const getFocusable = () => {
       const nodes = container.querySelectorAll(
         'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -175,7 +151,6 @@
 
     function onKeyDown(e) {
       if (e.key !== "Tab") return;
-
       const focusables = getFocusable();
       if (!focusables.length) return;
 
@@ -196,10 +171,7 @@
     }
 
     document.addEventListener("keydown", onKeyDown, true);
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown, true);
-    };
+    return () => document.removeEventListener("keydown", onKeyDown, true);
   }
 
   function openPolicyModal(anchorId) {
@@ -211,17 +183,14 @@
     policyOverlay.classList.add("open");
     policyOverlay.setAttribute("aria-hidden", "false");
 
-    // Focus trap
     try { releasePolicyTrap?.(); } catch {}
     releasePolicyTrap = trapFocus(policyModal);
 
-    // Optional scroll to section inside modal
     if (anchorId) {
-      const target = policyModal.querySelector(`#${CSS?.escape ? CSS.escape(anchorId) : anchorId}`);
+      const target = policyModal.querySelector(`#${anchorId}`);
       target?.scrollIntoView?.({ block: "start", behavior: "smooth" });
     }
 
-    // Move focus to first meaningful control
     (btnAcceptPrivacy || btnClosePolicy || policyModal.querySelector("button, [href], input, textarea, select, [tabindex]:not([tabindex='-1'])"))?.focus?.();
   }
 
@@ -235,44 +204,13 @@
     try { releasePolicyTrap?.(); } catch {}
     releasePolicyTrap = null;
 
-    // Restore focus
     try { lastFocusPolicy?.focus?.(); } catch {}
     lastFocusPolicy = null;
   }
 
-  function acceptPrivacy() {
-    handleConsent("accepted");
-    closePolicyModal();
-  }
+  function acceptPrivacy() { handleConsent("accepted"); closePolicyModal(); }
+  function denyPrivacy() { handleConsent("denied"); closePolicyModal(); }
 
-  function denyPrivacy() {
-    handleConsent("denied");
-    closePolicyModal();
-  }
-
-  // === THEME + LANGUAGE ===
-  consentState = readConsent();
-  if (consentState === "accepted") prefsApi?.setPersistenceAllowed(true);
-  if (consentState === "denied") prefsApi?.setPersistenceAllowed(false);
-
-  currentLang = prefsApi?.getLang?.() || currentLang;
-  currentTheme = prefsApi?.getTheme?.() || currentTheme;
-  setChatEnabled(consentState !== "denied");
-  applyConsentUI();
-
-  function setLanguage(lang) {
-    const toES = (lang === "es");
-    currentLang = toES ? "es" : "en";
-    document.documentElement.lang = currentLang;
-  }
-
-  document.addEventListener("ops:lang-change", (e) => {
-    const l = e?.detail?.lang;
-    setLanguage(l === "es" ? "es" : "en");
-    ensureWelcome();
-  });
-
-  // === TRANSCRIPT ===
   function renderTranscriptList() {
     if (!transcriptList) return;
     transcriptList.textContent = "";
@@ -280,9 +218,7 @@
     if (!transcript.length) {
       const empty = document.createElement("div");
       empty.className = "transcript-empty";
-      empty.textContent = (currentLang === "es")
-        ? "No hay transcripción todavía."
-        : "No transcript yet.";
+      empty.textContent = (currentLang === "es") ? "No hay transcripción todavía." : "No transcript yet.";
       transcriptList.appendChild(empty);
       return;
     }
@@ -313,13 +249,10 @@
     renderTranscriptList();
   }
 
-  function copyTranscript() {
-    if (!transcriptList) return;
-    const txt = transcript
-      .map(item => `${item.role === "user" ? "End User" : "Chatbot"}: ${item.text}`)
-      .join("\n\n");
+  function copyTranscriptNow() {
+    const txt = transcript.map(item => `${item.role === "user" ? "End User" : "Chatbot"}: ${item.text}`).join("\n\n");
+    if (!txt) return;
 
-    // Prefer clipboard API; fallback to textarea copy
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(txt).catch(() => {});
       return;
@@ -366,16 +299,14 @@
     try { releaseTranscriptTrap?.(); } catch {}
     releaseTranscriptTrap = null;
 
-    // Restore focus
     try { lastFocusTranscript?.focus?.(); } catch {}
     lastFocusTranscript = null;
 
     window.setTimeout(() => { transcriptDrawer.hidden = true; }, 220);
   }
 
-  // === CHAT UI ===
   function addLine(text, who, opts = {}) {
-    const o = opts && typeof opts === "object" ? opts : {};
+    const o = (opts && typeof opts === "object") ? opts : {};
     const record = (o.record !== false);
     const typing = (o.typing === true);
 
@@ -432,11 +363,9 @@
     log.dataset.welcomed = "true";
   }
 
-  // === TELEMETRY (consent-gated) ===
   const telemetrySampleRate = 0.25;
 
   function sendTelemetry(eventType, detail = {}) {
-    // Only send telemetry after explicit user consent
     if (consentState !== "accepted") return;
     if (Math.random() > telemetrySampleRate) return;
 
@@ -451,18 +380,16 @@
           event: String(eventType || ""),
           lang: currentLang,
           ts: Date.now(),
-          detail: detail && typeof detail === "object" ? detail : {}
+          detail: (detail && typeof detail === "object") ? detail : {}
         })
       }).catch(() => {});
     } catch {}
   }
 
-  // === VOICE (Web Speech API) ===
   const synth = ("speechSynthesis" in window) ? window.speechSynthesis : null;
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const recognition = Recognition ? new Recognition() : null;
 
-  let speaking = false;
   let listening = false;
 
   function setVoiceStatus(en, es) {
@@ -474,13 +401,13 @@
     if (!synth) return;
     if (speechToggle && speechToggle.getAttribute("aria-pressed") !== "true") return;
 
+    const clean = String(text || "").replace(/\s+/g, " ").trim();
+    if (!clean) return;
+
     try {
       synth.cancel();
-      const u = new SpeechSynthesisUtterance(text);
+      const u = new SpeechSynthesisUtterance(clean);
       u.lang = (lang === "es") ? "es-ES" : "en-US";
-      speaking = true;
-      u.onend = () => { speaking = false; };
-      u.onerror = () => { speaking = false; };
       synth.speak(u);
     } catch {}
   }
@@ -526,20 +453,39 @@
     setVoiceStatus("", "");
   }
 
-  // === EVENTS ===
+  consentState = readConsent();
+  if (consentState === "accepted") prefsApi?.setPersistenceAllowed(true);
+  if (consentState === "denied") prefsApi?.setPersistenceAllowed(false);
+
+  currentLang = prefsApi?.getLang?.() || currentLang;
+  currentTheme = prefsApi?.getTheme?.() || currentTheme;
+
+  setChatEnabled(consentState !== "denied");
+  applyConsentUI();
+
+  document.addEventListener("ops:lang-change", (e) => {
+    const l = e?.detail?.lang;
+    currentLang = (l === "es") ? "es" : "en";
+    ensureWelcome();
+    renderTranscriptList();
+    setNet(true, "Ready", "Listo");
+  });
+
+  document.addEventListener("ops:theme-change", (e) => {
+    const t = e?.detail?.theme;
+    currentTheme = (t === "dark") ? "dark" : "light";
+  });
+
   if (clearChatBtn) clearChatBtn.onclick = clearChat;
 
   if (transcriptTrigger) transcriptTrigger.onclick = openTranscriptDrawer;
   if (transcriptOverlay) transcriptOverlay.onclick = closeTranscriptDrawer;
   if (transcriptClose) transcriptClose.onclick = closeTranscriptDrawer;
-  if (transcriptCopy) transcriptCopy.onclick = copyTranscript;
-  if (clearTranscriptBtn) clearTranscriptBtn.onclick = () => {
-    transcript.length = 0;
-    renderTranscriptList();
-  };
+  if (transcriptCopy) transcriptCopy.onclick = copyTranscriptNow;
+  if (clearTranscriptBtn) clearTranscriptBtn.onclick = () => { transcript.length = 0; renderTranscriptList(); };
 
-  if (privacyTrigger) privacyTrigger.onclick = () => openPolicyModal('policy-privacy');
-  if (termsTrigger) termsTrigger.onclick = () => openPolicyModal('policy-terms');
+  if (privacyTrigger) privacyTrigger.onclick = () => openPolicyModal("policy-privacy");
+  if (termsTrigger) termsTrigger.onclick = () => openPolicyModal("policy-terms");
   if (policyOverlay) policyOverlay.onclick = closePolicyModal;
   if (btnClosePolicy) btnClosePolicy.onclick = closePolicyModal;
   if (btnAcceptPrivacy) btnAcceptPrivacy.onclick = acceptPrivacy;
@@ -554,7 +500,7 @@
   if (speechToggle) speechToggle.onclick = () => {
     const next = speechToggle.getAttribute("aria-pressed") !== "true";
     speechToggle.setAttribute("aria-pressed", next ? "true" : "false");
-    if (!next && synth) synth.cancel();
+    if (!next && synth) { try { synth.cancel(); } catch {} }
   };
 
   document.addEventListener("keydown", (e) => {
@@ -564,35 +510,30 @@
     }
   });
 
-  // Stop listening if tab is hidden
   document.addEventListener("visibilitychange", () => {
     if (document.hidden && listening && recognition) {
       try { recognition.stop(); } catch {}
     }
   });
 
-  // === SEND ===
   let inFlight = false;
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-
     if (inFlight) return;
 
     const msg = normalizeUserText(input.value);
     if (!msg) return;
 
-    // Client allowlist (extra)
     if (!isFullyAuthorized()) {
-      addBotLine(currentLang === "es"
+      const m = (currentLang === "es")
         ? "Este asistente solo acepta mensajes desde sitios autorizados."
-        : "This assistant only accepts messages from authorized sites."
-      );
+        : "This assistant only accepts messages from authorized sites.";
+      addBotLine(m);
       sendTelemetry("auth_block", { reason: "origin_or_path" });
       return;
     }
 
-    // Local block for obvious injection attempts
     if (looksSuspicious(msg)) {
       const warn = (currentLang === "es")
         ? "Mensaje bloqueado por seguridad. Escribe sin etiquetas o scripts."
@@ -603,11 +544,9 @@
       return;
     }
 
-    // Honeypots (bots fill these)
     const hp1 = normalizeUserText(hpEmail?.value || "");
     const hp2 = normalizeUserText(hpWebsite?.value || "");
 
-    // UI commit
     addUserLine(msg);
     input.value = "";
     input.focus();
@@ -616,81 +555,52 @@
     if (sendBtn) sendBtn.disabled = true;
     inFlight = true;
 
-    // Typing indicator bubble (NOT recorded into transcript)
     const botBubble = addBotLine("", { record: false, typing: true });
-
-    let res = null;
 
     try {
       const ctrl = new AbortController();
       const timeout = setTimeout(() => ctrl.abort(), 15000);
 
-      res = await fetch(API_URL, {
+      const res = await fetch(API_URL, {
         method: "POST",
         mode: "cors",
         cache: "no-store",
         credentials: "omit",
         redirect: "error",
         referrerPolicy: "no-referrer",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Ops-Asset-Id": ASSET_ID
-        },
-        body: JSON.stringify({
-          message: msg,
-          lang: currentLang,
-          hp_email: hp1,
-          hp_website: hp2
-        }),
+        headers: { "Content-Type": "application/json", "X-Ops-Asset-Id": ASSET_ID },
+        body: JSON.stringify({ message: msg, lang: currentLang, hp_email: hp1, hp_website: hp2 }),
         signal: ctrl.signal
       });
 
       clearTimeout(timeout);
 
-      const text = await res.text();
-      let data = null; try { data = JSON.parse(text); } catch {}
+      const raw = await res.text();
+      let data = null;
+      try { data = JSON.parse(raw); } catch {}
 
       if (!res.ok) {
         const fallback = (currentLang === "es") ? "Error del gateway de OPS." : "OPS gateway error.";
-        const errMsg = (data && (data.error || data.public_error))
-          ? String(data.error || data.public_error)
-          : (text || fallback);
-
+        const errMsg = (data && (data.error || data.public_error)) ? String(data.error || data.public_error) : (raw || fallback);
         botBubble.textContent = errMsg;
         recordTranscript("bot", errMsg);
         speak(errMsg, currentLang);
         sendTelemetry("api_error", { status: res.status });
-
         setNet(false, "Error", "Error");
         return;
       }
 
-      if (!data || typeof data !== "object") {
-        const fallback = (currentLang === "es")
-          ? "Respuesta no válida del gateway."
-          : "Invalid response from gateway.";
-        botBubble.textContent = fallback;
-        recordTranscript("bot", fallback);
-        speak(fallback, currentLang);
-        sendTelemetry("api_error", { type: "invalid_json" });
-        setNet(false, "Error", "Error");
-        return;
-      }
-
-      const replyLang = (data.lang === "es") ? "es" : currentLang;
-      const reply = (typeof data.reply === "string" && data.reply.trim())
+      const replyLang = (data && data.lang === "es") ? "es" : currentLang;
+      const reply = (data && typeof data.reply === "string" && data.reply.trim())
         ? data.reply.trim()
         : (currentLang === "es" ? "Sin respuesta." : "No reply.");
 
       botBubble.textContent = reply;
       recordTranscript("bot", reply);
       speak(reply, replyLang);
-
       setNet(true, "Ready", "Listo");
-    } catch (err) {
-      const fallback = (currentLang === "es")
-        ? "No puedo conectar con el asistente OPS."
-        : "Can’t reach OPS assistant.";
+    } catch {
+      const fallback = (currentLang === "es") ? "No puedo conectar con el asistente OPS." : "Can’t reach OPS assistant.";
       botBubble.textContent = fallback;
       recordTranscript("bot", fallback);
       speak(fallback, currentLang);
@@ -702,7 +612,6 @@
     }
   });
 
-  // === INIT ===
   if (!document.documentElement.getAttribute("data-theme")) {
     document.documentElement.setAttribute("data-theme", currentTheme);
   }
