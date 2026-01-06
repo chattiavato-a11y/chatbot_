@@ -13,17 +13,13 @@
   <meta name="color-scheme" content="light dark" />
   <meta name="robots" content="index,follow" />
 
-  <!-- Fallback CSP (best-effort on static hosts).
-       For real enforcement, set CSP + security headers at the edge (Cloudflare). -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev; worker-src 'self'; manifest-src 'self'; media-src 'self'; upgrade-insecure-requests; block-all-mixed-content" />
 
   <link rel="preconnect" href="https://ops-gateway.grabem-holdem-nuts-right.workers.dev" crossorigin />
 
-  <!-- App CSS -->
   <link rel="stylesheet" href="assets/chattia-theme.css" />
   <link rel="stylesheet" href="assets/chattia-ui.css" />
 
-  <!-- App JS -->
   <script defer src="assets/chattia-preferences.js"></script>
   <script defer src="assets/chattia-ui.js"></script>
 </head>
@@ -66,6 +62,7 @@
                     aria-label="Toggle language"
                     data-en-label="Toggle language"
                     data-es-label="Cambiar idioma">EN</button>
+
                   <button
                     type="button"
                     id="themeCtrl"
@@ -124,15 +121,15 @@
               <span data-en="Chatbot responses may be incorrect" data-es="Las respuestas del chatbot pueden ser incorrectas">
                 Chatbot responses may be incorrect
               </span>
-              •
+              <span aria-hidden="true">•</span>
               <button class="policy-link-btn" type="button" id="privacyTrigger" data-action="privacy">
                 <span data-en="Privacy" data-es="Privacidad">Privacy</span>
               </button>
-              •
+              <span aria-hidden="true">•</span>
               <button class="policy-link-btn" type="button" id="termsTrigger" data-action="terms">
                 <span data-en="Terms" data-es="Términos">Terms</span>
               </button>
-              •
+              <span aria-hidden="true">•</span>
               <button class="policy-link-btn" type="button" id="transcriptTrigger" data-action="transcript">
                 <span data-en="Transcript" data-es="Transcripción">Transcript</span>
               </button>
@@ -176,7 +173,9 @@
             <div class="consent-banner" id="consent-banner" role="region" aria-label="Privacy consent">
               <div class="consent-text">
                 <strong data-en="Privacy & consent" data-es="Privacidad y consentimiento">Privacy & consent</strong>
-                <div id="consent-note" class="consent-note" data-en="Consent is required to use the chat. Open Privacy to accept." data-es="Se requiere consentimiento para usar el chat. Abre Privacidad para aceptar.">
+                <div id="consent-note" class="consent-note"
+                  data-en="Consent is required to use the chat. Open Privacy to accept."
+                  data-es="Se requiere consentimiento para usar el chat. Abre Privacidad para aceptar.">
                   Consent is required to use the chat. Open Privacy to accept.
                 </div>
               </div>
@@ -192,7 +191,6 @@
     </div>
   </div>
 
-  <!-- Transcript drawer -->
   <div id="transcriptOverlay" class="drawer-overlay" aria-hidden="true"></div>
   <aside
     id="transcriptDrawer"
@@ -210,28 +208,20 @@
 
     <div class="drawer-body">
       <div class="drawer-actions">
-        <button
-          type="button"
-          id="transcript-copy"
-          class="pill-btn"
-          aria-label="Copy transcript"
-          data-en-label="Copy transcript"
-          data-es-label="Copiar transcripción">
+        <button type="button" id="transcript-copy" class="pill-btn" aria-label="Copy transcript"
+          data-en-label="Copy transcript" data-es-label="Copiar transcripción">
           <span data-en="Copy" data-es="Copiar">Copy</span>
         </button>
-        <button
-          type="button"
-          id="clearTranscript"
-          class="pill-btn accent"
-          aria-label="Clear transcript">
+
+        <button type="button" id="clearTranscript" class="pill-btn accent" aria-label="Clear transcript">
           <span data-en="Clear Transcript" data-es="Limpiar transcripción">Clear Transcript</span>
         </button>
       </div>
+
       <div id="transcriptList" class="transcript-list" role="region" aria-live="polite"></div>
     </div>
   </aside>
 
-  <!-- Privacy/Terms modal -->
   <div id="policyOverlay" class="modal-overlay" aria-hidden="true"></div>
   <section
     id="policyModal"
@@ -255,6 +245,7 @@
         data-es="Sin recolección de PII: Chattia y OPS no recopilan intencionalmente información personal identificable (PII). Si decides compartir PII, puede procesarse como parte de tu conversación.">
         No PII collection: Chattia and OPS do not intentionally collect personally identifiable information (PII). If you choose to share PII, it may be processed as part of your conversation.
       </li>
+
       <li
         data-en="If you deny consent, chat will be disabled until you accept."
         data-es="Si rechazas el consentimiento, el chat se deshabilitará hasta que aceptes.">
@@ -269,11 +260,13 @@
         data-es="Los mensajes pueden usarse para mejorar o entrenar el chatbot.">
         Messages may be used to improve or train the chatbot.
       </li>
+
       <li
         data-en="Chattia and OPS do not intentionally collect PII. Please avoid sharing PII."
         data-es="Chattia y OPS no recopilan intencionalmente PII. Por favor, evita compartir PII.">
         Chattia and OPS do not intentionally collect PII. Please avoid sharing PII.
       </li>
+
       <li
         data-en="If you enter PII, it may be processed as part of the chat text."
         data-es="Si ingresas PII, puede procesarse como parte del texto del chat.">
@@ -283,37 +276,27 @@
 
     <h3 data-en="Fair Use" data-es="Uso justo">Fair Use</h3>
     <ul>
-      <li
-        data-en="No abuse, harassment, or illegal content."
-        data-es="No abuso, acoso o contenido ilegal.">
+      <li data-en="No abuse, harassment, or illegal content." data-es="No abuso, acoso o contenido ilegal.">
         No abuse, harassment, or illegal content.
       </li>
-      <li
-        data-en="No attempts to exploit, bypass security, or spam."
-        data-es="No intentes explotar, evadir seguridad o hacer spam.">
+      <li data-en="No attempts to exploit, bypass security, or spam." data-es="No intentes explotar, evadir seguridad o hacer spam.">
         No attempts to exploit, bypass security, or spam.
       </li>
     </ul>
 
     <h3 data-en="Availability &amp; Accuracy" data-es="Disponibilidad y precisión">Availability &amp; Accuracy</h3>
     <ul>
-      <li
-        data-en="Chatbot responses may be incorrect; use at your own risk."
-        data-es="Las respuestas del chatbot pueden ser incorrectas; úsalo bajo tu propio riesgo.">
+      <li data-en="Chatbot responses may be incorrect; use at your own risk." data-es="Las respuestas del chatbot pueden ser incorrectas; úsalo bajo tu propio riesgo.">
         Chatbot responses may be incorrect; use at your own risk.
       </li>
-      <li
-        data-en="Service is provided “as-is” without warranties."
-        data-es="El servicio se proporciona “tal cual” sin garantías.">
+      <li data-en="Service is provided “as-is” without warranties." data-es="El servicio se proporciona “tal cual” sin garantías.">
         Service is provided “as-is” without warranties.
       </li>
     </ul>
 
     <h3 data-en="Security" data-es="Seguridad">Security</h3>
     <ul>
-      <li
-        data-en="Anti-abuse protections may be used."
-        data-es="Pueden aplicarse protecciones contra abuso.">
+      <li data-en="Anti-abuse protections may be used." data-es="Pueden aplicarse protecciones contra abuso.">
         Anti-abuse protections may be used.
       </li>
     </ul>
@@ -326,3 +309,4 @@
   </section>
 </body>
 </html>
+
