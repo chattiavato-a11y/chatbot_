@@ -101,6 +101,15 @@ html[data-theme="dark"] .brand-sub{ color: var(--muted-dark); }
   align-items: flex-end;
 }
 
+.status-row{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+}
+
 .status{
   display: inline-flex;
   align-items: center;
@@ -655,6 +664,9 @@ html[data-theme="dark"] .noscript{
   .chat-head{
     flex-direction: column;
     align-items: stretch;
+  }
+  .status-row{
+    justify-content: flex-start;
   }
   .chat-head-right{
     align-items: stretch;
