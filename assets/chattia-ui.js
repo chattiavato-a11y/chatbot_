@@ -250,7 +250,12 @@
   }
 
   function copyTranscriptNow() {
-    const txt = transcript.map(item => `${item.role === "user" ? "End User" : "Chatbot"}: ${item.text}`).join("\n\n");
+    const txt = transcript.map((item) => {
+      const roleLabel = item.role === "user"
+        ? (currentLang === "es" ? "Usuario" : "End User")
+        : (currentLang === "es" ? "Chatbot" : "Chatbot");
+      return `${roleLabel}: ${item.text}`;
+    }).join("\n\n");
     if (!txt) return;
 
     if (navigator?.clipboard?.writeText) {
