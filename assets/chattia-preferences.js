@@ -98,6 +98,7 @@
       const val = btn.getAttribute("data-theme-btn");
       const active = val === state.theme;
       btn.setAttribute("aria-pressed", active ? "true" : "false");
+      btn.setAttribute("aria-checked", active ? "true" : "false");
     });
 
     document.dispatchEvent(new CustomEvent("ops:theme-change", { detail: { theme: state.theme } }));
@@ -133,6 +134,7 @@
       const esTxt = btn.getAttribute("data-es");
       if (enTxt && esTxt) btn.textContent = toES ? esTxt : enTxt;
       btn.setAttribute("aria-pressed", active ? "true" : "false");
+      btn.setAttribute("aria-checked", active ? "true" : "false");
     });
 
     document.dispatchEvent(new CustomEvent("ops:lang-change", { detail: { lang: state.lang } }));
