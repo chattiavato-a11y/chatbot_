@@ -9,8 +9,8 @@
   const SESSION_KEY = "ops-chat-preferences-session";
   const CONSENT_KEY = "ops-chat-consent";
 
-  const langCtrl = qs("#langCtrl");
-  const themeCtrl = qs("#themeCtrl");
+  const langButtons = qsa("[data-lang-btn]");
+  const themeButtons = qsa("[data-theme-btn]");
 
   const transNodes = qsa("[data-en]");
 
@@ -94,10 +94,11 @@
     document.documentElement.classList.toggle("light-cycle", !isDark);
     document.body?.classList.toggle("light-cycle", !isDark);
 
-    if (themeCtrl) {
-      themeCtrl.textContent = isDark ? "Light" : "Dark";
-      themeCtrl.setAttribute("aria-pressed", isDark ? "true" : "false");
-    }
+    themeButtons.forEach((btn) => {
+      const val = btn.getAttribute("data-theme-btn");
+      const active = val === state.theme;
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+    });
 
     document.dispatchEvent(new CustomEvent("ops:theme-change", { detail: { theme: state.theme } }));
   }
@@ -113,12 +114,11 @@
       node.textContent = toES ? es : en;
     });
 
-    const inEl = qs("#chatbot-input");
-    if (inEl) {
-      const enPh = inEl.getAttribute("data-en-placeholder");
-      const esPh = inEl.getAttribute("data-es-placeholder");
-      if (enPh && esPh) inEl.setAttribute("placeholder", toES ? esPh : enPh);
-    }
+    qsa("[data-en-placeholder][data-es-placeholder]").forEach((node) => {
+      const enPh = node.getAttribute("data-en-placeholder");
+      const esPh = node.getAttribute("data-es-placeholder");
+      if (enPh && esPh) node.setAttribute("placeholder", toES ? esPh : enPh);
+    });
 
     qsa("[data-en-label][data-es-label]").forEach((node) => {
       const enL = node.getAttribute("data-en-label");
@@ -126,10 +126,14 @@
       if (enL && esL) node.setAttribute("aria-label", toES ? esL : enL);
     });
 
-    if (langCtrl) {
-      langCtrl.textContent = toES ? "ES" : "EN";
-      langCtrl.setAttribute("aria-pressed", toES ? "true" : "false");
-    }
+    langButtons.forEach((btn) => {
+      const val = btn.getAttribute("data-lang-btn");
+      const active = val === state.lang;
+      const enTxt = btn.getAttribute("data-en");
+      const esTxt = btn.getAttribute("data-es");
+      if (enTxt && esTxt) btn.textContent = toES ? esTxt : enTxt;
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+    });
 
     document.dispatchEvent(new CustomEvent("ops:lang-change", { detail: { lang: state.lang } }));
   }
@@ -140,18 +144,10 @@
     translateDom();
   }
 
-  function toggleLang() {
-    setLang(state.lang === "es" ? "en" : "es");
-  }
-
   function setTheme(next) {
     state.theme = (next === "dark") ? "dark" : "light";
     persistState();
     applyTheme();
-  }
-
-  function toggleTheme() {
-    setTheme(state.theme === "dark" ? "light" : "dark");
   }
 
   const persisted = readPersisted() || readSession(SESSION_KEY);
@@ -163,8 +159,12 @@
   applyTheme();
   translateDom();
 
-  if (langCtrl) langCtrl.addEventListener("click", toggleLang);
-  if (themeCtrl) themeCtrl.addEventListener("click", toggleTheme);
+  langButtons.forEach((btn) => {
+    btn.addEventListener("click", () => setLang(btn.getAttribute("data-lang-btn")));
+  });
+  themeButtons.forEach((btn) => {
+    btn.addEventListener("click", () => setTheme(btn.getAttribute("data-theme-btn")));
+  });
 
   window.OPS_PREFS = {
     getLang: () => state.lang,
