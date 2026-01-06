@@ -22,9 +22,7 @@
   const input = qs("#chatbot-input");
   const sendBtn = qs("#chatbot-send");
 
-  const speechToggle = qs("#speechToggle");
   const listenCtrl = qs("#listenCtrl");
-  const listenInline = qs("#listenInline");
   const voiceStatus = qs("#voice-status");
 
   const netDot = qs("#netDot");
@@ -395,6 +393,9 @@
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const recognition = Recognition ? new Recognition() : null;
 
+  let speechEnabled = false;
+  const VOICE_SESSION_MS = 45000;
+  let voiceSessionTimer = null;
   let listening = false;
   let lastVoiceTranscript = "";
   let requestedRepeat = false;
@@ -405,9 +406,28 @@
     voiceStatus.textContent = (currentLang === "es") ? (es || en || "") : (en || es || "");
   }
 
+  function updateListenUI() {
+    if (!listenCtrl) return;
+    const active = listening || speechEnabled;
+    listenCtrl.classList.toggle("active", active);
+    listenCtrl.setAttribute("aria-pressed", active ? "true" : "false");
+  }
+
+  function enableVoiceSession() {
+    if (!synth) return false;
+    speechEnabled = true;
+    clearTimeout(voiceSessionTimer);
+    voiceSessionTimer = setTimeout(() => {
+      speechEnabled = false;
+      try { synth.cancel(); } catch {}
+      updateListenUI();
+      setVoiceStatus("", "");
+    }, VOICE_SESSION_MS);
+    return true;
+  }
+
   function speak(text, lang) {
-    if (!synth) return;
-    if (speechToggle && speechToggle.getAttribute("aria-pressed") !== "true") return;
+    if (!synth || !speechEnabled) return;
 
     const clean = String(text || "").replace(/\s+/g, " ").trim();
     if (!clean) return;
@@ -418,6 +438,7 @@
       const u = new SpeechSynthesisUtterance(toSpeak);
       u.lang = (lang === "es") ? "es-ES" : "en-US";
       synth.speak(u);
+      enableVoiceSession();
     } catch {}
   }
 
@@ -458,6 +479,7 @@
 
       listening = true;
       setVoiceStatus("Listening…", "Escuchando…");
+      updateListenUI();
 
       recognition.onresult = (e) => {
         const t = e?.results?.[0]?.[0]?.transcript;
@@ -471,12 +493,14 @@
       recognition.onerror = () => {
         listening = false;
         setVoiceStatus("", "");
+        updateListenUI();
         if (!lastVoiceTranscript) promptRepeat();
       };
 
       recognition.onend = () => {
         listening = false;
         setVoiceStatus("", "");
+        updateListenUI();
         if (lastVoiceTranscript) {
           requestSubmitIfInput();
         } else if (!requestedRepeat) {
@@ -488,6 +512,7 @@
     } catch {
       listening = false;
       setVoiceStatus("", "");
+      updateListenUI();
     }
   }
 
@@ -496,6 +521,7 @@
     try { recognition.stop(); } catch {}
     listening = false;
     setVoiceStatus("", "");
+    updateListenUI();
   }
 
   consentState = readConsent();
@@ -539,13 +565,24 @@
   if (consentAccept) consentAccept.onclick = () => handleConsent("accepted");
   if (consentDeny) consentDeny.onclick = () => handleConsent("denied");
 
-  if (listenCtrl) listenCtrl.onclick = () => (listening ? stopListening() : startListening());
-  if (listenInline) listenInline.onclick = () => (listening ? stopListening() : startListening());
+  if (listenCtrl) listenCtrl.onclick = () => {
+    if (!recognition) {
+      setVoiceStatus(
+        "Voice input not available in this browser.",
+        "La entrada de voz no está disponible en este navegador."
+      );
+      return;
+    }
 
-  if (speechToggle) speechToggle.onclick = () => {
-    const next = speechToggle.getAttribute("aria-pressed") !== "true";
-    speechToggle.setAttribute("aria-pressed", next ? "true" : "false");
-    if (!next && synth) { try { synth.cancel(); } catch {} }
+    enableVoiceSession();
+    updateListenUI();
+
+    if (listening) {
+      try { recognition.stop(); } catch {}
+      return;
+    }
+
+    startListening();
   };
 
   document.addEventListener("keydown", (e) => {
@@ -659,6 +696,7 @@
     document.documentElement.setAttribute("data-theme", currentTheme);
   }
 
+  updateListenUI();
   setNet(true, "Ready", "Listo");
   ensureWelcome();
 })();
