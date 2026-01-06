@@ -1,5 +1,4 @@
 /* assets/chattia-preferences.js */
-/* Theme + language controls isolated from chat logic */
 (() => {
   "use strict";
 
@@ -72,7 +71,6 @@
     const consent = readConsent();
     const allowPersist = (consent === "accepted");
     if (!allowPersist) return null;
-
     return readStorage(STORAGE_KEY);
   }
 
@@ -80,26 +78,25 @@
     const consent = readConsent();
     const allowPersist = (consent === "accepted");
     if (!allowPersist) {
-      // Minimal session only (no long-term)
       writeSession(SESSION_KEY, state);
       return;
     }
-
     writeStorage(STORAGE_KEY, state);
   }
 
   function applyTheme() {
     document.documentElement.setAttribute("data-theme", state.theme);
-    document.documentElement.classList.toggle("dark-cycle", state.theme === "dark");
-    document.body?.classList.toggle("dark-cycle", state.theme === "dark");
 
-    // Light theme gets its own subtle motion class (watermark-like background)
-    document.documentElement.classList.toggle("light-cycle", state.theme !== "dark");
-    document.body?.classList.toggle("light-cycle", state.theme !== "dark");
+    const isDark = state.theme === "dark";
+    document.documentElement.classList.toggle("dark-cycle", isDark);
+    document.body?.classList.toggle("dark-cycle", isDark);
+
+    document.documentElement.classList.toggle("light-cycle", !isDark);
+    document.body?.classList.toggle("light-cycle", !isDark);
 
     if (themeCtrl) {
-      themeCtrl.textContent = (state.theme === "dark") ? "Light" : "Dark";
-      themeCtrl.setAttribute("aria-pressed", state.theme === "dark" ? "true" : "false");
+      themeCtrl.textContent = isDark ? "Light" : "Dark";
+      themeCtrl.setAttribute("aria-pressed", isDark ? "true" : "false");
     }
 
     document.dispatchEvent(new CustomEvent("ops:theme-change", { detail: { theme: state.theme } }));
@@ -116,7 +113,6 @@
       node.textContent = toES ? es : en;
     });
 
-    // Placeholders
     const inEl = qs("#chatbot-input");
     if (inEl) {
       const enPh = inEl.getAttribute("data-en-placeholder");
@@ -124,7 +120,6 @@
       if (enPh && esPh) inEl.setAttribute("placeholder", toES ? esPh : enPh);
     }
 
-    // aria-label toggles that have data-en-label/data-es-label
     qsa("[data-en-label][data-es-label]").forEach((node) => {
       const enL = node.getAttribute("data-en-label");
       const esL = node.getAttribute("data-es-label");
@@ -159,7 +154,6 @@
     setTheme(state.theme === "dark" ? "light" : "dark");
   }
 
-  // Boot: restore if allowed
   const persisted = readPersisted() || readSession(SESSION_KEY);
   if (persisted && typeof persisted === "object") {
     if (persisted.lang === "en" || persisted.lang === "es") state.lang = persisted.lang;
@@ -172,17 +166,14 @@
   if (langCtrl) langCtrl.addEventListener("click", toggleLang);
   if (themeCtrl) themeCtrl.addEventListener("click", toggleTheme);
 
-  // Public API used by chat logic
   window.OPS_PREFS = {
     getLang: () => state.lang,
     getTheme: () => state.theme,
     setPersistenceAllowed: (allowed) => {
       if (allowed) {
-        // Move session → storage when consent accepted
         const session = readSession(SESSION_KEY);
         if (session) writeStorage(STORAGE_KEY, session);
       } else {
-        // Remove long-term storage when denied
         try { localStorage.removeItem(STORAGE_KEY); } catch {}
       }
     }
