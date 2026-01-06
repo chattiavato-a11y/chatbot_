@@ -16,66 +16,94 @@
   <div class="content-shell">
     <header class="content-header">
       <div>
-        <p class="content-meta">OPS Online Support</p>
+        <p class="content-meta" data-en="OPS Online Support" data-es="Soporte en línea de OPS">OPS Online Support</p>
         <h1 data-en="Contact Us" data-es="Contáctanos">Contact Us</h1>
-        <p class="content-meta">Reach the team for accessibility, privacy, or support questions.</p>
+        <p class="content-meta" data-en="Reach the team for accessibility, privacy, or support questions." data-es="Contacta al equipo para preguntas de accesibilidad, privacidad o soporte.">Reach the team for accessibility, privacy, or support questions.</p>
       </div>
-      <div class="quick-toggles" aria-label="Theme and language controls">
-        <button
-          type="button"
-          id="langCtrl"
-          class="quick-toggle"
-          aria-pressed="false"
-          aria-label="Toggle language"
-          data-en-label="Toggle language"
-          data-es-label="Cambiar idioma">EN</button>
-        <button
-          type="button"
-          id="themeCtrl"
-          class="quick-toggle"
-          aria-pressed="false"
-          aria-label="Toggle theme"
-          data-en-label="Toggle theme"
-          data-es-label="Cambiar tema">Dark</button>
+      <div class="quick-toggles" aria-label="Theme and language controls" data-en-label="Theme and language controls" data-es-label="Controles de tema e idioma">
+        <div class="toggle-group" aria-label="Language selection" data-en-label="Language selection" data-es-label="Selección de idioma">
+          <button
+            type="button"
+            class="quick-toggle"
+            data-lang-btn="en"
+            aria-pressed="false"
+            aria-label="Switch to English"
+            data-en-label="Switch to English"
+            data-es-label="Cambiar a inglés"
+            data-en="EN"
+            data-es="EN">EN</button>
+          <button
+            type="button"
+            class="quick-toggle"
+            data-lang-btn="es"
+            aria-pressed="false"
+            aria-label="Switch to Spanish"
+            data-en-label="Switch to Spanish"
+            data-es-label="Cambiar a español"
+            data-en="ES"
+            data-es="ES">ES</button>
+        </div>
+        <div class="toggle-group" aria-label="Theme selection" data-en-label="Theme selection" data-es-label="Selección de tema">
+          <button
+            type="button"
+            class="quick-toggle"
+            data-theme-btn="light"
+            aria-pressed="false"
+            aria-label="Switch to light theme"
+            data-en-label="Switch to light theme"
+            data-es-label="Cambiar a tema claro"
+            data-en="Light"
+            data-es="Claro">Light</button>
+          <button
+            type="button"
+            class="quick-toggle"
+            data-theme-btn="dark"
+            aria-pressed="false"
+            aria-label="Switch to dark theme"
+            data-en-label="Switch to dark theme"
+            data-es-label="Cambiar a tema oscuro"
+            data-en="Dark"
+            data-es="Oscuro">Dark</button>
+        </div>
       </div>
     </header>
 
     <div class="content-grid">
       <section class="content-card">
-        <h2>Send a message</h2>
+        <h2 data-en="Send a message" data-es="Enviar un mensaje">Send a message</h2>
         <form class="form-grid" action="#" method="post">
-          <label for="contact-name">Name
-            <input id="contact-name" name="name" type="text" placeholder="Your name" required />
+          <label for="contact-name"><span data-en="Name" data-es="Nombre">Name</span>
+            <input id="contact-name" name="name" type="text" placeholder="Your name" required data-en-placeholder="Your name" data-es-placeholder="Tu nombre" />
           </label>
-          <label for="contact-email">Email
-            <input id="contact-email" name="email" type="email" placeholder="you@example.com" required />
+          <label for="contact-email"><span data-en="Email" data-es="Correo electrónico">Email</span>
+            <input id="contact-email" name="email" type="email" placeholder="you@example.com" required data-en-placeholder="you@example.com" data-es-placeholder="tu@ejemplo.com" />
           </label>
-          <label for="contact-topic">Topic
-            <input id="contact-topic" name="topic" type="text" placeholder="Privacy, accessibility, account, etc." />
+          <label for="contact-topic"><span data-en="Topic" data-es="Tema">Topic</span>
+            <input id="contact-topic" name="topic" type="text" placeholder="Privacy, accessibility, account, etc." data-en-placeholder="Privacy, accessibility, account, etc." data-es-placeholder="Privacidad, accesibilidad, cuenta, etc." />
           </label>
-          <label for="contact-message">Message
-            <textarea id="contact-message" name="message" placeholder="Share details so we can help." required></textarea>
+          <label for="contact-message"><span data-en="Message" data-es="Mensaje">Message</span>
+            <textarea id="contact-message" name="message" placeholder="Share details so we can help." required data-en-placeholder="Share details so we can help." data-es-placeholder="Comparte detalles para que podamos ayudar."></textarea>
           </label>
           <div class="content-actions">
-            <button class="btn btn-primary" type="submit">Send</button>
+            <button class="btn btn-primary" type="submit" data-en="Send" data-es="Enviar">Send</button>
           </div>
         </form>
       </section>
 
       <section class="content-card">
-        <h2>Response expectations</h2>
+        <h2 data-en="Response expectations" data-es="Expectativas de respuesta">Response expectations</h2>
         <ul class="content-list">
-          <li>Do not include sensitive personal data. Reference session time and topic only.</li>
-          <li>We target next-business-day responses for privacy, accessibility, and security requests.</li>
-          <li>For urgent security concerns, include the words “Security Issue” in the topic field.</li>
+          <li data-en="Do not include sensitive personal data. Reference session time and topic only." data-es="No incluyas datos personales sensibles. Menciona solo la hora de la sesión y el tema.">Do not include sensitive personal data. Reference session time and topic only.</li>
+          <li data-en="We target next-business-day responses for privacy, accessibility, and security requests." data-es="Apuntamos a responder el siguiente día hábil para solicitudes de privacidad, accesibilidad y seguridad.">We target next-business-day responses for privacy, accessibility, and security requests.</li>
+          <li data-en="For urgent security concerns, include the words “Security Issue” in the topic field." data-es="Para inquietudes de seguridad urgentes, incluye las palabras “Problema de seguridad” en el campo de tema.">For urgent security concerns, include the words “Security Issue” in the topic field.</li>
         </ul>
         <div class="content-actions">
-          <a class="pill-link" href="../index.html">Back to Chat</a>
+          <a class="pill-link" href="../index.html" data-en="Back to Chat" data-es="Volver al Chat">Back to Chat</a>
         </div>
       </section>
     </div>
 
-    <footer class="content-meta">OPS Online Support • Secure by design</footer>
+    <footer class="content-meta" data-en="OPS Online Support • Secure by design" data-es="Soporte en línea de OPS • Seguro desde el diseño">OPS Online Support • Secure by design</footer>
   </div>
 </body>
 </html>

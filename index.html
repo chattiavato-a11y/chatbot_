@@ -25,10 +25,8 @@
 </head>
 
 <body>
-  <a class="skip-link" href="#chat" data-en="Skip to chat" data-es="Saltar al chat">Skip to chat</a>
-
   <noscript>
-    <div class="noscript">
+    <div class="noscript" data-en="This app requires JavaScript to run." data-es="Esta aplicación requiere JavaScript para ejecutarse.">
       This app requires JavaScript to run.
     </div>
   </noscript>
@@ -36,7 +34,12 @@
   <div class="shell app-shell">
     <div class="layout">
       <main class="panel" role="main" id="chat-root">
-        <section class="chat chat-panel" aria-label="Chat" id="chat">
+        <section
+          class="chat chat-panel"
+          aria-label="Chat"
+          data-en-label="Chat"
+          data-es-label="Chat"
+          id="chat">
           <div class="chat-head">
             <div class="brand brand-inline">
               <div class="brand-mark" aria-hidden="true"></div>
@@ -47,33 +50,63 @@
             </div>
 
             <div class="chat-head-right">
-              <div class="status" aria-label="Network status">
+              <div class="status" aria-label="Network status" data-en-label="Network status" data-es-label="Estado de la red">
                 <span class="dot" id="netDot" aria-hidden="true"></span>
                 <span id="netText" data-en="Ready" data-es="Listo">Ready</span>
               </div>
 
               <div class="chat-utility-stack">
-                <div class="quick-toggles" aria-label="Theme and language controls">
-                  <button
-                    type="button"
-                    id="langCtrl"
-                    class="quick-toggle"
-                    aria-pressed="false"
-                    aria-label="Toggle language"
-                    data-en-label="Toggle language"
-                    data-es-label="Cambiar idioma">EN</button>
+                <div class="quick-toggles" aria-label="Theme and language controls" data-en-label="Theme and language controls" data-es-label="Controles de tema e idioma">
+                  <div class="toggle-group" aria-label="Language selection" data-en-label="Language selection" data-es-label="Selección de idioma">
+                    <button
+                      type="button"
+                      class="quick-toggle"
+                      data-lang-btn="en"
+                      aria-pressed="false"
+                      aria-label="Switch to English"
+                      data-en-label="Switch to English"
+                      data-es-label="Cambiar a inglés"
+                      data-en="EN"
+                      data-es="EN">EN</button>
 
-                  <button
-                    type="button"
-                    id="themeCtrl"
-                    class="quick-toggle"
-                    aria-pressed="false"
-                    aria-label="Toggle theme"
-                    data-en-label="Toggle theme"
-                    data-es-label="Cambiar tema">Dark</button>
+                    <button
+                      type="button"
+                      class="quick-toggle"
+                      data-lang-btn="es"
+                      aria-pressed="false"
+                      aria-label="Switch to Spanish"
+                      data-en-label="Switch to Spanish"
+                      data-es-label="Cambiar a español"
+                      data-en="ES"
+                      data-es="ES">ES</button>
+                  </div>
+
+                  <div class="toggle-group" aria-label="Theme selection" data-en-label="Theme selection" data-es-label="Selección de tema">
+                    <button
+                      type="button"
+                      class="quick-toggle"
+                      data-theme-btn="light"
+                      aria-pressed="false"
+                      aria-label="Switch to light theme"
+                      data-en-label="Switch to light theme"
+                      data-es-label="Cambiar a tema claro"
+                      data-en="Light"
+                      data-es="Claro">Light</button>
+
+                    <button
+                      type="button"
+                      class="quick-toggle"
+                      data-theme-btn="dark"
+                      aria-pressed="false"
+                      aria-label="Switch to dark theme"
+                      data-en-label="Switch to dark theme"
+                      data-es-label="Cambiar a tema oscuro"
+                      data-en="Dark"
+                      data-es="Oscuro">Dark</button>
+                  </div>
                 </div>
 
-                <div class="chat-actions" aria-label="Chat actions">
+                <div class="chat-actions" aria-label="Chat actions" data-en-label="Chat actions" data-es-label="Acciones del chat">
                   <button
                     type="button"
                     class="pill-btn"
@@ -158,19 +191,37 @@
                   data-en-placeholder="Type a message..."
                   data-es-placeholder="Escribe un mensaje..." />
 
-                <button type="button" class="mic-inline" id="listenInline" aria-label="Voice input">
+                <button
+                  type="button"
+                  class="mic-inline"
+                  id="listenInline"
+                  aria-label="Voice input"
+                  data-en-label="Voice input"
+                  data-es-label="Entrada de voz">
                   <svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.93V21h2v-3.07A7 7 0 0 0 19 11h-2Z"></path>
                   </svg>
                 </button>
               </div>
 
-              <button id="chatbot-send" class="send-btn" type="submit" aria-label="Send">
+              <button
+                id="chatbot-send"
+                class="send-btn"
+                type="submit"
+                aria-label="Send"
+                data-en-label="Send"
+                data-es-label="Enviar">
                 <span data-en="Send" data-es="Enviar">Send</span>
               </button>
             </form>
 
-            <div class="consent-banner" id="consent-banner" role="region" aria-label="Privacy consent">
+            <div
+              class="consent-banner"
+              id="consent-banner"
+              role="region"
+              aria-label="Privacy consent"
+              data-en-label="Privacy consent"
+              data-es-label="Consentimiento de privacidad">
               <div class="consent-text">
                 <strong data-en="Privacy & consent" data-es="Privacidad y consentimiento">Privacy & consent</strong>
                 <div id="consent-note" class="consent-note"
@@ -198,10 +249,18 @@
     role="dialog"
     aria-modal="true"
     aria-label="Transcript drawer"
+    data-en-label="Transcript drawer"
+    data-es-label="Panel de transcripción"
     hidden>
     <div class="drawer-head">
       <div class="drawer-title" data-en="Transcript" data-es="Transcripción">Transcript</div>
-      <button id="transcriptClose" class="pill-btn" type="button" aria-label="Close transcript">
+      <button
+        id="transcriptClose"
+        class="pill-btn"
+        type="button"
+        aria-label="Close transcript"
+        data-en-label="Close transcript"
+        data-es-label="Cerrar transcripción">
         <span data-en="Close" data-es="Cerrar">Close</span>
       </button>
     </div>
@@ -229,6 +288,8 @@
     role="dialog"
     aria-modal="true"
     aria-label="Privacy, consent, and terms"
+    data-en-label="Privacy, consent, and terms"
+    data-es-label="Privacidad, consentimiento y términos"
     hidden>
     <h2 data-en="Privacy, Consent, and Terms" data-es="Privacidad, consentimiento y términos">Privacy, Consent, and Terms</h2>
 
@@ -309,4 +370,3 @@
   </section>
 </body>
 </html>
-

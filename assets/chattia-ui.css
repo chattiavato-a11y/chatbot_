@@ -17,25 +17,6 @@ html[data-theme="dark"] :focus-visible{
   outline-color: rgba(44,242,162,0.55);
 }
 
-/* Skip link */
-.skip-link{
-  position:absolute;
-  left:-9999px;
-  top: 8px;
-  z-index: 9999;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
-  box-shadow: var(--shadow);
-  color: inherit;
-}
-.skip-link:focus{ left: 12px; }
-html[data-theme="dark"] .skip-link{
-  background: var(--surface-dark-2);
-  border-color: var(--border);
-}
-
 /* Shell layout */
 .shell{
   min-height: 100%;
@@ -154,12 +135,24 @@ html[data-theme="dark"] .status{
   display: flex;
   gap: 8px;
 }
-.quick-toggle{
+.toggle-group{
+  display: inline-flex;
+  gap: 6px;
   border: 1px solid var(--surface-border);
   background: rgba(255,255,255,0.72);
+  border-radius: 999px;
+  padding: 6px;
+}
+html[data-theme="dark"] .toggle-group{
+  border-color: var(--border);
+  background: rgba(10,16,28,0.65);
+}
+.quick-toggle{
+  border: 1px solid var(--surface-border);
+  background: transparent;
   color: inherit;
   border-radius: 999px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   font-size: 12px;
   cursor: pointer;
   transition: transform 150ms ease, background 150ms ease, border-color 150ms ease;
@@ -167,7 +160,14 @@ html[data-theme="dark"] .status{
 .quick-toggle:hover{ transform: translateY(-1px); }
 html[data-theme="dark"] .quick-toggle{
   border-color: var(--border);
-  background: rgba(10,16,28,0.65);
+}
+.quick-toggle[aria-pressed="true"]{
+  background: rgba(13,99,178,0.12);
+  border-color: rgba(13,99,178,0.28);
+}
+html[data-theme="dark"] .quick-toggle[aria-pressed="true"]{
+  background: rgba(44,242,162,0.12);
+  border-color: rgba(44,242,162,0.35);
 }
 
 .chat-actions{
