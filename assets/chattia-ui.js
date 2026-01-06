@@ -411,7 +411,8 @@
 
     try {
       synth.cancel();
-      const u = new SpeechSynthesisUtterance(clean);
+      const toSpeak = clean.replace(/\bOPS\b/gi, "Ops");
+      const u = new SpeechSynthesisUtterance(toSpeak);
       u.lang = (lang === "es") ? "es-ES" : "en-US";
       synth.speak(u);
     } catch {}
