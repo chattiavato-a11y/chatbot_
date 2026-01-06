@@ -5,9 +5,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
 
-  <title>Chattia for OPS</title>
-  <meta name="description" content="Chattia for OPS — secure, fast, accessible assistant UI." />
+  <title data-en="Chattia for OPS" data-es="Chattia para OPS">Chattia for OPS</title>
+  <meta
+    name="description"
+    data-en="Chattia for OPS — secure, fast, accessible assistant UI."
+    data-es="Chattia para OPS: interfaz de asistente segura, rápida y accesible."
+    content="Chattia for OPS — secure, fast, accessible assistant UI." />
   <link rel="canonical" href="https://www.chattia.io/" />
+  <link rel="alternate" href="https://www.chattia.io/" hreflang="en" data-hreflang="en" />
+  <link rel="alternate" href="https://www.chattia.io/?lang=es" hreflang="es" data-hreflang="es" />
+  <link rel="alternate" href="https://www.chattia.io/" hreflang="x-default" data-hreflang="x-default" />
 
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <meta name="color-scheme" content="light dark" />
@@ -22,6 +29,21 @@
 
   <script defer src="assets/chattia-preferences.js"></script>
   <script defer src="assets/chattia-ui.js"></script>
+  <script defer>
+    (() => {
+      const titleEl = document.querySelector("title[data-en][data-es]");
+      const descEl = document.querySelector('meta[name="description"][data-en][data-es]');
+
+      const applyHeadLang = (lang) => {
+        const toES = (lang === "es");
+        if (titleEl) document.title = toES ? titleEl.dataset.es : titleEl.dataset.en;
+        if (descEl) descEl.setAttribute("content", toES ? descEl.dataset.es : descEl.dataset.en);
+      };
+
+      applyHeadLang(document.documentElement.lang === "es" ? "es" : "en");
+      document.addEventListener("ops:lang-change", (event) => applyHeadLang(event.detail?.lang || "en"));
+    })();
+  </script>
 </head>
 
 <body>

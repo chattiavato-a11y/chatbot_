@@ -3,14 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>About • OPS Online Support</title>
-  <meta name="description" content="About Chattia for OPS and the design principles behind the assistant experience." />
+  <title data-en="About • OPS Online Support" data-es="Acerca de • Soporte en línea de OPS">About • OPS Online Support</title>
+  <meta
+    name="description"
+    data-en="About Chattia for OPS and the design principles behind the assistant experience."
+    data-es="Acerca de Chattia para OPS y los principios de diseño detrás de la experiencia del asistente."
+    content="About Chattia for OPS and the design principles behind the assistant experience." />
   <link rel="canonical" href="https://www.chattia.io/ops-online-support/pages/about.html" />
+  <link rel="alternate" href="https://www.chattia.io/ops-online-support/pages/about.html" hreflang="en" data-hreflang="en" />
+  <link rel="alternate" href="https://www.chattia.io/ops-online-support/pages/about.html?lang=es" hreflang="es" data-hreflang="es" />
+  <link rel="alternate" href="https://www.chattia.io/ops-online-support/pages/about.html" hreflang="x-default" data-hreflang="x-default" />
 
   <link rel="stylesheet" href="../assets/chattia-theme.css" />
   <link rel="stylesheet" href="../assets/chattia-ui.css" />
 
   <script src="../assets/chattia-preferences.js" defer></script>
+  <script defer>
+    (() => {
+      const titleEl = document.querySelector("title[data-en][data-es]");
+      const descEl = document.querySelector('meta[name="description"][data-en][data-es]');
+
+      const applyHeadLang = (lang) => {
+        const toES = (lang === "es");
+        if (titleEl) document.title = toES ? titleEl.dataset.es : titleEl.dataset.en;
+        if (descEl) descEl.setAttribute("content", toES ? descEl.dataset.es : descEl.dataset.en);
+      };
+
+      applyHeadLang(document.documentElement.lang === "es" ? "es" : "en");
+      document.addEventListener("ops:lang-change", (event) => applyHeadLang(event.detail?.lang || "en"));
+    })();
+  </script>
 </head>
 <body>
   <div class="content-shell">
