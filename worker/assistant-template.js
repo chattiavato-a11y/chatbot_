@@ -1,77 +1,101 @@
-/**
- * OPS ONLINE ASSISTANT — BRAIN (v2)
- *
- * Called ONLY by ops-gateway via Service Binding (env.BRAIN.fetch).
- *
- * Upgrades vs v1:
- * - Verifies Gateway HMAC signature: X-Ops-Ts + X-Ops-Sig
- * - Anti-replay window (timestamp freshness)
- * - No public CORS (browser cannot call this directly)
- * - JSON-only for /api/ops-online-chat and /api/transcribe (simple + secure)
- *
- * Signature rule (must match Gateway v2):
- *   sig = HMAC_SHA256_HEX(HAND_SHAKE, `${ts}.${bodyText}`)
- */
+/* worker/assistant-template.js
+   OPS ONLINE ASSISTANT — BRAIN (v3.1)
+   Called ONLY by ops-gateway via Service Binding (env.BRAIN.fetch)
+
+   Changes per your request:
+   - Replies are shorter (tokens cut ~50%)
+   - Focused ONLY on opsonlinesupport.com CX + lead generation + careers path
+   - Turnstile: not used
+   - Strong HMAC verification (ts + nonce + method + path + bodySha)
+   - Optional nonce replay cache (KV, if you bind OPS_NONCE or reuse OPS_RL)
+
+   REQUIRED:
+   - Secret: HAND_SHAKE (same value as Gateway)
+   - Workers AI binding on Brain: AI (for chat model)  [optional but recommended]
+
+   OPTIONAL:
+   - KV namespace: OPS_NONCE (preferred) OR OPS_RL (fallback) for replay cache
+*/
+
+import { OPS_SITE, OPS_SITE_RULES_EN, OPS_SITE_RULES_ES } from "./ops-site-content.js";
 
 const CHAT_MODEL_ID = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
-const WHISPER_MODEL_ID = "@cf/openai/whisper";
 
-const MAX_BODY_BYTES = 16_384; // brain can allow a bit more than gateway
+const MAX_BODY_BYTES = 16_384;
 const MAX_MSG_CHARS = 256;
+const MAX_HISTORY_ITEMS = 12;
 
-// +/- 2 minutes time window for anti-replay
-const SIG_MAX_SKEW_MS = 120_000;
+// anti-replay window
+const SIG_MAX_SKEW_MS = 5 * 60 * 1000;
 
-const SYSTEM_PROMPT_EN = `
-You are OPS Online Assistant, the friendly and professional helper for the OPS Remote Professional Network.
-I’m here to assist you with everything related to OPS services, our business operations, contact center solutions, IT support, and professionals-on-demand.
-always answer in short, clear sentences and small paragraphs so the information is easy to read and pleasant to listen to with text-to-speech.
-keep replies concise and under roughly 1300 tokens; trim any extra detail that is not essential to the user’s request.
-use simple plain text without bullet lists, bold, headings, emojis, or extra symbols.
+// tokens cut ~50% (previous was ~1548)
+const MAX_OUTPUT_TOKENS = 774;
+
+function systemPrompt(lang) {
+  const rules = (lang === "es") ? OPS_SITE_RULES_ES : OPS_SITE_RULES_EN;
+
+  const positioning = (lang === "es") ? OPS_SITE.positioning_es : OPS_SITE.positioning_en;
+  const services = (lang === "es") ? OPS_SITE.services_es : OPS_SITE.services_en;
+  const leadFlow = (lang === "es") ? OPS_SITE.lead_flow_es : OPS_SITE.lead_flow_en;
+  const contact = (lang === "es") ? OPS_SITE.contact_cta_es : OPS_SITE.contact_cta_en;
+  const careers = (lang === "es") ? OPS_SITE.careers_cta_es : OPS_SITE.careers_cta_en;
+
+  const servicesText = services.map(s => `- ${s}`).join("\n");
+
+  // Keep it compact: rules + minimal KB
+  return `
+${rules}
+
+Website:
+- Domain: ${OPS_SITE.domain}
+- Brand: ${OPS_SITE.brand}
+
+Positioning:
+${positioning}
+
+Services (high level):
+${servicesText}
+
+Lead flow guidance:
+${leadFlow}
+
+Calls to action:
+- Contact: ${contact}
+- Careers: ${careers}
 `.trim();
-
-const SYSTEM_PROMPT_ES = `
-Eres OPS Online Assistant, un asistente amable y profesional para la Red de Profesionales Remotos de OPS.
-Te ayudo con todo lo relacionado con los servicios de OPS, nuestras operaciones de negocio, soluciones de contact center, soporte de TI y profesionales bajo demanda.
-responde siempre en español con frases cortas y párrafos pequeños para que sean fáciles de leer y agradables de escuchar con texto a voz.
-mantén las respuestas concisas y por debajo de unas 1300 tokens; elimina detalles que no sean esenciales para la petición del usuario.
-usa texto simple sin listas con viñetas, negritas, encabezados, emojis ni símbolos extra.
-`.trim();
-
-function systemPromptForLang(lang) {
-  return lang === "es" ? SYSTEM_PROMPT_ES : SYSTEM_PROMPT_EN;
 }
 
 /* -------------------- Response helpers -------------------- */
 
 function securityHeaders() {
   return {
-    "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store, max-age=0",
-    "x-content-type-options": "nosniff",
-    "referrer-policy": "no-referrer",
-    "x-frame-options": "DENY",
-    "strict-transport-security": "max-age=31536000; includeSubDomains"
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store, max-age=0",
+    "Pragma": "no-cache",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "X-Frame-Options": "DENY",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
   };
 }
 
-function json(status, obj) {
-  return new Response(JSON.stringify(obj, null, 2), {
+function json(status, obj, extra = {}) {
+  return new Response(JSON.stringify(obj), {
     status,
-    headers: securityHeaders()
+    headers: { ...securityHeaders(), ...extra }
   });
 }
 
 /* -------------------- Body helpers -------------------- */
 
-async function readBodyLimitedText(request) {
+async function readBodyLimitedArrayBuffer(request) {
   const len = Number(request.headers.get("content-length") || "0");
   if (len && len > MAX_BODY_BYTES) return null;
 
   const ab = await request.arrayBuffer();
-  if (ab.byteLength === 0 || ab.byteLength > MAX_BODY_BYTES) return null;
-
-  return new TextDecoder().decode(ab);
+  if (!ab || ab.byteLength === 0) return null;
+  if (ab.byteLength > MAX_BODY_BYTES) return null;
+  return ab;
 }
 
 function normalizeUserText(s) {
@@ -82,18 +106,78 @@ function normalizeUserText(s) {
   return out;
 }
 
-function base64ToBytes(b64) {
-  const clean = String(b64 || "").replace(/^data:audio\/[\w.+-]+;base64,/, "");
-  const bin = atob(clean);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+function looksSuspicious(s) {
+  const t = String(s || "").toLowerCase();
+  const bad = [
+    "<script", "</script", "javascript:",
+    "<img", "onerror", "onload",
+    "<iframe", "<object", "<embed",
+    "<svg", "<link", "<meta", "<style",
+    "document.cookie",
+    "onmouseover", "onmouseenter",
+    "<form", "<input", "<textarea"
+  ];
+  return bad.some(p => t.includes(p));
+}
+
+function safeJsonParse(text) {
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+function sanitizeHistory(historyIn) {
+  const out = [];
+  if (!Array.isArray(historyIn)) return out;
+
+  for (const item of historyIn) {
+    if (!item || typeof item !== "object") continue;
+    if (out.length >= MAX_HISTORY_ITEMS) break;
+
+    const role = (item.role === "assistant") ? "assistant" : "user";
+    const content = normalizeUserText(String(item.content || ""));
+    if (!content) continue;
+    if (looksSuspicious(content)) continue;
+
+    out.push({ role, content });
+  }
   return out;
 }
 
-/* -------------------- HMAC verify (Gateway -> Brain) -------------------- */
+/* -------------------- PCI-ish DLP: block payment cards (never collect) -------------------- */
+
+function digitsOnly(s) {
+  return String(s || "").replace(/\D/g, "");
+}
+
+function luhnValid(numStr) {
+  let sum = 0;
+  let alt = false;
+  for (let i = numStr.length - 1; i >= 0; i--) {
+    let n = numStr.charCodeAt(i) - 48;
+    if (n < 0 || n > 9) return false;
+    if (alt) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+
+function containsLikelyCardNumber(text) {
+  const raw = String(text || "");
+  const candidates = raw.match(/(?:\d[ -]*?){13,19}/g) || [];
+  for (const c of candidates) {
+    const d = digitsOnly(c);
+    if (d.length >= 13 && d.length <= 19 && luhnValid(d)) return true;
+  }
+  return false;
+}
+
+/* -------------------- Strong HMAC verify (Gateway -> Brain) -------------------- */
 
 function bytesToHex(bytes) {
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 function timingSafeEqualHex(a, b) {
@@ -103,6 +187,11 @@ function timingSafeEqualHex(a, b) {
   let out = 0;
   for (let i = 0; i < aa.length; i++) out |= aa.charCodeAt(i) ^ bb.charCodeAt(i);
   return out === 0;
+}
+
+async function sha256HexFromArrayBuffer(ab) {
+  const digest = await crypto.subtle.digest("SHA-256", ab);
+  return bytesToHex(new Uint8Array(digest));
 }
 
 async function hmacSha256Hex(secret, message) {
@@ -117,240 +206,163 @@ async function hmacSha256Hex(secret, message) {
   return bytesToHex(new Uint8Array(sig));
 }
 
-async function verifyGatewayHmac(request, env, bodyText) {
-  const secret = (env.HAND_SHAKE || "").toString();
+async function verifyGatewaySignature(request, env, rawBodyAb) {
+  const secret = String(env.HAND_SHAKE || "");
   if (!secret) {
-    return {
-      ok: false,
-      status: 500,
-      code: "NO_HAND_SHAKE",
-      publicMsg: "Assistant configuration error.",
-      opsMsg: "Missing HAND_SHAKE in brain env."
-    };
+    return { ok: false, status: 500, code: "NO_HAND_SHAKE", publicMsg: "Assistant configuration error." };
   }
 
-  const ts = request.headers.get("X-Ops-Ts") || "";
-  const sig = request.headers.get("X-Ops-Sig") || "";
+  const ts = String(request.headers.get("X-Ops-Ts") || "");
+  const nonce = String(request.headers.get("X-Ops-Nonce") || "");
+  const bodyShaHdr = String(request.headers.get("X-Ops-Body-Sha256") || "");
+  const sigHdr = String(request.headers.get("X-Ops-Sig") || "");
 
-  if (!ts || !sig) {
-    return {
-      ok: false,
-      status: 401,
-      code: "MISSING_SIG",
-      publicMsg: "Unauthorized request.",
-      opsMsg: "Missing X-Ops-Ts or X-Ops-Sig."
-    };
+  if (!ts || !nonce || !bodyShaHdr || !sigHdr) {
+    return { ok: false, status: 401, code: "MISSING_SIG", publicMsg: "Unauthorized request." };
   }
 
   const tsNum = Number(ts);
   if (!Number.isFinite(tsNum) || tsNum <= 0) {
-    return {
-      ok: false,
-      status: 401,
-      code: "BAD_TS",
-      publicMsg: "Unauthorized request.",
-      opsMsg: "Invalid timestamp."
-    };
+    return { ok: false, status: 401, code: "BAD_TS", publicMsg: "Unauthorized request." };
   }
 
-  const now = Date.now();
-  const skew = Math.abs(now - tsNum);
+  const skew = Math.abs(Date.now() - tsNum);
   if (skew > SIG_MAX_SKEW_MS) {
-    return {
-      ok: false,
-      status: 401,
-      code: "STALE_TS",
-      publicMsg: "Unauthorized request.",
-      opsMsg: `Timestamp outside allowed window. skew_ms=${skew}`
-    };
+    return { ok: false, status: 401, code: "STALE_TS", publicMsg: "Unauthorized request." };
   }
 
-  const msg = `${ts}.${bodyText || ""}`;
-  const expected = await hmacSha256Hex(secret, msg);
+  const path = new URL(request.url).pathname || "/";
+  const method = request.method.toUpperCase();
 
-  if (!timingSafeEqualHex(sig, expected)) {
-    return {
-      ok: false,
-      status: 401,
-      code: "BAD_SIG",
-      publicMsg: "Unauthorized request.",
-      opsMsg: "Signature mismatch."
-    };
+  const bodySha = await sha256HexFromArrayBuffer(rawBodyAb);
+  if (!timingSafeEqualHex(bodySha, bodyShaHdr)) {
+    return { ok: false, status: 401, code: "BODY_SHA_MISMATCH", publicMsg: "Unauthorized request." };
+  }
+
+  const toSign = [ts, nonce, method, path, bodySha].join(".");
+  const expectedSig = await hmacSha256Hex(secret, toSign);
+
+  if (!timingSafeEqualHex(sigHdr, expectedSig)) {
+    return { ok: false, status: 401, code: "BAD_SIG", publicMsg: "Unauthorized request." };
+  }
+
+  // Optional replay cache (bind OPS_NONCE preferred; OPS_RL fallback)
+  const kv = env.OPS_NONCE || env.OPS_RL;
+  if (kv && typeof kv.get === "function" && typeof kv.put === "function") {
+    const k = `nonce:${ts}:${nonce}`;
+    const seen = await kv.get(k);
+    if (seen) return { ok: false, status: 401, code: "REPLAY", publicMsg: "Unauthorized request." };
+    await kv.put(k, "1", { expirationTtl: 600 });
   }
 
   return { ok: true };
 }
 
-/* -------------------- Handlers -------------------- */
+/* -------------------- AI response (concise) -------------------- */
 
-async function handleOpsOnlineChat(request, env) {
-  const ct = (request.headers.get("content-type") || "").toLowerCase();
-  if (!ct.includes("application/json")) {
-    return json(415, { error: "JSON only." });
+function fallbackReply(lang, message) {
+  if (lang === "es") {
+    return "Puedo ayudarte con información general sobre OPS Online Support y guiarte a Contacto o Carreras/Únete en opsonlinesupport.com. ¿Buscas servicios para tu negocio o quieres postular a un puesto?";
   }
+  return "I can help with OPS Online Support website info and guide you to Contact or Careers/Join Us on opsonlinesupport.com. Are you looking for services for your business, or applying for a role?";
+}
 
-  const bodyText = await readBodyLimitedText(request);
-  if (!bodyText) {
-    return json(413, { error: "Request too large or empty." });
-  }
+async function runChat(env, lang, history, message) {
+  const ai = env.AI;
+  if (!ai || typeof ai.run !== "function") return fallbackReply(lang, message);
 
-  const verify = await verifyGatewayHmac(request, env, bodyText);
-  if (!verify.ok) {
-    console.error("Gateway verification failed:", verify.opsMsg);
-    return json(verify.status, {
-      public_error: verify.publicMsg,
-      error_layer: "L7",
-      error_code: verify.code
+  const msgs = [{ role: "system", content: systemPrompt(lang) }];
+
+  for (const h of history) {
+    msgs.push({
+      role: h.role === "assistant" ? "assistant" : "user",
+      content: h.content
     });
   }
 
-  let payload = {};
-  try { payload = JSON.parse(bodyText); } catch { payload = {}; }
-
-  const lang = payload.lang === "es" ? "es" : "en";
-  const message = normalizeUserText(typeof payload.message === "string" ? payload.message : "");
-  const history = Array.isArray(payload.history) ? payload.history : [];
-
-  if (!message) {
-    return json(400, {
-      error: lang === "es" ? "No se proporcionó ningún mensaje." : "No message provided.",
-      lang
-    });
-  }
-
-  const messages = [{ role: "system", content: systemPromptForLang(lang) }];
-
-  for (const item of history) {
-    if (!item || !item.content) continue;
-    messages.push({
-      role: item.role === "assistant" ? "assistant" : "user",
-      content: normalizeUserText(String(item.content))
-    });
-  }
-
-  messages.push({ role: "user", content: message });
+  msgs.push({ role: "user", content: message });
 
   try {
-    const aiResult = await env.AI.run(CHAT_MODEL_ID, {
-      messages,
-      max_tokens: 1548
+    const out = await ai.run(CHAT_MODEL_ID, {
+      messages: msgs,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      temperature: 0.3
     });
 
     const reply =
-      aiResult?.response
-        ? String(aiResult.response)
-        : (lang === "es" ? "Aún no tengo una respuesta para eso." : "I’m not sure how to answer that yet.");
+      (typeof out?.response === "string" && out.response.trim()) ? out.response.trim() :
+      (typeof out?.result === "string" && out.result.trim()) ? out.result.trim() :
+      "";
 
-    return json(200, { reply, lang });
-  } catch (err) {
-    console.error("Error in /api/ops-online-chat:", err);
-    return json(500, { error: "Failed to process Ops Online Assistant request" });
+    return reply || fallbackReply(lang, message);
+  } catch (e) {
+    console.error("Brain AI run failed:", e);
+    return fallbackReply(lang, message);
   }
 }
 
-async function handleWhisperTranscription(request, env) {
-  // Secure + simple: JSON only (audio_base64 or audio array)
+/* -------------------- Handler -------------------- */
+
+async function handleOpsOnlineChat(request, env) {
   const ct = (request.headers.get("content-type") || "").toLowerCase();
-  if (!ct.includes("application/json")) {
-    return json(415, { error: "JSON only." });
-  }
+  if (!ct.includes("application/json")) return json(415, { ok: false, error: "JSON only." });
 
-  const bodyText = await readBodyLimitedText(request);
-  if (!bodyText) {
-    return json(413, { error: "Request too large or empty." });
-  }
+  const raw = await readBodyLimitedArrayBuffer(request);
+  if (!raw) return json(413, { ok: false, error: "Request too large or empty." });
 
-  const verify = await verifyGatewayHmac(request, env, bodyText);
-  if (!verify.ok) {
-    console.error("Gateway verification failed:", verify.opsMsg);
-    return json(verify.status, {
-      public_error: verify.publicMsg,
-      error_layer: "L7",
-      error_code: verify.code
+  const verify = await verifyGatewaySignature(request, env, raw);
+  if (!verify.ok) return json(verify.status, { ok: false, error: verify.publicMsg, error_code: verify.code });
+
+  const bodyText = new TextDecoder().decode(raw);
+
+  // DLP hard-stop (PCI-ish)
+  if (containsLikelyCardNumber(bodyText)) {
+    return json(400, {
+      ok: false,
+      error: "For security, do not share card details in chat. Please use the site contact page."
     });
   }
 
-  let payload = {};
-  try { payload = JSON.parse(bodyText); } catch { payload = {}; }
+  const payload = safeJsonParse(bodyText);
+  if (!payload || typeof payload !== "object") return json(400, { ok: false, error: "Invalid JSON." });
 
-  let audioBytes = null;
+  const lang = (payload.lang === "es") ? "es" : "en";
+  const message = normalizeUserText(typeof payload.message === "string" ? payload.message : "");
+  const history = sanitizeHistory(payload.history);
 
-  const audioBase64 =
-    typeof payload.audio_base64 === "string"
-      ? payload.audio_base64
-      : typeof payload.audio === "string"
-        ? payload.audio
-        : "";
-
-  const audioArray = Array.isArray(payload.audio) ? payload.audio : null;
-
-  if (audioBase64) {
-    try {
-      audioBytes = base64ToBytes(audioBase64);
-    } catch (e) {
-      console.error("Invalid base64 audio:", e);
-      return json(400, { error: "Invalid audio payload" });
-    }
-  } else if (audioArray) {
-    audioBytes = new Uint8Array(audioArray);
+  if (!message) {
+    return json(400, {
+      ok: false,
+      lang,
+      error: lang === "es" ? "No se proporcionó ningún mensaje." : "No message provided."
+    });
   }
 
-  if (!audioBytes || !audioBytes.length) {
-    return json(400, { error: "No audio provided" });
+  if (looksSuspicious(message) || looksSuspicious(bodyText)) {
+    return json(400, { ok: false, lang, error: lang === "es" ? "Solicitud bloqueada." : "Request blocked." });
   }
 
-  try {
-    const aiResult = await env.AI.run(WHISPER_MODEL_ID, { audio: audioBytes });
+  const reply = await runChat(env, lang, history, message);
 
-    const transcript =
-      aiResult?.text ||
-      aiResult?.transcript ||
-      aiResult?.transcription ||
-      aiResult?.response ||
-      "";
-
-    const responsePayload = { transcript: transcript || "" };
-    if (aiResult?.text !== undefined) responsePayload.text = aiResult.text;
-    if (aiResult?.word_count !== undefined) responsePayload.word_count = aiResult.word_count;
-    if (aiResult?.vtt !== undefined) responsePayload.vtt = aiResult.vtt;
-
-    return json(200, responsePayload);
-  } catch (err) {
-    console.error("Error in /api/transcribe:", err);
-    return json(500, { error: "Failed to transcribe audio" });
-  }
+  return json(200, { ok: true, reply, lang, site: OPS_SITE.domain });
 }
 
 /* -------------------- Router -------------------- */
 
 export default {
-  async fetch(request, env, ctx) {
-    void ctx;
+  async fetch(request, env) {
     const url = new URL(request.url);
     const pathname = url.pathname || "/";
 
-    // Health check
-    if (pathname === "/ping" || pathname === "/") {
-      // If you’re serving ASSETS, prefer those. Otherwise, return a small JSON ping.
-      if (env.ASSETS && typeof env.ASSETS.fetch === "function" && pathname !== "/ping") {
-        return env.ASSETS.fetch(request);
-      }
-      return json(200, { ok: true, service: "ops-online-assistant-brain" });
-    }
-
-    // NOTE: No CORS preflights here. Browser should NOT call brain directly.
-    if (request.method !== "POST") {
-      return json(405, { error: "POST only." });
+    if (request.method === "GET" && (pathname === "/health" || pathname === "/ping")) {
+      return json(200, { ok: true, service: "ops-online-assistant-brain", site: OPS_SITE.domain });
     }
 
     if (pathname === "/api/ops-online-chat") {
+      if (request.method !== "POST") return json(405, { ok: false, error: "POST only." });
       return handleOpsOnlineChat(request, env);
     }
 
-    if (pathname === "/api/transcribe") {
-      return handleWhisperTranscription(request, env);
-    }
-
-    return json(404, { error: "Not found." });
+    return json(404, { ok: false, error: "Not found." });
   }
 };
