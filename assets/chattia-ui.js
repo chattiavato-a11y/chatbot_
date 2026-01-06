@@ -396,6 +396,9 @@
   const recognition = Recognition ? new Recognition() : null;
 
   let listening = false;
+  let lastVoiceTranscript = "";
+  let requestedRepeat = false;
+  let inFlight = false;
 
   function setVoiceStatus(en, es) {
     if (!voiceStatus) return;
@@ -417,6 +420,30 @@
     } catch {}
   }
 
+  function requestSubmitIfInput() {
+    if (!form || !input) return false;
+    const msg = normalizeUserText(input.value);
+    if (!msg) return false;
+    input.value = msg;
+    try {
+      if (typeof form.requestSubmit === "function") form.requestSubmit();
+      else form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      return true;
+    } catch {
+      try { form.submit(); return true; } catch { return false; }
+    }
+  }
+
+  function promptRepeat() {
+    if (requestedRepeat) return;
+    requestedRepeat = true;
+    const apology = (currentLang === "es")
+      ? "Disculpame, ¿podrías repetir eso? No te escuché."
+      : "My apologies, would you please repeat that? I'm sorry, I didn't get that.";
+    addBotLine(apology);
+    speak(apology, currentLang);
+  }
+
   function startListening() {
     if (!recognition || listening) return;
     if (consentState === "denied") return;
@@ -425,23 +452,35 @@
       recognition.lang = (currentLang === "es") ? "es-ES" : "en-US";
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
+      lastVoiceTranscript = "";
+      requestedRepeat = false;
 
       listening = true;
       setVoiceStatus("Listening…", "Escuchando…");
 
       recognition.onresult = (e) => {
         const t = e?.results?.[0]?.[0]?.transcript;
-        if (t && input) input.value = String(t).slice(0, MAX_INPUT_CHARS);
+        const normalized = normalizeUserText(t);
+        if (normalized && input) {
+          lastVoiceTranscript = normalized;
+          input.value = normalized;
+        }
       };
 
       recognition.onerror = () => {
         listening = false;
         setVoiceStatus("", "");
+        if (!lastVoiceTranscript) promptRepeat();
       };
 
       recognition.onend = () => {
         listening = false;
         setVoiceStatus("", "");
+        if (lastVoiceTranscript) {
+          requestSubmitIfInput();
+        } else if (!requestedRepeat) {
+          promptRepeat();
+        }
       };
 
       recognition.start();
@@ -520,8 +559,6 @@
       try { recognition.stop(); } catch {}
     }
   });
-
-  let inFlight = false;
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
