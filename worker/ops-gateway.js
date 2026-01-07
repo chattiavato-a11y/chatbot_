@@ -1,16 +1,12 @@
 /* worker/ops-gateway.js
-   OPS GATEWAY (v3.2) — PUBLIC EDGE
-   UI (opsonlinesupport.com / chattia.io / GH Pages) -> Gateway -> Brain (Service Binding)
+   OPS GATEWAY (v3.2.2) — PUBLIC EDGE (UI -> Gateway -> Brain)
 
-   Fixes + Enhancements:
-   - FIX: KV expirationTtl must be >= 60 (burst ttl updated)
-   - Adds WRONG_PATH hint for /api/chat
-   - Adds privacy-preserving ip_tag in logs (no raw IP stored)
-   - Optional debug allow for Cloudflare Dashboard origin via env.DEBUG_ALLOW_DASH="1"
+   HOTFIX: Cloudflare KV `expirationTtl` must be >= 60 seconds.
+           (Fixes: "Invalid expiration_ttl of 30. Expiration TTL must be at least 60.")
 
-   REQUIRED bindings:
+   REQUIRED bindings (Worker → Settings → Bindings):
    - Service binding:  BRAIN      (points to your Brain worker)
-   - Workers AI:       FIREWALL   (llama-guard)
+   - Workers AI:       FIREWALL   (used for @cf/meta/llama-guard-3-8b)
    - Secret:           HAND_SHAKE (same value as Brain)
 
    OPTIONAL:
@@ -18,7 +14,7 @@
    - KV namespace:     OPS_RL     (rate limit counters)
 
    REQUIRED (client allowlist):
-   - Secret or var:    OPS_ASSET_IDS (comma-separated) OR ASSET_ID (single)
+   - Secret or var:    OPS_ASSET_IDS (comma-separated allowlist) OR ASSET_ID (single)
      UI must send:     X-Ops-Asset-Id
 */
 
@@ -34,7 +30,7 @@ const MAX_CHAT_BYTES = 8_192;
 const MAX_MSG_CHARS = 256;
 const MAX_HISTORY_ITEMS = 12;
 
-/* ------------ Security headers (OWASP-friendly) ------------ */
+/* ------------ “Compliance-aligned” security headers (OWASP-friendly) ------------ */
 
 const API_CSP = [
   "default-src 'none'",
@@ -55,11 +51,11 @@ const PERMISSIONS_POLICY = [
 function securityHeaders() {
   return {
     "Content-Security-Policy": API_CSP,
-    "Permissions-Policy": PERMISSIONS_POLICY,
-    "Cross-Origin-Resource-Policy": "same-origin",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": PERMISSIONS_POLICY,
+    "Cross-Origin-Resource-Policy": "same-origin",
     "X-Permitted-Cross-Domain-Policies": "none",
     "X-DNS-Prefetch-Control": "off",
     "X-XSS-Protection": "0",
@@ -72,22 +68,16 @@ function securityHeaders() {
 
 /* -------------------- CORS -------------------- */
 
-function originAllowed(origin, env) {
-  if (!origin) return false;
-  if (ALLOWED_ORIGINS.has(origin)) return true;
-
-  // Optional debug: allow dashboard to test via CF UI
-  if (String(env?.DEBUG_ALLOW_DASH || "") === "1" && origin === "https://dash.cloudflare.com") return true;
-
-  return false;
+function originAllowed(origin) {
+  return !!origin && ALLOWED_ORIGINS.has(origin);
 }
 
-function corsHeaders(origin, env, requestedHeadersRaw = "") {
+function corsHeaders(origin, requestedHeadersRaw = "") {
   const h = {
     Vary: "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
   };
 
-  if (!originAllowed(origin, env)) return h;
+  if (!originAllowed(origin)) return h;
 
   const requestedHeaders = (requestedHeadersRaw || "")
     .split(",")
@@ -98,19 +88,19 @@ function corsHeaders(origin, env, requestedHeadersRaw = "") {
   h["Access-Control-Allow-Origin"] = origin;
   h["Access-Control-Allow-Methods"] = "POST, OPTIONS";
   h["Access-Control-Allow-Headers"] = requestedHeaders || "Content-Type, X-Ops-Asset-Id";
-  h["Access-Control-Max-Age"] = "600";
   h["Access-Control-Expose-Headers"] = "X-Ops-Request-Id";
+  h["Access-Control-Max-Age"] = "600";
   return h;
 }
 
 /* -------------------- Responses -------------------- */
 
-function json(origin, env, status, obj, extra = {}) {
+function json(origin, status, obj, extra = {}) {
   return new Response(JSON.stringify(obj), {
     status,
     headers: {
       ...securityHeaders(),
-      ...corsHeaders(origin, env),
+      ...corsHeaders(origin),
       "Content-Type": "application/json; charset=utf-8",
       ...extra
     }
@@ -209,7 +199,7 @@ function containsLikelyCardNumber(text) {
   return false;
 }
 
-/* -------------------- Minimal audit logging (no raw messages, no raw IP) -------------------- */
+/* -------------------- Minimal audit logging (no raw messages) -------------------- */
 
 function randHex(byteLen = 16) {
   const b = new Uint8Array(byteLen);
@@ -228,34 +218,27 @@ async function sha256Hex(text) {
 }
 
 async function ipTag(ip) {
-  // Short stable tag (first 16 hex chars)
   const h = await sha256Hex(ip || "");
   return h.slice(0, 16);
 }
 
 async function logEvent(ctx, env, event) {
-  try {
-    const safe = { ts: new Date().toISOString(), ...event };
-    console.warn("[OPS_EVENT]", JSON.stringify(safe));
+  const safe = { ts: new Date().toISOString(), ...event };
+  console.warn("[OPS_EVENT]", JSON.stringify(safe));
 
-    const kv = env.OPS_EVENTS;
-    if (kv && typeof kv.put === "function") {
-      const key = `ops_evt:${Date.now()}:${randHex(8)}`;
-      ctx.waitUntil(kv.put(key, JSON.stringify(safe), { expirationTtl: 60 * 60 * 24 * 7 }));
-    }
-  } catch (e) {
-    console.error("logEvent failed:", e);
+  const kv = env.OPS_EVENTS;
+  if (kv && typeof kv.put === "function") {
+    const key = `ops_evt:${Date.now()}:${randHex(8)}`;
+    ctx.waitUntil(kv.put(key, JSON.stringify(safe), { expirationTtl: 60 * 60 * 24 * 7 }));
   }
 }
 
-/* -------------------- Rate limiting (KV-based) — tightened limits -------------------- */
+/* -------------------- Rate limiting (KV-based) — KV TTL >= 60 -------------------- */
 /**
  * Uses KV namespace OPS_RL (optional). Fail-open if not bound.
  * Limits:
  * - Burst:     4 requests / 10 seconds
  * - Sustained: 30 requests / 5 minutes
- *
- * IMPORTANT: Cloudflare KV expirationTtl must be >= 60.
  */
 async function rateLimitCheck(env, ip) {
   const kv = env.OPS_RL;
@@ -286,11 +269,10 @@ async function rateLimitCheck(env, ip) {
     sum += v;
   }
 
-  const nextSum = (sum - curMin) + (curMin + 1);
-  if (nextSum > sustainedLimit) return { ok: false, retryAfter: 30 };
+  if ((sum + 1) > sustainedLimit) return { ok: false, retryAfter: 30 };
 
-  // KV TTL must be >= 60
-  await kv.put(kBurst, String(burstCount + 1), { expirationTtl: 120 });
+  // KV TTL must be >= 60 seconds
+  await kv.put(kBurst, String(burstCount + 1), { expirationTtl: 60 });
   await kv.put(`rl:m:${ip}:${minuteBucket}`, String(curMin + 1), { expirationTtl: 60 * 10 });
 
   return { ok: true };
@@ -372,21 +354,15 @@ function getAllowedAssetIds(env) {
 
 async function proxyJsonToBrain(origin, request, env, ctx, brainPath, rawClientBodyAb, reqId) {
   if (!env.BRAIN || typeof env.BRAIN.fetch !== "function") {
-    return json(origin, env, 500, {
-      ok: false,
-      error: "Gateway misconfigured (missing BRAIN service binding).",
-      error_code: "NO_BRAIN",
-      request_id: reqId
+    return json(origin, 500, { ok: false, error: "Gateway misconfigured (missing BRAIN).", error_code: "NO_BRAIN", request_id: reqId }, {
+      "X-Ops-Request-Id": reqId
     });
   }
 
   const signHeaders = await signForBrain(env, "POST", brainPath, rawClientBodyAb);
   if (!signHeaders) {
-    return json(origin, env, 500, {
-      ok: false,
-      error: "Gateway misconfigured (missing HAND_SHAKE secret).",
-      error_code: "NO_HAND_SHAKE",
-      request_id: reqId
+    return json(origin, 500, { ok: false, error: "Gateway misconfigured (missing HAND_SHAKE).", error_code: "NO_HAND_SHAKE", request_id: reqId }, {
+      "X-Ops-Request-Id": reqId
     });
   }
 
@@ -406,14 +382,16 @@ async function proxyJsonToBrain(origin, request, env, ctx, brainPath, rawClientB
   } catch (e) {
     console.error("BRAIN fetch failed:", e);
     const tag = await ipTag(request.headers.get("CF-Connecting-IP") || "");
-    await logEvent(ctx, env, { type: "BRAIN_UNREACHABLE", ip_tag: tag, path: brainPath, request_id: reqId });
-    return json(origin, env, 502, { ok: false, error: "Upstream error.", error_code: "UPSTREAM", request_id: reqId });
+    await logEvent(ctx, env, { type: "BRAIN_UNREACHABLE", ip_tag: tag, request_id: reqId });
+    return json(origin, 502, { ok: false, error: "Upstream error.", error_code: "UPSTREAM", request_id: reqId }, {
+      "X-Ops-Request-Id": reqId
+    });
   }
 
   const ab = await brainResp.arrayBuffer();
   const headers = new Headers({
     ...securityHeaders(),
-    ...corsHeaders(origin, env),
+    ...corsHeaders(origin),
     "Content-Type": brainResp.headers.get("content-type") || "application/json; charset=utf-8",
     "X-Ops-Request-Id": reqId
   });
@@ -431,46 +409,39 @@ export default {
     const clientIp = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
     const reqId = `req_${Date.now()}_${randHex(6)}`;
 
+    const isChatPath = pathname === "/api/ops-online-chat";
     const isRoot = pathname === "/" || pathname === "/ping" || pathname === "/health";
 
-    // Root / ping / health
+    // Root/ping/health
     if (request.method === "GET" && isRoot) {
-      return json(origin, env, 200, {
+      return json(origin, 200, {
         ok: true,
         service: "ops-gateway",
         allowed_origins: Array.from(ALLOWED_ORIGINS),
         has_rate_limit_kv: !!(env.OPS_RL && typeof env.OPS_RL.get === "function"),
         has_firewall: !!(env.FIREWALL && typeof env.FIREWALL.run === "function"),
         request_id: reqId
-      });
+      }, { "X-Ops-Request-Id": reqId });
     }
 
-    // Wrong path helper
+    // Friendly wrong-path hint
     if (pathname === "/api/chat") {
-      return json(origin, env, 404, {
+      return json(origin, 404, {
         ok: false,
         error: "Not found.",
         error_code: "WRONG_PATH",
         hint: "Use /api/ops-online-chat.",
         request_id: reqId
-      });
-    }
-
-    // Only supported API path
-    if (pathname !== "/api/ops-online-chat") {
-      return json(origin, env, 404, { ok: false, error: "Not found.", error_code: "NOT_FOUND", request_id: reqId });
+      }, { "X-Ops-Request-Id": reqId });
     }
 
     // Preflight (strict)
     if (request.method === "OPTIONS") {
-      if (!originAllowed(origin, env)) {
-        return json(origin, env, 403, {
-          ok: false,
-          error: "Origin not allowed.",
-          error_code: "ORIGIN_BLOCK",
-          origin_seen: origin,
-          path: pathname,
-          request_id: reqId
+      if (!originAllowed(origin)) {
+        const tag = await ipTag(clientIp);
+        await logEvent(ctx, env, { type: "ORIGIN_BLOCK", ip_tag: tag, origin_seen: origin, path: pathname, request_id: reqId });
+        return json(origin, 403, { ok: false, error: "Origin not allowed.", error_code: "ORIGIN_BLOCK", origin_seen: origin, path: pathname, request_id: reqId }, {
+          "X-Ops-Request-Id": reqId
         });
       }
 
@@ -480,61 +451,62 @@ export default {
 
       const allowedHeaders = ["content-type", "x-ops-asset-id"];
       if (acrm && acrm !== "POST") {
-        return json(origin, env, 403, { ok: false, error: "Preflight rejected.", error_code: "PREFLIGHT", request_id: reqId });
+        return json(origin, 403, { ok: false, error: "Preflight rejected.", error_code: "PREFLIGHT_METHOD", request_id: reqId }, {
+          "X-Ops-Request-Id": reqId
+        });
       }
 
       const disallowed = requested.filter(h => !allowedHeaders.includes(h));
       if (disallowed.length) {
         const tag = await ipTag(clientIp);
-        await logEvent(ctx, env, { type: "PREFLIGHT_REJECT", ip_tag: tag, disallowed, origin_seen: origin, path: pathname, request_id: reqId });
-        return json(origin, env, 403, { ok: false, error: "Preflight rejected.", error_code: "PREFLIGHT", request_id: reqId });
+        await logEvent(ctx, env, { type: "PREFLIGHT_REJECT", ip_tag: tag, disallowed, request_id: reqId });
+        return json(origin, 403, { ok: false, error: "Preflight rejected.", error_code: "PREFLIGHT_HEADERS", request_id: reqId }, {
+          "X-Ops-Request-Id": reqId
+        });
       }
 
       return new Response(null, {
         status: 204,
-        headers: { ...securityHeaders(), ...corsHeaders(origin, env, acrhRaw) }
+        headers: { ...securityHeaders(), ...corsHeaders(origin, acrhRaw), "X-Ops-Request-Id": reqId }
       });
     }
 
+    if (!isChatPath) {
+      return json(origin, 404, { ok: false, error: "Not found.", error_code: "NOT_FOUND", request_id: reqId }, {
+        "X-Ops-Request-Id": reqId
+      });
+    }
     if (request.method !== "POST") {
-      return json(origin, env, 405, { ok: false, error: "POST only.", error_code: "METHOD", request_id: reqId });
+      return json(origin, 405, { ok: false, error: "POST only.", error_code: "METHOD", request_id: reqId }, {
+        "X-Ops-Request-Id": reqId
+      });
     }
 
     // 1) Enforce origin
-    if (!originAllowed(origin, env)) {
+    if (!originAllowed(origin)) {
       const tag = await ipTag(clientIp);
       await logEvent(ctx, env, { type: "ORIGIN_BLOCK", ip_tag: tag, origin_seen: origin, path: pathname, request_id: reqId });
-      return json(origin, env, 403, {
-        ok: false,
-        error: "Origin not allowed.",
-        error_code: "ORIGIN_BLOCK",
-        origin_seen: origin,
-        path: pathname,
-        request_id: reqId
+      return json(origin, 403, { ok: false, error: "Origin not allowed.", error_code: "ORIGIN_BLOCK", origin_seen: origin, path: pathname, request_id: reqId }, {
+        "X-Ops-Request-Id": reqId
       });
     }
 
-    // 2) Rate limit early (tight)
+    // 2) Rate limit early
     const rl = await rateLimitCheck(env, clientIp);
     if (!rl.ok) {
       const tag = await ipTag(clientIp);
-      await logEvent(ctx, env, { type: "RATE_LIMIT", ip_tag: tag, origin_seen: origin, path: pathname, request_id: reqId });
-      return json(origin, env, 429, {
-        ok: false,
-        error: "Too many requests. Please wait and try again.",
-        error_code: "RATE_LIMIT",
-        request_id: reqId
-      }, { "Retry-After": String(Math.max(1, Number(rl.retryAfter || 10))) });
+      await logEvent(ctx, env, { type: "RATE_LIMIT", ip_tag: tag, request_id: reqId });
+      return json(origin, 429, { ok: false, error: "Too many requests. Please wait and try again.", error_code: "RATE_LIMIT", request_id: reqId }, {
+        "Retry-After": String(Math.max(1, Number(rl.retryAfter || 10))),
+        "X-Ops-Request-Id": reqId
+      });
     }
 
     // 3) Verify Asset ID allowlist
     const allowedAssets = getAllowedAssetIds(env);
     if (!allowedAssets.length) {
-      return json(origin, env, 500, {
-        ok: false,
-        error: "Gateway config error (missing OPS_ASSET_IDS/ASSET_ID).",
-        error_code: "NO_ASSET_CONFIG",
-        request_id: reqId
+      return json(origin, 500, { ok: false, error: "Gateway config error (missing OPS_ASSET_IDS/ASSET_ID).", error_code: "NO_ASSET_ALLOWLIST", request_id: reqId }, {
+        "X-Ops-Request-Id": reqId
       });
     }
 
@@ -542,23 +514,28 @@ export default {
     if (!clientAssetId || !allowedAssets.some(v => v === clientAssetId)) {
       const tag = await ipTag(clientIp);
       await logEvent(ctx, env, { type: "ASSET_BLOCK", ip_tag: tag, origin_seen: origin, path: pathname, request_id: reqId });
-      return json(origin, env, 401, {
+      return json(origin, 401, {
         ok: false,
         error: "Unauthorized client.",
         error_code: "ASSET_BLOCK",
+        hint: "Send header X-Ops-Asset-Id with an allowed value.",
         request_id: reqId
-      });
+      }, { "X-Ops-Request-Id": reqId });
     }
 
     // 4) JSON-only
     const ct = (request.headers.get("content-type") || "").toLowerCase();
     if (!ct.includes("application/json")) {
-      return json(origin, env, 415, { ok: false, error: "JSON only.", error_code: "JSON_ONLY", request_id: reqId });
+      return json(origin, 415, { ok: false, error: "JSON only.", error_code: "JSON_ONLY", request_id: reqId }, {
+        "X-Ops-Request-Id": reqId
+      });
     }
 
     const raw = await readBodyArrayBufferLimited(request, MAX_CHAT_BYTES);
     if (!raw) {
-      return json(origin, env, 413, { ok: false, error: "Request too large or empty.", error_code: "TOO_LARGE", request_id: reqId });
+      return json(origin, 413, { ok: false, error: "Request too large or empty.", error_code: "TOO_LARGE", request_id: reqId }, {
+        "X-Ops-Request-Id": reqId
+      });
     }
 
     const bodyText = new TextDecoder().decode(raw);
@@ -566,14 +543,18 @@ export default {
     // 5) Block uploads & obvious injection
     if (hasDataUriBase64(bodyText) || looksSuspicious(bodyText)) {
       const tag = await ipTag(clientIp);
-      await logEvent(ctx, env, { type: "SANITIZE_BLOCK", ip_tag: tag, reason: "body", origin_seen: origin, path: pathname, request_id: reqId });
-      return json(origin, env, 400, { ok: false, error: "Request blocked.", error_code: "SANITIZE", request_id: reqId });
+      await logEvent(ctx, env, { type: "SANITIZE_BLOCK", ip_tag: tag, reason: "body", request_id: reqId });
+      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "SANITIZE", request_id: reqId }, {
+        "X-Ops-Request-Id": reqId
+      });
     }
 
     // 6) Parse + enforce schema
     const payload = safeJsonParse(bodyText);
     if (!payload || typeof payload !== "object") {
-      return json(origin, env, 400, { ok: false, error: "Invalid JSON.", error_code: "BAD_JSON", request_id: reqId });
+      return json(origin, 400, { ok: false, error: "Invalid JSON.", error_code: "BAD_JSON", request_id: reqId }, {
+        "X-Ops-Request-Id": reqId
+      });
     }
 
     // Honeypots
@@ -581,8 +562,10 @@ export default {
     const hpWebsite = String(payload.hp_website || "").trim();
     if (hpEmail || hpWebsite) {
       const tag = await ipTag(clientIp);
-      await logEvent(ctx, env, { type: "HONEYPOT_TRIP", ip_tag: tag, origin_seen: origin, path: pathname, request_id: reqId });
-      return json(origin, env, 400, { ok: false, error: "Request blocked.", error_code: "HONEYPOT", request_id: reqId });
+      await logEvent(ctx, env, { type: "HONEYPOT_TRIP", ip_tag: tag, request_id: reqId });
+      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "HONEYPOT", request_id: reqId }, {
+        "X-Ops-Request-Id": reqId
+      });
     }
 
     const lang = (payload.lang === "es") ? "es" : "en";
@@ -590,17 +573,21 @@ export default {
     const history = sanitizeHistory(payload.history);
 
     if (!message) {
-      return json(origin, env, 400, { ok: false, error: "No message provided.", lang, error_code: "NO_MESSAGE", request_id: reqId });
+      return json(origin, 400, { ok: false, error: "No message provided.", error_code: "NO_MESSAGE", lang, request_id: reqId }, {
+        "X-Ops-Request-Id": reqId
+      });
     }
     if (looksSuspicious(message)) {
-      return json(origin, env, 400, { ok: false, error: "Request blocked.", lang, error_code: "SUSPECT_TEXT", request_id: reqId });
+      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "SUSPECT_TEXT", lang, request_id: reqId }, {
+        "X-Ops-Request-Id": reqId
+      });
     }
 
-    // 7) PCI-ish DLP
+    // 7) PCI-ish DLP: never accept card numbers
     if (containsLikelyCardNumber(message) || containsLikelyCardNumber(bodyText)) {
       const tag = await ipTag(clientIp);
-      await logEvent(ctx, env, { type: "DLP_BLOCK_CARD", ip_tag: tag, origin_seen: origin, path: pathname, request_id: reqId });
-      return json(origin, env, 400, {
+      await logEvent(ctx, env, { type: "DLP_BLOCK_CARD", ip_tag: tag, request_id: reqId });
+      return json(origin, 400, {
         ok: false,
         lang,
         request_id: reqId,
@@ -608,15 +595,17 @@ export default {
         error: lang === "es"
           ? "Por seguridad, no compartas datos de tarjeta en el chat. Usa la página de contacto del sitio."
           : "For security, do not share card details in chat. Please use the site contact page."
-      });
+      }, { "X-Ops-Request-Id": reqId });
     }
 
-    // 8) FIREWALL llama-guard on the user message
+    // 8) FIREWALL llama-guard on the user message (required)
     const fw = await firewallCheck(env, message);
     if (!fw.ok) {
       const tag = await ipTag(clientIp);
-      await logEvent(ctx, env, { type: "FIREWALL_BLOCK", ip_tag: tag, origin_seen: origin, path: pathname, request_id: reqId });
-      return json(origin, env, 400, { ok: false, error: "Request blocked.", lang, error_code: "FIREWALL", request_id: reqId });
+      await logEvent(ctx, env, { type: "FIREWALL_BLOCK", ip_tag: tag, request_id: reqId });
+      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "FIREWALL", lang, request_id: reqId }, {
+        "X-Ops-Request-Id": reqId
+      });
     }
 
     // 9) Forward upstream
