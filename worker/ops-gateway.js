@@ -195,6 +195,51 @@ function randId() {
   return Array.from(b).map(x => x.toString(16).padStart(2, "0")).join("");
 }
 
+function clampString(value, max = 200) {
+  const s = typeof value === "string" ? value : String(value || "");
+  return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
+function analyzeCspReport(report) {
+  const base = report?.["csp-report"] || report?.["csp_report"] || report?.report || report;
+  if (!base || typeof base !== "object") return null;
+
+  const directiveRaw = clampString(base["effective-directive"] || base["violated-directive"] || "");
+  const blockedRaw = clampString(base["blocked-uri"] || base["blockedURL"] || "");
+  const dispositionRaw = clampString(base["disposition"] || "");
+  const doc = clampString(base["document-uri"] || base["documentURL"] || base["referrer"] || "");
+  const source = clampString(base["source-file"] || "");
+  const scriptSample = clampString(base["script-sample"] || base["sample"] || "", 160);
+
+  const directive = directiveRaw.toLowerCase();
+  const blocked = blockedRaw.toLowerCase();
+
+  let severity = "low";
+  let signal = "generic";
+
+  if (directive.includes("script-src")) {
+    signal = "script-blocked";
+    severity = (blocked.includes("inline") || !!scriptSample) ? "high" : "medium";
+  } else if (directive.includes("style-src")) {
+    signal = "style-blocked";
+    severity = blocked.includes("inline") ? "medium" : "low";
+  } else if (directive.includes("img-src") && blocked.startsWith("data")) {
+    signal = "data-image-blocked";
+    severity = "medium";
+  }
+
+  return {
+    severity,
+    signal,
+    directive: directiveRaw,
+    blocked: blockedRaw,
+    disposition: dispositionRaw,
+    document: doc,
+    source,
+    scriptSample
+  };
+}
+
 /**
  * Privacy: do NOT store raw message or tokens. Minimal metadata only.
  * Optional KV sink: bind KV as OPS_EVENTS (optional).
@@ -325,13 +370,30 @@ export default {
       let data = {};
       try { data = JSON.parse(bodyText); } catch {}
 
+      const cspSignal = isCspReport ? analyzeCspReport(data) : null;
+
       const event = {
         type: isCspReport ? "CSP_REPORT" : "TELEMETRY",
         ip: clientIp,
         ua: request.headers.get("User-Agent") || "",
         sample: Math.random(),
-        report: data
+        report: data,
+        csp: cspSignal || undefined
       };
+
+      if (isCspReport && cspSignal?.severity === "high") {
+        await logEvent(ctx, env, {
+          type: "CSP_MONITOR_ALERT",
+          severity: cspSignal.severity,
+          signal: cspSignal.signal,
+          directive: cspSignal.directive,
+          blocked: cspSignal.blocked,
+          disposition: cspSignal.disposition,
+          document: cspSignal.document,
+          source: cspSignal.source,
+          sample: cspSignal.scriptSample || undefined
+        });
+      }
 
       // sampling
       if (event.sample <= 0.9) await logEvent(ctx, env, event);
