@@ -1,82 +1,55 @@
-/**
- * OPS GATEWAY (v2)
- * GH Pages / www.chattia.io (UI) -> Gateway -> Brain (service binding)
- *
- * Upgrades vs v1:
- * - Strict CORS allowlist (GH Pages + www.chattia.io)
- * - Stronger OWASP header set (HTTP headers, always-on for errors too)
- * - HMAC request signing to Brain (anti-replay window) instead of plain shared header
- * - Cleaner CSP for API responses (no fake nonces on JSON APIs)
- * - Preflight validation + safer reporting endpoints handling
- */
+/* worker/ops-gateway.js
+   OPS GATEWAY (v3.1) — PUBLIC EDGE
+   UI (opsonlinesupport.com / chattia.io / GH Pages) -> Gateway -> Brain (Service Binding)
 
-const ALLOWED_ORIGINS = [
+   REQUIRED bindings (Worker → Settings → Bindings):
+   - Service binding:  BRAIN      (points to your Brain worker)
+   - Workers AI:       FIREWALL   (used for @cf/meta/llama-guard-3-8b)
+   - Secret:           HAND_SHAKE (same value as Brain)
+
+   OPTIONAL:
+   - KV namespace:     OPS_EVENTS (minimal audit events, no raw messages)
+   - KV namespace:     OPS_RL     (rate limit counters)
+
+   REQUIRED (client allowlist):
+   - Secret or var:    OPS_ASSET_IDS   (comma-separated allowlist)  OR  ASSET_ID (single)
+     UI must send:     X-Ops-Asset-Id
+
+   NOTE:
+   - Turnstile intentionally removed (per your request).
+*/
+
+const ALLOWED_ORIGINS = new Set([
   "https://chattiavato-a11y.github.io",
+  "https://chattia.io",
   "https://www.chattia.io",
-  "https://chattia.io"
-];
+  "https://opsonlinesupport.com",
+  "https://www.opsonlinesupport.com"
+]);
 
-const MAX_BODY_BYTES = 4096; // small safety limit for JSON payloads
+const MAX_CHAT_BYTES = 8_192;
+const MAX_AUDIO_BYTES = 1 * 1024 * 1024;
+const MAX_REPORT_BYTES = 8_192;
+
 const MAX_MSG_CHARS = 256;
+const MAX_HISTORY_ITEMS = 12;
 
-const REPO_URL = "https://github.com/chattiavato-a11y/ops-online-support";
-const BRAIN_URL = "https://ops-online-assistant.grabem-holdem-nuts-right.workers.dev/api/ops-online-chat";
-const GATEWAY_ORIGIN = "https://ops-gateway.grabem-holdem-nuts-right.workers.dev";
-
-const CSP_REPORT_PATH = "/reports/csp";
-const TELEMETRY_REPORT_PATH = "/reports/telemetry";
-
-/* -------------------- Reporting config (CSP/Telemetry) -------------------- */
-
-const REPORTING_ENDPOINTS = {
-  csp: {
-    group: "csp-endpoint",
-    max_age: 86400,
-    endpoints: [{ url: `${GATEWAY_ORIGIN}${CSP_REPORT_PATH}` }]
-  },
-  telemetry: {
-    group: "telemetry",
-    max_age: 86400,
-    endpoints: [{ url: `${GATEWAY_ORIGIN}${TELEMETRY_REPORT_PATH}` }]
-  }
-};
-
-/* -------------------- Security headers (API-safe, OWASP-aligned) -------------------- */
+/* ------------ “Compliance-aligned” security headers (OWASP-friendly) ------------ */
 
 const API_CSP = [
   "default-src 'none'",
   "base-uri 'none'",
   "frame-ancestors 'none'",
-  "form-action 'none'",
-  "object-src 'none'"
+  "object-src 'none'",
+  "form-action 'none'"
 ].join("; ");
 
 const PERMISSIONS_POLICY = [
-  "accelerometer=()",
-  "autoplay=()",
-  "camera=()",
-  "display-capture=()",
-  "encrypted-media=()",
-  "fullscreen=()",
-  "geolocation=()",
-  "gyroscope=()",
-  "magnetometer=()",
-  "microphone=()",
-  "midi=()",
-  "payment=()",
-  "picture-in-picture=()",
-  "publickey-credentials-get=()",
-  "screen-wake-lock=()",
-  "usb=()",
-  "bluetooth=()",
-  "clipboard-read=()",
-  "clipboard-write=()",
-  "gamepad=()",
-  "hid=()",
-  "idle-detection=()",
-  "serial=()",
-  "web-share=()",
-  "xr-spatial-tracking=()"
+  "accelerometer=()","autoplay=()","camera=()","display-capture=()","encrypted-media=()","fullscreen=()",
+  "geolocation=()","gyroscope=()","magnetometer=()","microphone=()","midi=()","payment=()",
+  "picture-in-picture=()","publickey-credentials-get=()","screen-wake-lock=()","usb=()","bluetooth=()",
+  "clipboard-read=()","clipboard-write=()","gamepad=()","hid=()","idle-detection=()","serial=()",
+  "web-share=()","xr-spatial-tracking=()"
 ].join(", ");
 
 function securityHeaders() {
@@ -92,19 +65,14 @@ function securityHeaders() {
     "X-XSS-Protection": "0",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     "Cache-Control": "no-store, max-age=0",
-    "Pragma": "no-cache",
-    "Report-To": JSON.stringify([REPORTING_ENDPOINTS.csp, REPORTING_ENDPOINTS.telemetry]),
-    "Reporting-Endpoints": [
-      `${REPORTING_ENDPOINTS.csp.group}="${REPORTING_ENDPOINTS.csp.endpoints[0].url}"`,
-      `${REPORTING_ENDPOINTS.telemetry.group}="${REPORTING_ENDPOINTS.telemetry.endpoints[0].url}"`
-    ].join(", ")
+    "Pragma": "no-cache"
   };
 }
 
 /* -------------------- CORS -------------------- */
 
 function originAllowed(origin) {
-  return !!origin && ALLOWED_ORIGINS.includes(origin);
+  return !!origin && ALLOWED_ORIGINS.has(origin);
 }
 
 function corsHeaders(origin, requestedHeadersRaw = "") {
@@ -116,7 +84,7 @@ function corsHeaders(origin, requestedHeadersRaw = "") {
 
   const requestedHeaders = (requestedHeadersRaw || "")
     .split(",")
-    .map((s) => s.trim())
+    .map(s => s.trim())
     .filter(Boolean)
     .join(", ");
 
@@ -130,26 +98,15 @@ function corsHeaders(origin, requestedHeadersRaw = "") {
 /* -------------------- Responses -------------------- */
 
 function json(origin, status, obj, extra = {}) {
-  return new Response(JSON.stringify(obj, null, 2), {
+  return new Response(JSON.stringify(obj), {
     status,
     headers: {
       ...securityHeaders(),
       ...corsHeaders(origin),
-      "content-type": "application/json; charset=utf-8",
+      "Content-Type": "application/json; charset=utf-8",
       ...extra
     }
   });
-}
-
-function text(status, msg) {
-  return new Response(msg, {
-    status,
-    headers: { ...securityHeaders(), "content-type": "text/plain; charset=utf-8" }
-  });
-}
-
-function localizedError(lang, enText, esText) {
-  return lang === "es" ? esText : enText;
 }
 
 /* -------------------- Helpers -------------------- */
@@ -173,137 +130,170 @@ function looksSuspicious(s) {
     "onmouseover", "onmouseenter",
     "<form", "<input", "<textarea"
   ];
-  return badPatterns.some((p) => t.includes(p));
+  return badPatterns.some(p => t.includes(p));
 }
 
 function hasDataUriBase64(s) {
   return /data:\s*[^;]+;\s*base64\s*,/i.test(String(s || ""));
 }
 
-async function readBodyLimited(request) {
+async function readBodyArrayBufferLimited(request, limitBytes) {
   const len = Number(request.headers.get("content-length") || "0");
-  if (len && len > MAX_BODY_BYTES) return null;
+  if (len && len > limitBytes) return null;
 
   const ab = await request.arrayBuffer();
-  if (ab.byteLength === 0 || ab.byteLength > MAX_BODY_BYTES) return null;
-  return new TextDecoder().decode(ab);
+  if (!ab || ab.byteLength === 0) return null;
+  if (ab.byteLength > limitBytes) return null;
+  return ab;
 }
 
-function randId() {
-  const b = new Uint8Array(16);
+function safeJsonParse(text) {
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+function sanitizeHistory(historyIn) {
+  const out = [];
+  if (!Array.isArray(historyIn)) return out;
+
+  for (const item of historyIn) {
+    if (!item || typeof item !== "object") continue;
+    if (out.length >= MAX_HISTORY_ITEMS) break;
+
+    const role = (item.role === "assistant") ? "assistant" : "user";
+    const content = normalizeUserText(String(item.content || ""));
+    if (!content) continue;
+    if (looksSuspicious(content)) continue;
+
+    out.push({ role, content });
+  }
+  return out;
+}
+
+/* -------------------- PCI-ish DLP: block payment cards (never collect) -------------------- */
+
+function digitsOnly(s) {
+  return String(s || "").replace(/\D/g, "");
+}
+
+function luhnValid(numStr) {
+  let sum = 0;
+  let alt = false;
+  for (let i = numStr.length - 1; i >= 0; i--) {
+    let n = numStr.charCodeAt(i) - 48;
+    if (n < 0 || n > 9) return false;
+    if (alt) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+
+function containsLikelyCardNumber(text) {
+  const raw = String(text || "");
+  const candidates = raw.match(/(?:\d[ -]*?){13,19}/g) || [];
+  for (const c of candidates) {
+    const d = digitsOnly(c);
+    if (d.length >= 13 && d.length <= 19 && luhnValid(d)) return true;
+  }
+  return false;
+}
+
+/* -------------------- Minimal audit logging (no raw messages) -------------------- */
+
+function randHex(byteLen = 16) {
+  const b = new Uint8Array(byteLen);
   crypto.getRandomValues(b);
   return Array.from(b).map(x => x.toString(16).padStart(2, "0")).join("");
 }
 
-function clampString(value, max = 200) {
-  const s = typeof value === "string" ? value : String(value || "");
-  return s.length > max ? `${s.slice(0, max)}…` : s;
-}
-
-function analyzeCspReport(report) {
-  const base = report?.["csp-report"] || report?.["csp_report"] || report?.report || report;
-  if (!base || typeof base !== "object") return null;
-
-  const directiveRaw = clampString(base["effective-directive"] || base["violated-directive"] || "");
-  const blockedRaw = clampString(base["blocked-uri"] || base["blockedURL"] || "");
-  const dispositionRaw = clampString(base["disposition"] || "");
-  const doc = clampString(base["document-uri"] || base["documentURL"] || base["referrer"] || "");
-  const source = clampString(base["source-file"] || "");
-  const scriptSample = clampString(base["script-sample"] || base["sample"] || "", 160);
-
-  const directive = directiveRaw.toLowerCase();
-  const blocked = blockedRaw.toLowerCase();
-
-  let severity = "low";
-  let signal = "generic";
-
-  if (directive.includes("script-src")) {
-    signal = "script-blocked";
-    severity = (blocked.includes("inline") || !!scriptSample) ? "high" : "medium";
-  } else if (directive.includes("style-src")) {
-    signal = "style-blocked";
-    severity = blocked.includes("inline") ? "medium" : "low";
-  } else if (directive.includes("img-src") && blocked.startsWith("data")) {
-    signal = "data-image-blocked";
-    severity = "medium";
-  }
-
-  return {
-    severity,
-    signal,
-    directive: directiveRaw,
-    blocked: blockedRaw,
-    disposition: dispositionRaw,
-    document: doc,
-    source,
-    scriptSample
-  };
-}
-
-/**
- * Privacy: do NOT store raw message or tokens. Minimal metadata only.
- * Optional KV sink: bind KV as OPS_EVENTS (optional).
- */
 async function logEvent(ctx, env, event) {
   const safe = { ts: new Date().toISOString(), ...event };
   console.warn("[OPS_EVENT]", JSON.stringify(safe));
 
-  if (env.OPS_EVENTS && typeof env.OPS_EVENTS.put === "function") {
-    const key = `ops_evt:${Date.now()}:${randId()}`;
-    ctx.waitUntil(
-      env.OPS_EVENTS.put(key, JSON.stringify(safe), { expirationTtl: 60 * 60 * 24 * 7 })
-    );
+  const kv = env.OPS_EVENTS;
+  if (kv && typeof kv.put === "function") {
+    const key = `ops_evt:${Date.now()}:${randHex(8)}`;
+    ctx.waitUntil(kv.put(key, JSON.stringify(safe), { expirationTtl: 60 * 60 * 24 * 7 }));
   }
 }
 
-/* -------------------- Optional AI guard -------------------- */
+/* -------------------- Rate limiting (KV-based) — tightened limits -------------------- */
+/**
+ * Uses KV namespace OPS_RL (optional). Fail-open if not bound.
+ * Limits (tighter than before):
+ * - Burst:     4 requests / 10 seconds
+ * - Sustained: 30 requests / 5 minutes
+ */
+async function rateLimitCheck(env, ip) {
+  const kv = env.OPS_RL;
+  if (!kv || typeof kv.get !== "function" || typeof kv.put !== "function") return { ok: true };
 
-async function aiGuardIfAvailable(env, textToCheck) {
-  const ai = env.MY_BRAIN;
-  if (!ai || typeof ai.run !== "function") return { ok: true };
+  const now = Date.now();
+  const burstWindowMs = 10_000;
+  const minuteMs = 60_000;
+  const windowMinutes = 5;
+
+  const burstLimit = 4;
+  const sustainedLimit = 30;
+
+  const burstBucket = Math.floor(now / burstWindowMs);
+  const minuteBucket = Math.floor(now / minuteMs);
+
+  const kBurst = `rl:b:${ip}:${burstBucket}`;
+  const burstCount = Number((await kv.get(kBurst)) || 0);
+  if (burstCount + 1 > burstLimit) return { ok: false, retryAfter: 10 };
+
+  // small sequential reads (KV has no multi-get)
+  let sum = 0;
+  let curMin = 0;
+
+  for (let i = 0; i < windowMinutes; i++) {
+    const k = `rl:m:${ip}:${minuteBucket - i}`;
+    const v = Number((await kv.get(k)) || 0);
+    if (i === 0) curMin = v;
+    sum += v;
+  }
+
+  const nextSum = (sum - curMin) + (curMin + 1);
+  if (nextSum > sustainedLimit) return { ok: false, retryAfter: 30 };
+
+  await kv.put(kBurst, String(burstCount + 1), { expirationTtl: 30 });
+  await kv.put(`rl:m:${ip}:${minuteBucket}`, String(curMin + 1), { expirationTtl: 60 * 10 });
+
+  return { ok: true };
+}
+
+/* -------------------- FIREWALL llama-guard (required) -------------------- */
+
+async function firewallCheck(env, textToCheck) {
+  const fw = env.FIREWALL;
+  if (!fw || typeof fw.run !== "function") return { ok: true, skipped: true };
 
   try {
-    const out = await ai.run("@cf/meta/llama-guard-3-8b", { prompt: textToCheck });
+    const out = await fw.run("@cf/meta/llama-guard-3-8b", { prompt: String(textToCheck || "") });
     const resp = String(out?.response || out?.result || "").trim().toLowerCase();
-    if (!resp) return { ok: true };
+    if (!resp) return { ok: true, skipped: true };
     if (resp.includes("unsafe")) return { ok: false };
     if (resp === "safe") return { ok: true };
     return { ok: true };
   } catch (e) {
-    console.error("AI guard failed (ignored):", e);
-    return { ok: true };
+    console.error("FIREWALL llama-guard failed (ignored):", e);
+    return { ok: true, skipped: true };
   }
 }
 
-/* -------------------- Rate Limiting (Durable Object) -------------------- */
-
-async function rateLimitCheck(request, env) {
-  if (!env.OPS_RL) return { ok: true }; // fail-open if not bound
-
-  const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
-  const id = env.OPS_RL.idFromName(`ip:${ip}`);
-  const stub = env.OPS_RL.get(id);
-
-  const res = await stub.fetch("https://rl/check", { method: "POST" });
-  let data = null;
-  try { data = await res.json(); } catch {}
-  if (!data || typeof data.ok !== "boolean") return { ok: true };
-  return data;
-}
-
-/* -------------------- HMAC signing Gateway -> Brain -------------------- */
+/* -------------------- HMAC signing Gateway -> Brain (strong) -------------------- */
 
 function bytesToHex(bytes) {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-function timingSafeEqualHex(a, b) {
-  const aa = String(a || "");
-  const bb = String(b || "");
-  if (aa.length !== bb.length) return false;
-  let out = 0;
-  for (let i = 0; i < aa.length; i++) out |= aa.charCodeAt(i) ^ bb.charCodeAt(i);
-  return out === 0;
+async function sha256HexFromArrayBuffer(ab) {
+  const digest = await crypto.subtle.digest("SHA-256", ab);
+  return bytesToHex(new Uint8Array(digest));
 }
 
 async function hmacSha256Hex(secret, message) {
@@ -318,6 +308,82 @@ async function hmacSha256Hex(secret, message) {
   return bytesToHex(new Uint8Array(sig));
 }
 
+function randomNonceHex(byteLen = 16) {
+  const b = new Uint8Array(byteLen);
+  crypto.getRandomValues(b);
+  return bytesToHex(b);
+}
+
+/**
+ * bodySha = SHA256_HEX(rawBodyBytes)
+ * toSign  = `${ts}.${nonce}.${method}.${path}.${bodySha}`
+ * sig     = HMAC_SHA256_HEX(HAND_SHAKE, toSign)
+ */
+async function signForBrain(env, method, path, rawBodyArrayBuffer) {
+  const secret = String(env.HAND_SHAKE || "");
+  if (!secret) return null;
+
+  const ts = String(Date.now());
+  const nonce = randomNonceHex(16);
+  const bodySha = await sha256HexFromArrayBuffer(rawBodyArrayBuffer);
+  const toSign = [ts, nonce, method.toUpperCase(), path, bodySha].join(".");
+  const sig = await hmacSha256Hex(secret, toSign);
+
+  return {
+    "X-Ops-Ts": ts,
+    "X-Ops-Nonce": nonce,
+    "X-Ops-Body-Sha256": bodySha,
+    "X-Ops-Sig": sig
+  };
+}
+
+function getAllowedAssetIds(env) {
+  const raw = String(env.OPS_ASSET_IDS || env.ASSET_ID || "");
+  return raw.split(",").map(s => s.trim()).filter(Boolean);
+}
+
+/* -------------------- Proxy to Brain (Service Binding) -------------------- */
+
+async function proxyJsonToBrain(origin, request, env, ctx, brainPath, rawClientBodyAb, reqId) {
+  if (!env.BRAIN || typeof env.BRAIN.fetch !== "function") {
+    return json(origin, 500, { ok: false, error: "Gateway misconfigured (missing BRAIN service binding)." });
+  }
+
+  const signHeaders = await signForBrain(env, "POST", brainPath, rawClientBodyAb);
+  if (!signHeaders) {
+    return json(origin, 500, { ok: false, error: "Gateway misconfigured (missing HAND_SHAKE secret)." });
+  }
+
+  const brainReq = new Request("https://brain.local" + brainPath, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "X-Ops-Request-Id": reqId,
+      ...signHeaders
+    },
+    body: rawClientBodyAb
+  });
+
+  let brainResp;
+  try {
+    brainResp = await env.BRAIN.fetch(brainReq);
+  } catch (e) {
+    console.error("BRAIN fetch failed:", e);
+    await logEvent(ctx, env, { type: "BRAIN_UNREACHABLE", ip: request.headers.get("CF-Connecting-IP") || "" });
+    return json(origin, 502, { ok: false, error: "Upstream error." });
+  }
+
+  const ab = await brainResp.arrayBuffer();
+  const headers = new Headers({
+    ...securityHeaders(),
+    ...corsHeaders(origin),
+    "Content-Type": brainResp.headers.get("content-type") || "application/json; charset=utf-8",
+    "X-Ops-Request-Id": reqId
+  });
+
+  return new Response(ab, { status: brainResp.status, headers });
+}
+
 /* -------------------- Main Worker -------------------- */
 
 export default {
@@ -325,99 +391,39 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname || "/";
     const origin = request.headers.get("Origin") || "";
-    const clientIp = request.headers.get("CF-Connecting-IP") || "";
+    const clientIp = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
+    const reqId = `req_${Date.now()}_${randHex(6)}`;
 
     const isChatPath = pathname === "/api/ops-online-chat";
-    const isRoot = pathname === "/" || pathname === "/ping";
-    const isCspReport = pathname === CSP_REPORT_PATH;
-    const isTelemetryReport = pathname === TELEMETRY_REPORT_PATH;
+    const isRoot = pathname === "/" || pathname === "/ping" || pathname === "/health";
 
-    // Root/ping
-    if (isRoot) {
+    // Root/ping/health
+    if (request.method === "GET" && isRoot) {
       return json(origin, 200, {
         ok: true,
         service: "ops-gateway",
-        usage: "POST /api/ops-online-chat with X-Ops-Asset-Id header",
-        allowed_origins: ALLOWED_ORIGINS,
-        repo: REPO_URL
+        allowed_origins: Array.from(ALLOWED_ORIGINS),
+        has_rate_limit_kv: !!(env.OPS_RL && typeof env.OPS_RL.get === "function"),
+        has_firewall: !!(env.FIREWALL && typeof env.FIREWALL.run === "function"),
+        request_id: reqId
       });
     }
 
-    // Reports preflight
-    if ((isCspReport || isTelemetryReport) && request.method === "OPTIONS") {
-      if (!originAllowed(origin)) return json(origin, 403, { error: "Origin not allowed." });
-      return new Response(null, {
-        status: 204,
-        headers: { ...securityHeaders(), ...corsHeaders(origin) }
-      });
-    }
+    // Preflight (strict)
+    if (request.method === "OPTIONS") {
+      if (!originAllowed(origin)) return json(origin, 403, { ok: false, error: "Origin not allowed.", request_id: reqId });
 
-    // Reports ingestion
-    if (isCspReport || isTelemetryReport) {
-      if (!originAllowed(origin)) {
-        await logEvent(ctx, env, { type: "REPORT_ORIGIN_BLOCK", ip: clientIp });
-        return json(origin, 403, { error: "Origin not allowed." });
-      }
-
-      if (request.method !== "POST") return json(origin, 405, { error: "POST only." });
-
-      const ct = (request.headers.get("content-type") || "").toLowerCase();
-      if (!ct.includes("application/json")) return json(origin, 415, { error: "JSON only." });
-
-      const bodyText = await readBodyLimited(request);
-      if (!bodyText) return json(origin, 400, { error: "Empty report." });
-
-      let data = {};
-      try { data = JSON.parse(bodyText); } catch {}
-
-      const cspSignal = isCspReport ? analyzeCspReport(data) : null;
-
-      const event = {
-        type: isCspReport ? "CSP_REPORT" : "TELEMETRY",
-        ip: clientIp,
-        ua: request.headers.get("User-Agent") || "",
-        sample: Math.random(),
-        report: data,
-        csp: cspSignal || undefined
-      };
-
-      if (isCspReport && cspSignal?.severity === "high") {
-        await logEvent(ctx, env, {
-          type: "CSP_MONITOR_ALERT",
-          severity: cspSignal.severity,
-          signal: cspSignal.signal,
-          directive: cspSignal.directive,
-          blocked: cspSignal.blocked,
-          disposition: cspSignal.disposition,
-          document: cspSignal.document,
-          source: cspSignal.source,
-          sample: cspSignal.scriptSample || undefined
-        });
-      }
-
-      // sampling
-      if (event.sample <= 0.9) await logEvent(ctx, env, event);
-      return json(origin, 202, { ok: true });
-    }
-
-    // CORS preflight for chat
-    if (isChatPath && request.method === "OPTIONS") {
-      if (!originAllowed(origin)) return json(origin, 403, { error: "Origin not allowed." });
-
-      // Validate preflight method/header hints (fail closed)
       const acrm = (request.headers.get("Access-Control-Request-Method") || "").toUpperCase();
       const acrhRaw = request.headers.get("Access-Control-Request-Headers") || "";
-      const acrh = acrhRaw.toLowerCase();
-      const allowedHeaders = ["content-type", "x-ops-asset-id"];
+      const requested = (acrhRaw || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
 
-      if (acrm && acrm !== "POST") return json(origin, 403, { error: "Preflight rejected." });
-      if (acrh) {
-        const requested = acrh.split(",").map((s) => s.trim()).filter(Boolean);
-        const disallowed = requested.filter((h) => !allowedHeaders.includes(h));
-        if (disallowed.length) {
-          await logEvent(ctx, env, { type: "PREFLIGHT_REJECT", ip: clientIp, headers: requested });
-          return json(origin, 403, { error: "Preflight rejected.", details: { disallowed } });
-        }
+      const allowedHeaders = ["content-type", "x-ops-asset-id"];
+      if (acrm && acrm !== "POST") return json(origin, 403, { ok: false, error: "Preflight rejected.", request_id: reqId });
+
+      const disallowed = requested.filter(h => !allowedHeaders.includes(h));
+      if (disallowed.length) {
+        await logEvent(ctx, env, { type: "PREFLIGHT_REJECT", ip: clientIp, disallowed });
+        return json(origin, 403, { ok: false, error: "Preflight rejected.", request_id: reqId });
       }
 
       return new Response(null, {
@@ -426,225 +432,94 @@ export default {
       });
     }
 
-    if (!isChatPath) return json(origin, 404, { error: "Not found.", hint: "Use POST /api/ops-online-chat" });
-    if (request.method !== "POST") return json(origin, 405, { error: "POST only." });
+    if (!isChatPath) return json(origin, 404, { ok: false, error: "Not found.", request_id: reqId });
+    if (request.method !== "POST") return json(origin, 405, { ok: false, error: "POST only.", request_id: reqId });
 
     // 1) Enforce origin
     if (!originAllowed(origin)) {
       await logEvent(ctx, env, { type: "ORIGIN_BLOCK", ip: clientIp, origin });
-      return json(origin, 403, { error: "Origin not allowed." });
+      return json(origin, 403, { ok: false, error: "Origin not allowed.", request_id: reqId });
     }
 
-    // 2) Rate limit early
-    const rl = await rateLimitCheck(request, env);
+    // 2) Rate limit early (tight)
+    const rl = await rateLimitCheck(env, clientIp);
     if (!rl.ok) {
       await logEvent(ctx, env, { type: "RATE_LIMIT", ip: clientIp });
-      return json(origin, 429, { error: "Too many requests. Please wait and try again." }, {
+      return json(origin, 429, { ok: false, error: "Too many requests. Please wait and try again.", request_id: reqId }, {
         "Retry-After": String(Math.max(1, Number(rl.retryAfter || 10)))
       });
     }
 
-    // 3) JSON-only, reject uploads
-    const ct = (request.headers.get("content-type") || "").toLowerCase();
-    if (ct.includes("multipart/form-data") || ct.includes("application/x-www-form-urlencoded")) {
-      await logEvent(ctx, env, { type: "UPLOAD_BLOCK", ip: clientIp, reason: "content-type" });
-      return json(origin, 415, { error: "Unsupported content type." });
-    }
-    if (!ct.includes("application/json")) {
-      await logEvent(ctx, env, { type: "UPLOAD_BLOCK", ip: clientIp, reason: "not-json" });
-      return json(origin, 415, { error: "JSON only." });
-    }
-
-    // 4) Verify Asset ID
-    const allowedAssets = (env.OPS_ASSET_IDS || env.ASSET_ID || "")
-      .toString()
-      .split(",")
-      .map(v => v.trim())
-      .filter(Boolean);
-
+    // 3) Verify Asset ID allowlist
+    const allowedAssets = getAllowedAssetIds(env);
     if (!allowedAssets.length) {
-      return json(origin, 500, { error: "Gateway config error (missing OPS_ASSET_IDS/ASSET_ID)." });
+      return json(origin, 500, { ok: false, error: "Gateway config error (missing OPS_ASSET_IDS/ASSET_ID).", request_id: reqId });
     }
 
     const clientAssetId = request.headers.get("X-Ops-Asset-Id") || "";
     if (!clientAssetId || !allowedAssets.some(v => v === clientAssetId)) {
       await logEvent(ctx, env, { type: "ASSET_BLOCK", ip: clientIp });
-      return json(origin, 401, { error: "Unauthorized client." });
+      return json(origin, 401, { ok: false, error: "Unauthorized client.", request_id: reqId });
     }
 
-    // 5) Read + parse body (limited)
-    const bodyText = await readBodyLimited(request);
-    if (!bodyText) return json(origin, 413, { error: "Request too large or empty." });
+    // 4) JSON-only
+    const ct = (request.headers.get("content-type") || "").toLowerCase();
+    if (!ct.includes("application/json")) return json(origin, 415, { ok: false, error: "JSON only.", request_id: reqId });
 
-    if (hasDataUriBase64(bodyText)) {
-      await logEvent(ctx, env, { type: "UPLOAD_BLOCK", ip: clientIp, reason: "data-uri-base64" });
-      return json(origin, 400, { error: "Uploads are not allowed." });
+    const raw = await readBodyArrayBufferLimited(request, MAX_CHAT_BYTES);
+    if (!raw) return json(origin, 413, { ok: false, error: "Request too large or empty.", request_id: reqId });
+
+    const bodyText = new TextDecoder().decode(raw);
+
+    // 5) Block uploads & obvious injection
+    if (hasDataUriBase64(bodyText) || looksSuspicious(bodyText)) {
+      await logEvent(ctx, env, { type: "SANITIZE_BLOCK", ip: clientIp, reason: "body" });
+      return json(origin, 400, { ok: false, error: "Request blocked.", request_id: reqId });
     }
 
-    let payload = {};
-    try { payload = JSON.parse(bodyText); } catch { payload = {}; }
-
-    const langRaw = typeof payload.lang === "string" ? payload.lang.toLowerCase() : "en";
-    const lang = langRaw === "es" ? "es" : "en";
+    // 6) Parse + enforce schema
+    const payload = safeJsonParse(bodyText);
+    if (!payload || typeof payload !== "object") return json(origin, 400, { ok: false, error: "Invalid JSON.", request_id: reqId });
 
     // Honeypots
-    const hpEmail = typeof payload.hp_email === "string" ? payload.hp_email.trim() : "";
-    const hpWebsite = typeof payload.hp_website === "string" ? payload.hp_website.trim() : "";
+    const hpEmail = String(payload.hp_email || "").trim();
+    const hpWebsite = String(payload.hp_website || "").trim();
     if (hpEmail || hpWebsite) {
       await logEvent(ctx, env, { type: "HONEYPOT_TRIP", ip: clientIp });
-      return json(origin, 400, { error: localizedError(lang, "Request blocked.", "Solicitud bloqueada."), lang });
+      return json(origin, 400, { ok: false, error: "Request blocked.", request_id: reqId });
     }
 
-    // Message
-    const msgRaw = typeof payload.message === "string" ? payload.message : "";
-    const v = Number.isInteger(payload.v) ? payload.v : 1;
-    const message = normalizeUserText(msgRaw);
+    const lang = (payload.lang === "es") ? "es" : "en";
+    const message = normalizeUserText(typeof payload.message === "string" ? payload.message : "");
+    const history = sanitizeHistory(payload.history);
 
-    if (!message) {
-      return json(origin, 400, { error: localizedError(lang, "No message provided.", "No se proporcionó ningún mensaje."), lang });
-    }
+    if (!message) return json(origin, 400, { ok: false, error: "No message provided.", lang, request_id: reqId });
+    if (looksSuspicious(message)) return json(origin, 400, { ok: false, error: "Request blocked.", lang, request_id: reqId });
 
-    // Sanitization
-    if (looksSuspicious(bodyText) || looksSuspicious(message)) {
-      await logEvent(ctx, env, { type: "SANITIZE_BLOCK", ip: clientIp, reason: "pattern" });
-      return json(origin, 400, { error: localizedError(lang, "Request blocked by OPS security gateway.", "Solicitud bloqueada por el gateway de seguridad OPS."), lang });
-    }
-
-    // Optional AI guard
-    const guard = await aiGuardIfAvailable(env, message);
-    if (!guard.ok) {
-      await logEvent(ctx, env, { type: "SANITIZE_BLOCK", ip: clientIp, reason: "ai-guard" });
-      return json(origin, 400, { error: localizedError(lang, "Request blocked by OPS safety gateway.", "Solicitud bloqueada por el gateway de seguridad OPS."), lang });
-    }
-
-    // Gateway -> Brain secret
-    const handShake = (env.HAND_SHAKE || "").toString();
-    if (!handShake) {
-      return json(origin, 500, { error: localizedError(lang, "Gateway config error (missing HAND_SHAKE).", "Error de configuración del gateway (falta HAND_SHAKE)."), lang });
-    }
-
-    // Must have service binding
-    if (!env.BRAIN || typeof env.BRAIN.fetch !== "function") {
-      return json(origin, 500, { error: localizedError(lang, "Gateway config error (missing BRAIN binding).", "Error de configuración del gateway (falta la vinculación BRAIN)."), lang });
-    }
-
-    // Forward to brain (HMAC signed, anti-replay)
-    const brainBody = JSON.stringify({ message, lang, v });
-    const ts = Date.now().toString();
-    const sig = await hmacSha256Hex(handShake, `${ts}.${brainBody}`);
-
-    let brainRes;
-    try {
-      brainRes = await env.BRAIN.fetch(BRAIN_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Ops-Ts": ts,
-          "X-Ops-Sig": sig
-        },
-        body: brainBody
+    // 7) PCI-ish DLP: never accept card numbers
+    if (containsLikelyCardNumber(message) || containsLikelyCardNumber(bodyText)) {
+      await logEvent(ctx, env, { type: "DLP_BLOCK_CARD", ip: clientIp });
+      return json(origin, 400, {
+        ok: false,
+        lang,
+        request_id: reqId,
+        error: lang === "es"
+          ? "Por seguridad, no compartas datos de tarjeta en el chat. Usa la página de contacto del sitio."
+          : "For security, do not share card details in chat. Please use the site contact page."
       });
-    } catch (err) {
-      console.error("Gateway -> Brain error:", err);
-      await logEvent(ctx, env, { type: "BRAIN_UNREACHABLE", ip: clientIp });
-      return json(origin, 502, { error: localizedError(lang, "Gateway could not reach brain.", "El gateway no pudo conectarse con el cerebro."), lang });
     }
 
-    const responseText = await brainRes.text();
-    let out = null;
-    try { out = JSON.parse(responseText); } catch { out = null; }
-
-    if (!out || typeof out !== "object") {
-      await logEvent(ctx, env, { type: "BRAIN_BAD_JSON", ip: clientIp });
-      return json(origin, 502, { error: localizedError(lang, "Brain returned invalid JSON.", "El cerebro devolvió JSON no válido."), lang });
+    // 8) FIREWALL llama-guard on the user message (required)
+    const fw = await firewallCheck(env, message);
+    if (!fw.ok) {
+      await logEvent(ctx, env, { type: "FIREWALL_BLOCK", ip: clientIp });
+      return json(origin, 400, { ok: false, error: "Request blocked.", lang, request_id: reqId });
     }
 
-    // Always return JSON with gateway headers
-    return json(origin, brainRes.status, { ...out, lang });
+    // 9) Forward upstream (turnstile removed)
+    const cleanPayload = { lang, message, history, v: 3 };
+    const rawUpstream = new TextEncoder().encode(JSON.stringify(cleanPayload)).buffer;
+
+    return proxyJsonToBrain(origin, request, env, ctx, "/api/ops-online-chat", rawUpstream, reqId);
   }
 };
-
-/* -------------------- Durable Object: Rate Limiter -------------------- */
-/**
- * Limits:
- *  - Burst: 5 requests / 10 seconds
- *  - Sustained: 60 requests / 5 minutes
- *
- * Bind this DO in the Gateway Worker:
- *   Binding name: OPS_RL
- *   Class name:   OpsRateLimiter
- */
-export class OpsRateLimiter {
-  constructor(state, env) {
-    this.state = state;
-    this.storage = state.storage;
-    this.env = env;
-  }
-
-  async fetch(request) {
-    const url = new URL(request.url);
-    if (request.method !== "POST" || url.pathname !== "/check") {
-      return new Response("Not found", { status: 404 });
-    }
-
-    const now = Date.now();
-
-    const burstLimit = 5;
-    const burstWindowMs = 10_000;
-
-    const sustainedLimit = 60;
-    const minuteMs = 60_000;
-    const windowMinutes = 5;
-
-    const burstBucket = Math.floor(now / burstWindowMs);
-    const minuteBucket = Math.floor(now / minuteMs);
-
-    const kBurst = `b:${burstBucket}`;
-    const kMinute = (i) => `m:${minuteBucket - i}`;
-
-    const burstCount = Number(await this.storage.get(kBurst) || 0);
-
-    const keys = [];
-    for (let i = 0; i < windowMinutes; i++) keys.push(kMinute(i));
-    const got = await this.storage.get(keys);
-
-    let sum = 0;
-    for (const k of keys) sum += Number(got?.get?.(k) || 0);
-
-    const currentMinute = Number(got?.get?.(kMinute(0)) || 0);
-
-    const nextBurst = burstCount + 1;
-    const nextMinute = currentMinute + 1;
-    const nextSum = (sum - currentMinute) + nextMinute;
-
-    if (nextBurst > burstLimit) {
-      return new Response(JSON.stringify({ ok: false, retryAfter: 10 }), {
-        status: 200,
-        headers: { "content-type": "application/json" }
-      });
-    }
-
-    if (nextSum > sustainedLimit) {
-      return new Response(JSON.stringify({ ok: false, retryAfter: 30 }), {
-        status: 200,
-        headers: { "content-type": "application/json" }
-      });
-    }
-
-    await this.storage.put(kBurst, nextBurst);
-    await this.storage.put(kMinute(0), nextMinute);
-
-    // Cleanup old buckets (best effort)
-    await this.storage.delete([
-      `b:${burstBucket - 4}`,
-      `b:${burstBucket - 5}`,
-      `m:${minuteBucket - 11}`,
-      `m:${minuteBucket - 12}`
-    ]);
-
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "content-type": "application/json" }
-    });
-  }
-}

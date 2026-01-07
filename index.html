@@ -39,6 +39,15 @@
     </div>
   </noscript>
 
+  <div
+    id="live-region"
+    role="status"
+    aria-live="assertive"
+    data-en=""
+    data-es=""
+    style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;clip:rect(1px, 1px, 1px, 1px);">
+  </div>
+
   <div class="shell app-shell">
     <div class="layout">
       <main class="panel" role="main" id="chat-root">
@@ -266,7 +275,13 @@
           <span data-en="Copy" data-es="Copiar">Copy</span>
         </button>
 
-        <button type="button" id="clearTranscript" class="pill-btn accent" aria-label="Clear transcript">
+        <button
+          type="button"
+          id="clearTranscript"
+          class="pill-btn accent"
+          aria-label="Clear transcript"
+          data-en-label="Clear transcript"
+          data-es-label="Limpiar transcripción">
           <span data-en="Clear Transcript" data-es="Limpiar transcripción">Clear Transcript</span>
         </button>
       </div>
