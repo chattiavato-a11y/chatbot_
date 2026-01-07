@@ -1,799 +1,600 @@
-/* assets/chattia-ui.js */
+/* assets/chattia-ui.js
+   OPS Online Support — Chattia UI Controller (v2)
+   - No external libs
+   - Handles:
+     - Language toggle (expects assets/chattia-head-lang.js sets <html lang>)
+     - Theme toggle (expects assets/chattia-theme.css + localStorage key)
+     - Privacy/Consent modal (localStorage consent gate)
+     - Transcript drawer (right-to-left)
+     - Chat send -> OPS Gateway (/api/ops-online-chat)
+     - Minimal client-side sanitization (UI-level) + honeypots
+     - Asset ID header (X-Ops-Asset-Id) from meta tag
+
+   REQUIRED in index.html:
+   - <meta name="ops-gateway" content="https://ops-gateway.grabem-holdem-nuts-right.workers.dev">
+   - <meta name="ops-asset-id" content="YOUR_ASSET_ID_VALUE">
+   - Basic elements with IDs used below (see selectors)
+*/
+
 (() => {
   "use strict";
 
-  const qs  = (s) => document.querySelector(s);
+  /* -------------------- Config keys -------------------- */
 
-  const ASSET_ID = "CAFF600A21B457E5D909FD887AF48018B3CBFDDF6F9746E56238B23AF061F9E2";
-  const GATEWAY_ORIGIN = "https://ops-gateway.grabem-holdem-nuts-right.workers.dev";
-  const API_URL = `${GATEWAY_ORIGIN}/api/ops-online-chat`;
-  const TELEMETRY_URL = `${GATEWAY_ORIGIN}/reports/telemetry`;
-
-  const AUTH_RULES = [
-    { origin: "https://chattiavato-a11y.github.io", pathPrefixes: ["/ops-online-support", "/ops-online-support/"] },
-    { origin: "https://www.chattia.io", pathPrefixes: ["/"] },
-    { origin: "https://chattia.io", pathPrefixes: ["/"] }
-  ];
-
-  const MAX_INPUT_CHARS = 256;
-
-  const log = qs("#chat-log");
-  const form = qs("#chatbot-input-row");
-  const input = qs("#chatbot-input");
-  const sendBtn = qs("#chatbot-send");
-
-  const liveRegion = qs("#live-region");
-
-  const listenCtrl = qs("#listenCtrl");
-  const voiceStatus = qs("#voice-status");
-
-  const netDot = qs("#netDot");
-  const netText = qs("#netText");
-
-  const consentBanner = qs("#consent-banner");
-  const consentAccept = qs("#consent-accept");
-  const consentDeny = qs("#consent-deny");
-  const consentNote = qs("#consent-note");
-
-  const hpEmail = qs("#hp_email");
-  const hpWebsite = qs("#hp_website");
-
-  const clearChatBtn = qs("#clearChat");
-
-  const transcriptTrigger = qs("#transcriptTrigger");
-  const transcriptDrawer = qs("#transcriptDrawer");
-  const transcriptOverlay = qs("#transcriptOverlay");
-  const transcriptClose = qs("#transcriptClose");
-  const transcriptList = qs("#transcriptList");
-  const transcriptCopy = qs("#transcript-copy");
-  const clearTranscriptBtn = qs("#clearTranscript");
-
-  const privacyTrigger = qs("#privacyTrigger");
-  const termsTrigger = qs("#termsTrigger");
-  const policyOverlay = qs("#policyOverlay");
-  const policyModal = qs("#policyModal");
-  const btnClosePolicy = qs("#btnClosePolicy");
-  const btnAcceptPrivacy = qs("#btnAcceptPrivacy");
-  const btnDenyPrivacy = qs("#btnDenyPrivacy");
-
-  const prefsApi = window.OPS_PREFS;
-
-  const CONSENT_KEY = "ops-chat-consent";
-  let currentLang = prefsApi?.getLang?.() || (document.documentElement.lang === "es" ? "es" : "en");
-  let currentTheme = prefsApi?.getTheme?.() || (document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
-  let consentState = "pending";
-
-  const transcript = [];
-
-  const I18N = {
-    ready: { en: "Ready", es: "Listo" },
-    sending: { en: "Sending…", es: "Enviando…" },
-    statusError: { en: "Error", es: "Error" },
-    offline: { en: "Offline", es: "Sin conexión" },
-    welcome: {
-      en: "Chattia for OPS is ready. Type or use the mic to chat.",
-      es: "Chattia para OPS está listo. Escribe o usa el micrófono para chatear."
-    },
-    transcriptEmpty: { en: "No transcript yet.", es: "No hay transcripción todavía." },
-    roleUser: { en: "End User", es: "Usuario" },
-    roleBot: { en: "Chatbot", es: "Chatbot" },
-    listening: { en: "Listening…", es: "Escuchando…" },
-    voiceUnavailable: {
-      en: "Voice input not available in this browser.",
-      es: "La entrada de voz no está disponible en este navegador."
-    },
-    repeatPrompt: {
-      en: "My apologies, would you please repeat that? I'm sorry, I didn't get that.",
-      es: "Disculpame, ¿podrías repetir eso? No te escuché."
-    },
-    unauthorized: {
-      en: "This assistant only accepts messages from authorized sites.",
-      es: "Este asistente solo acepta mensajes desde sitios autorizados."
-    },
-    suspiciousBlocked: {
-      en: "Message blocked for security. Please write without tags or scripts.",
-      es: "Mensaje bloqueado por seguridad. Escribe sin etiquetas o scripts."
-    },
-    gatewayError: { en: "OPS gateway error.", es: "Error del gateway de OPS." },
-    noReply: { en: "No reply.", es: "Sin respuesta." },
-    networkError: { en: "Can’t reach OPS assistant.", es: "No puedo conectar con el asistente OPS." },
-    consentDeniedLive: {
-      en: "Consent denied. Chat is disabled until you accept privacy terms.",
-      es: "Consentimiento rechazado. El chat está deshabilitado hasta que aceptes la privacidad."
-    },
-    networkErrorLive: {
-      en: "Network error. Please check your connection and try again.",
-      es: "Error de red. Verifica tu conexión y vuelve a intentarlo."
-    }
+  const LS = {
+    THEME: "ops_theme",           // "dark" | "light"
+    LANG: "ops_lang",             // "en" | "es"
+    CONSENT: "ops_consent_v1",    // "accept" | "deny"
+    TRANSCRIPT: "ops_transcript"  // JSON array (local only)
   };
 
-  const clamp = (s, n) => (typeof s === "string" ? s.slice(0, n) : "");
-  const safeText = (s) => clamp(String(s || ""), MAX_INPUT_CHARS);
+  const LIMITS = {
+    MAX_MSG_CHARS: 256,
+    MAX_HISTORY_ITEMS: 12
+  };
 
-  function t(key, lang = currentLang) {
-    const entry = I18N[key];
-    if (!entry) return "";
-    return (lang === "es") ? entry.es : entry.en;
-  }
+  /* -------------------- DOM helpers -------------------- */
 
-  function setCustomText(el, text) {
-    if (!el) return;
-    const normalized = String(text || "");
-    el.dataset.en = normalized;
-    el.dataset.es = normalized;
-    el.textContent = normalized;
-  }
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-  function setTextWithDataset(el, key, lang = currentLang) {
-    const entry = I18N[key];
-    if (!el || !entry) return "";
-    const text = (lang === "es") ? entry.es : entry.en;
-    el.dataset.en = entry.en;
-    el.dataset.es = entry.es;
-    el.textContent = text;
-    return text;
-  }
-
-  function setLiveMessage(key) {
-    if (!liveRegion || !I18N[key]) return;
-    setTextWithDataset(liveRegion, key);
-  }
-
-  function clearLiveMessage() {
-    if (!liveRegion) return;
-    setCustomText(liveRegion, "");
-  }
-
-  function setNet(ok, statusKey, overrideText) {
-    if (!netDot || !netText) return;
-    netDot.style.background = ok ? "rgba(44,242,162,.9)" : "rgba(255,59,143,.9)";
-
-    if (statusKey && I18N[statusKey]) {
-      setTextWithDataset(netText, statusKey);
-    } else if (overrideText) {
-      setCustomText(netText, overrideText);
+  function el(tag, attrs = {}, children = []) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = String(v);
+      else if (k.startsWith("aria-")) n.setAttribute(k, String(v));
+      else if (k === "html") n.innerHTML = String(v);
+      else n.setAttribute(k, String(v));
     }
+    for (const c of children) n.appendChild(c);
+    return n;
   }
+
+  /* -------------------- Safe text helpers (UI-level) -------------------- */
 
   function normalizeUserText(s) {
-    return safeText(s).replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
+    let out = String(s || "");
+    out = out.replace(/[\u0000-\u001F\u007F]/g, " ");
+    out = out.replace(/\s+/g, " ").trim();
+    if (out.length > LIMITS.MAX_MSG_CHARS) out = out.slice(0, LIMITS.MAX_MSG_CHARS);
+    return out;
   }
 
   function looksSuspicious(s) {
-    const x = String(s || "").toLowerCase();
-    return [
-      "<script", "</script", "javascript:", "<img", "onerror", "onload", "<iframe", "<object", "<embed",
-      "<svg", "<link", "<meta", "<style", "document.cookie", "onmouseover", "onmouseenter", "<form", "<input", "<textarea"
-    ].some((p) => x.includes(p));
+    const t = String(s || "").toLowerCase();
+    const bad = [
+      "<script", "</script", "javascript:",
+      "<img", "onerror", "onload",
+      "<iframe", "<object", "<embed",
+      "<svg", "<link", "<meta", "<style",
+      "document.cookie",
+      "onmouseover", "onmouseenter",
+      "<form", "<input", "<textarea"
+    ];
+    return bad.some(p => t.includes(p));
   }
 
-  function isFullyAuthorized() {
+  /* -------------------- Meta config -------------------- */
+
+  function getMeta(name) {
+    const m = document.querySelector(`meta[name="${name}"]`);
+    return m ? (m.getAttribute("content") || "") : "";
+  }
+
+  const GATEWAY_BASE = (getMeta("ops-gateway") || "").replace(/\/+$/, "");
+  const ASSET_ID = (getMeta("ops-asset-id") || "").trim();
+
+  function requireConfigOrThrow() {
+    if (!GATEWAY_BASE) throw new Error("Missing meta[name=ops-gateway].");
+    if (!ASSET_ID) throw new Error("Missing meta[name=ops-asset-id].");
+  }
+
+  /* -------------------- UI selectors (IDs expected) -------------------- */
+
+  const UI = {
+    // Chat
+    messages: $("#messages"),
+    composer: $("#composer"),
+    sendBtn: $("#sendBtn"),
+    statusPill: $("#statusPill"),
+    langBtn: $("#langBtn"),
+    themeBtn: $("#themeBtn"),
+    transcriptBtn: $("#transcriptBtn"),
+
+    // Drawer
+    drawer: $("#transcriptDrawer"),
+    drawerBody: $("#drawerBody"),
+    drawerClose: $("#drawerClose"),
+    drawerClear: $("#drawerClear"),
+    backdrop: $("#backdrop"),
+
+    // Consent modal
+    consentModal: $("#consentModal"),
+    consentAccept: $("#consentAccept"),
+    consentDeny: $("#consentDeny"),
+    consentClose: $("#consentClose"),
+
+    // FABs
+    fabChatbot: $("#fabChatbot"),
+    fabContact: $("#fabContact"),
+    fabJoin: $("#fabJoin")
+  };
+
+  /* -------------------- State -------------------- */
+
+  const state = {
+    lang: (document.documentElement.lang === "es") ? "es" : "en",
+    theme: "dark",
+    consent: "deny",
+    transcript: [] // { role, content, ts }
+  };
+
+  /* -------------------- Copy (EN/ES) -------------------- */
+
+  const COPY = {
+    en: {
+      online: "Online",
+      offline: "Offline",
+      sending: "Sending…",
+      blocked: "Blocked",
+      consentTitle: "Privacy & Consent",
+      consentBody:
+        "This chat is for general information about OPS Online Support. Please do not share sensitive personal data (passwords, OTP codes, bank or card details). Messages may be processed to provide the chat experience. If you do not consent, chat will be disabled until you accept.",
+      accept: "Accept",
+      deny: "Deny",
+      close: "Close",
+      transcriptTitle: "Transcript",
+      clear: "Clear",
+      emptyTranscript: "No messages yet.",
+      placeholder: "Type your message…",
+      send: "Send",
+      mustConsent: "To use chat, please accept Privacy & Consent.",
+      badInput: "Message blocked. Please remove unsafe content.",
+      configError: "Site configuration error."
+    },
+    es: {
+      online: "En línea",
+      offline: "Fuera de línea",
+      sending: "Enviando…",
+      blocked: "Bloqueado",
+      consentTitle: "Privacidad y consentimiento",
+      consentBody:
+        "Este chat es para información general sobre OPS Online Support. No compartas datos sensibles (contraseñas, códigos, banco o tarjetas). Los mensajes pueden procesarse para brindar la experiencia de chat. Si no das consentimiento, el chat quedará deshabilitado hasta que aceptes.",
+      accept: "Aceptar",
+      deny: "Denegar",
+      close: "Cerrar",
+      transcriptTitle: "Transcripción",
+      clear: "Borrar",
+      emptyTranscript: "Aún no hay mensajes.",
+      placeholder: "Escribe tu mensaje…",
+      send: "Enviar",
+      mustConsent: "Para usar el chat, acepta Privacidad y consentimiento.",
+      badInput: "Mensaje bloqueado. Elimina contenido inseguro.",
+      configError: "Error de configuración del sitio."
+    }
+  };
+
+  function t(key) {
+    const d = COPY[state.lang] || COPY.en;
+    return d[key] || COPY.en[key] || "";
+  }
+
+  /* -------------------- Storage helpers -------------------- */
+
+  function readLS(key, fallback = "") {
+    try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
+  }
+  function writeLS(key, value) {
+    try { localStorage.setItem(key, String(value)); } catch {}
+  }
+
+  function loadTranscript() {
+    const raw = readLS(LS.TRANSCRIPT, "");
+    if (!raw) return [];
     try {
-      const origin = window.location.origin;
-      const path = window.location.pathname || "/";
-      return AUTH_RULES.some((r) => r.origin === origin && (r.pathPrefixes || ["/"]).some((pref) => path.startsWith(pref)));
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter(x => x && typeof x === "object")
+        .slice(-200); // keep local history bounded
     } catch {
-      return false;
+      return [];
     }
   }
 
-  function setChatEnabled(enabled) {
-    if (input) input.disabled = !enabled;
-    if (sendBtn) sendBtn.disabled = !enabled;
-    if (listenCtrl) listenCtrl.disabled = !enabled;
-    if (consentNote) consentNote.hidden = enabled;
+  function saveTranscript() {
+    try {
+      writeLS(LS.TRANSCRIPT, JSON.stringify(state.transcript.slice(-200)));
+    } catch {}
   }
+
+  /* -------------------- Theme -------------------- */
+
+  function applyTheme(theme) {
+    const th = (theme === "light") ? "light" : "dark";
+    state.theme = th;
+    document.documentElement.setAttribute("data-theme", th);
+    writeLS(LS.THEME, th);
+
+    // Update toggle UI if present
+    const isOn = (th === "dark");
+    if (UI.themeBtn) {
+      UI.themeBtn.classList.toggle("is-on", isOn);
+      UI.themeBtn.setAttribute("aria-pressed", String(isOn));
+    }
+  }
+
+  /* -------------------- Language -------------------- */
+
+  function applyLang(lang) {
+    const lg = (lang === "es") ? "es" : "en";
+    state.lang = lg;
+    document.documentElement.lang = lg;
+    writeLS(LS.LANG, lg);
+
+    // placeholder / labels (if elements exist)
+    if (UI.composer) UI.composer.setAttribute("placeholder", t("placeholder"));
+    if (UI.sendBtn) UI.sendBtn.textContent = t("send");
+
+    // modal content
+    const title = $("#consentTitle");
+    const body = $("#consentBody");
+    if (title) title.textContent = t("consentTitle");
+    if (body) body.textContent = t("consentBody");
+    if (UI.consentAccept) UI.consentAccept.textContent = t("accept");
+    if (UI.consentDeny) UI.consentDeny.textContent = t("deny");
+    if (UI.consentClose) UI.consentClose.textContent = t("close");
+
+    const drTitle = $("#drawerTitle");
+    if (drTitle) drTitle.textContent = t("transcriptTitle");
+    if (UI.drawerClear) UI.drawerClear.textContent = t("clear");
+
+    // FAB labels (optional)
+    const fabChatLabel = $("#fabChatLabel");
+    const fabContactLabel = $("#fabContactLabel");
+    const fabJoinLabel = $("#fabJoinLabel");
+    if (fabChatLabel) fabChatLabel.textContent = "Chatbot";
+    if (fabContactLabel) fabContactLabel.textContent = "Contact";
+    if (fabJoinLabel) fabJoinLabel.textContent = "Join Us";
+    // (Keep labels consistent; pages handle EN/ES content)
+  }
+
+  /* -------------------- Consent -------------------- */
 
   function readConsent() {
-    try { return localStorage.getItem(CONSENT_KEY) || "pending"; }
-    catch { return "pending"; }
+    const c = readLS(LS.CONSENT, "deny");
+    return (c === "accept") ? "accept" : "deny";
   }
 
-  function persistConsent(value) {
-    try { localStorage.setItem(CONSENT_KEY, value); } catch {}
+  function setConsent(val) {
+    const v = (val === "accept") ? "accept" : "deny";
+    state.consent = v;
+    writeLS(LS.CONSENT, v);
   }
 
-  function applyConsentUI() {
-    const hide = (consentState === "accepted" || consentState === "denied");
-    if (consentBanner) {
-      consentBanner.style.display = hide ? "none" : "flex";
-      consentBanner.setAttribute("aria-hidden", hide ? "true" : "false");
-    }
+  function openConsentModal() {
+    if (!UI.consentModal) return;
+    UI.consentModal.classList.add("is-open");
+    UI.consentModal.setAttribute("aria-hidden", "false");
   }
 
-  function handleConsent(next) {
-    consentState = next;
-    persistConsent(next);
-
-    if (next === "accepted") {
-      prefsApi?.setPersistenceAllowed(true);
-      setChatEnabled(true);
-      clearLiveMessage();
-    } else if (next === "denied") {
-      prefsApi?.setPersistenceAllowed(false);
-      setChatEnabled(false);
-      setLiveMessage("consentDeniedLive");
-    }
-
-    applyConsentUI();
+  function closeConsentModal() {
+    if (!UI.consentModal) return;
+    UI.consentModal.classList.remove("is-open");
+    UI.consentModal.setAttribute("aria-hidden", "true");
   }
 
-  let releasePolicyTrap = null;
-  let releaseTranscriptTrap = null;
-  let lastFocusPolicy = null;
-  let lastFocusTranscript = null;
+  function ensureConsentOrPrompt() {
+    if (state.consent === "accept") return true;
+    openConsentModal();
+    status(t("mustConsent"), "warn");
+    return false;
+  }
 
-  function trapFocus(container) {
-    if (!container) return () => {};
-    const getFocusable = () => {
-      const nodes = container.querySelectorAll(
-        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      );
-      return [...nodes].filter(el => !el.hasAttribute("hidden") && el.offsetParent !== null);
+  /* -------------------- Status pill -------------------- */
+
+  function status(text, level = "ok") {
+    if (!UI.statusPill) return;
+    UI.statusPill.textContent = String(text || "");
+    UI.statusPill.dataset.level = level;
+  }
+
+  /* -------------------- Transcript + message rendering -------------------- */
+
+  function pushTranscript(role, content) {
+    const msg = {
+      role: (role === "assistant") ? "assistant" : "user",
+      content: String(content || ""),
+      ts: new Date().toISOString()
     };
+    state.transcript.push(msg);
+    saveTranscript();
+  }
 
-    function onKeyDown(e) {
-      if (e.key !== "Tab") return;
-      const focusables = getFocusable();
-      if (!focusables.length) return;
+  function renderMessage(role, content) {
+    if (!UI.messages) return;
 
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
+    const safeRole = (role === "assistant") ? "assistant" : "user";
+    const wrap = el("div", { class: `msg ${safeRole}` });
+    const bubble = el("div", { class: "bubble", text: String(content || "") });
+    const stamp = el("div", { class: "stamp", text: new Date().toLocaleString() });
 
-      if (e.shiftKey) {
-        if (document.activeElement === first || document.activeElement === container) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
+    wrap.appendChild(bubble);
+    wrap.appendChild(stamp);
+    UI.messages.appendChild(wrap);
+    UI.messages.scrollTop = UI.messages.scrollHeight;
+  }
+
+  function rebuildChatFromTranscript() {
+    if (!UI.messages) return;
+    UI.messages.innerHTML = "";
+    for (const m of state.transcript.slice(-50)) {
+      renderMessage(m.role, m.content);
     }
-
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
   }
 
-  function openPolicyModal(anchorId) {
-    if (!policyModal || !policyOverlay) return;
+  function rebuildDrawer() {
+    if (!UI.drawerBody) return;
 
-    lastFocusPolicy = document.activeElement;
-
-    policyModal.hidden = false;
-    policyOverlay.classList.add("open");
-    policyOverlay.setAttribute("aria-hidden", "false");
-
-    try { releasePolicyTrap?.(); } catch {}
-    releasePolicyTrap = trapFocus(policyModal);
-
-    if (anchorId) {
-      const target = policyModal.querySelector(`#${anchorId}`);
-      target?.scrollIntoView?.({ block: "start", behavior: "smooth" });
-    }
-
-    (btnAcceptPrivacy || btnClosePolicy || policyModal.querySelector("button, [href], input, textarea, select, [tabindex]:not([tabindex='-1'])"))?.focus?.();
-  }
-
-  function closePolicyModal() {
-    if (!policyModal || !policyOverlay) return;
-
-    policyModal.hidden = true;
-    policyOverlay.classList.remove("open");
-    policyOverlay.setAttribute("aria-hidden", "true");
-
-    try { releasePolicyTrap?.(); } catch {}
-    releasePolicyTrap = null;
-
-    try { lastFocusPolicy?.focus?.(); } catch {}
-    lastFocusPolicy = null;
-  }
-
-  function acceptPrivacy() { handleConsent("accepted"); closePolicyModal(); }
-  function denyPrivacy() { handleConsent("denied"); closePolicyModal(); }
-
-  function renderTranscriptList() {
-    if (!transcriptList) return;
-    transcriptList.textContent = "";
-
-    if (!transcript.length) {
-      const empty = document.createElement("div");
-      empty.className = "transcript-empty";
-      setTextWithDataset(empty, "transcriptEmpty");
-      transcriptList.appendChild(empty);
+    const items = state.transcript.slice(-150);
+    if (!items.length) {
+      UI.drawerBody.textContent = t("emptyTranscript");
       return;
     }
 
-    transcript.forEach((item) => {
-      const row = document.createElement("div");
-      row.className = "transcript-row";
+    UI.drawerBody.innerHTML = "";
+    for (const m of items) {
+      const line = el("div", { class: "bubble", text: `${m.role === "user" ? "End User" : "Chatbot"}: ${m.content}` });
+      line.style.marginBottom = "10px";
+      UI.drawerBody.appendChild(line);
+    }
+  }
 
-      const who = document.createElement("div");
-      who.className = "transcript-who";
-      const whoKey = item.role === "user" ? "roleUser" : "roleBot";
-      setTextWithDataset(who, whoKey);
+  /* -------------------- Drawer controls -------------------- */
 
-      const txt = document.createElement("div");
-      txt.className = "transcript-text";
-      txt.textContent = item.text;
+  function openDrawer() {
+    if (!UI.drawer || !UI.backdrop) return;
+    UI.drawer.classList.add("is-open");
+    UI.backdrop.classList.add("is-on");
+    UI.drawer.setAttribute("aria-hidden", "false");
+    rebuildDrawer();
+  }
 
-      row.appendChild(who);
-      row.appendChild(txt);
-      transcriptList.appendChild(row);
+  function closeDrawer() {
+    if (!UI.drawer || !UI.backdrop) return;
+    UI.drawer.classList.remove("is-open");
+    UI.backdrop.classList.remove("is-on");
+    UI.drawer.setAttribute("aria-hidden", "true");
+  }
+
+  function clearTranscript() {
+    state.transcript = [];
+    saveTranscript();
+    rebuildChatFromTranscript();
+    rebuildDrawer();
+  }
+
+  /* -------------------- Gateway call -------------------- */
+
+  function buildHistoryForGateway() {
+    // Convert local transcript -> gateway history
+    // Keep within LIMITS.MAX_HISTORY_ITEMS
+    const last = state.transcript.slice(-LIMITS.MAX_HISTORY_ITEMS);
+    return last.map(m => ({
+      role: (m.role === "assistant") ? "assistant" : "user",
+      content: normalizeUserText(m.content)
+    }));
+  }
+
+  async function sendToGateway(message) {
+    requireConfigOrThrow();
+
+    const url = `${GATEWAY_BASE}/api/ops-online-chat`;
+    const payload = {
+      lang: state.lang,
+      message,
+      history: buildHistoryForGateway(),
+      // Honeypots: must be empty
+      hp_email: "",
+      hp_website: ""
+    };
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "X-Ops-Asset-Id": ASSET_ID
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const text = await res.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch {}
+
+    if (!res.ok) {
+      const msg = (data && (data.error || data.message)) ? String(data.error || data.message) : `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+
+    const reply = (data && typeof data.reply === "string") ? data.reply : "";
+    return reply || "";
+  }
+
+  /* -------------------- Main chat flow -------------------- */
+
+  let isSending = false;
+
+  async function onSend() {
+    if (isSending) return;
+    if (!UI.composer) return;
+    if (!ensureConsentOrPrompt()) return;
+
+    const raw = normalizeUserText(UI.composer.value || "");
+    if (!raw) return;
+
+    // UI-level suspicious block (server also blocks)
+    if (looksSuspicious(raw)) {
+      status(t("badInput"), "warn");
+      return;
+    }
+
+    // Update UI immediately
+    UI.composer.value = "";
+    renderMessage("user", raw);
+    pushTranscript("user", raw);
+
+    isSending = true;
+    status(t("sending"), "busy");
+    if (UI.sendBtn) UI.sendBtn.disabled = true;
+
+    try {
+      const reply = await sendToGateway(raw);
+
+      // If empty, fallback UI message
+      const finalReply = reply || (state.lang === "es"
+        ? "Gracias. Para continuar, usa la página de Contacto o Carreras/Únete en opsonlinesupport.com."
+        : "Thanks. To continue, please use the Contact or Careers/Join Us section on opsonlinesupport.com.");
+
+      renderMessage("assistant", finalReply);
+      pushTranscript("assistant", finalReply);
+      status(t("online"), "ok");
+    } catch (e) {
+      console.error(e);
+      renderMessage("assistant", state.lang === "es"
+        ? "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o usa la página de Contacto."
+        : "There was a problem connecting to the assistant. Please try again or use the Contact page.");
+      pushTranscript("assistant", state.lang === "es"
+        ? "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o usa la página de Contacto."
+        : "There was a problem connecting to the assistant. Please try again or use the Contact page.");
+      status(t("offline"), "warn");
+    } finally {
+      isSending = false;
+      if (UI.sendBtn) UI.sendBtn.disabled = false;
+    }
+  }
+
+  /* -------------------- Event wiring -------------------- */
+
+  function wireEvents() {
+    // Send
+    if (UI.sendBtn) UI.sendBtn.addEventListener("click", onSend);
+    if (UI.composer) {
+      UI.composer.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          onSend();
+        }
+      });
+    }
+
+    // Transcript drawer
+    if (UI.transcriptBtn) UI.transcriptBtn.addEventListener("click", openDrawer);
+    if (UI.drawerClose) UI.drawerClose.addEventListener("click", closeDrawer);
+    if (UI.backdrop) UI.backdrop.addEventListener("click", closeDrawer);
+    if (UI.drawerClear) UI.drawerClear.addEventListener("click", () => {
+      clearTranscript();
+      closeDrawer();
+    });
+
+    // Consent modal open (nav link)
+    const privacyBtn = $("#privacyBtn");
+    if (privacyBtn) privacyBtn.addEventListener("click", () => openConsentModal());
+
+    if (UI.consentAccept) UI.consentAccept.addEventListener("click", () => {
+      setConsent("accept");
+      closeConsentModal();
+      status(t("online"), "ok");
+    });
+
+    if (UI.consentDeny) UI.consentDeny.addEventListener("click", () => {
+      setConsent("deny");
+      closeConsentModal();
+      status(t("offline"), "warn");
+    });
+
+    if (UI.consentClose) UI.consentClose.addEventListener("click", () => closeConsentModal());
+
+    // Theme toggle
+    if (UI.themeBtn) UI.themeBtn.addEventListener("click", () => {
+      applyTheme(state.theme === "dark" ? "light" : "dark");
+    });
+
+    // Language toggle
+    if (UI.langBtn) UI.langBtn.addEventListener("click", () => {
+      applyLang(state.lang === "en" ? "es" : "en");
+      // Re-render drawer title + empty state if needed
+      rebuildDrawer();
+    });
+
+    // FABs
+    if (UI.fabChatbot) UI.fabChatbot.addEventListener("click", () => {
+      // focus composer
+      if (UI.composer) UI.composer.focus();
+    });
+
+    // Contact + Join must go to nav menu links (pages)
+    if (UI.fabContact) UI.fabContact.addEventListener("click", () => {
+      const a = $("#navContact");
+      if (a && a.getAttribute("href")) window.location.href = a.getAttribute("href");
+    });
+
+    if (UI.fabJoin) UI.fabJoin.addEventListener("click", () => {
+      const a = $("#navJoin");
+      if (a && a.getAttribute("href")) window.location.href = a.getAttribute("href");
+    });
+
+    // ESC closes drawer/modals
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      closeDrawer();
+      closeConsentModal();
     });
   }
 
-  function recordTranscript(role, text) {
-    if (!text) return;
-    transcript.push({ role, text, ts: Date.now() });
-    renderTranscriptList();
-  }
+  /* -------------------- Init -------------------- */
 
-  function copyTranscriptNow() {
-    const txt = transcript.map((item) => {
-      const roleLabel = t(item.role === "user" ? "roleUser" : "roleBot");
-      return `${roleLabel}: ${item.text}`;
-    }).join("\n\n");
-    if (!txt) return;
+  function init() {
+    // Load persisted state
+    state.theme = readLS(LS.THEME, "dark") === "light" ? "light" : "dark";
+    state.lang = readLS(LS.LANG, document.documentElement.lang === "es" ? "es" : "en");
+    state.consent = readConsent();
+    state.transcript = loadTranscript();
 
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(txt).catch(() => {});
-      return;
-    }
+    applyTheme(state.theme);
+    applyLang(state.lang);
 
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = txt;
-      ta.setAttribute("readonly", "true");
-      ta.style.position = "absolute";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    } catch {}
-  }
+    // Build UI from transcript
+    rebuildChatFromTranscript();
+    rebuildDrawer();
 
-  function openTranscriptDrawer() {
-    if (!transcriptDrawer || !transcriptOverlay) return;
-
-    lastFocusTranscript = document.activeElement;
-
-    transcriptDrawer.hidden = false;
-    transcriptDrawer.classList.add("open");
-    transcriptOverlay.classList.add("open");
-    transcriptOverlay.setAttribute("aria-hidden", "false");
-
-    renderTranscriptList();
-
-    try { releaseTranscriptTrap?.(); } catch {}
-    releaseTranscriptTrap = trapFocus(transcriptDrawer);
-
-    transcriptClose?.focus?.();
-  }
-
-  function closeTranscriptDrawer() {
-    if (!transcriptDrawer || !transcriptOverlay) return;
-
-    transcriptDrawer.classList.remove("open");
-    transcriptOverlay.classList.remove("open");
-    transcriptOverlay.setAttribute("aria-hidden", "true");
-
-    try { releaseTranscriptTrap?.(); } catch {}
-    releaseTranscriptTrap = null;
-
-    try { lastFocusTranscript?.focus?.(); } catch {}
-    lastFocusTranscript = null;
-
-    window.setTimeout(() => { transcriptDrawer.hidden = true; }, 220);
-  }
-
-  function addLine(text, who, opts = {}) {
-    const o = (opts && typeof opts === "object") ? opts : {};
-    const record = (o.record !== false);
-    const typing = (o.typing === true);
-    const i18nKey = o.i18nKey;
-
-    const wrap = document.createElement("div");
-    wrap.className = `msg ${who}`;
-
-    const bubble = document.createElement("div");
-    bubble.className = "bubble";
-
-    if (typing) {
-      const t = document.createElement("span");
-      t.className = "typing";
-      for (let i = 0; i < 3; i++) {
-        const d = document.createElement("span");
-        d.className = "typing-dot";
-        t.appendChild(d);
-      }
-      bubble.appendChild(t);
+    // Consent gating
+    if (state.consent !== "accept") {
+      // keep chat visible but blocked until accept
+      status(t("offline"), "warn");
+      openConsentModal();
     } else {
-      bubble.textContent = text;
-      if (i18nKey && I18N[i18nKey]) {
-        bubble.dataset.en = I18N[i18nKey].en;
-        bubble.dataset.es = I18N[i18nKey].es;
-      } else {
-        bubble.dataset.en = text;
-        bubble.dataset.es = text;
-      }
+      status(t("online"), "ok");
     }
 
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    meta.textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    wireEvents();
 
-    wrap.appendChild(bubble);
-    wrap.appendChild(meta);
-
-    log.appendChild(wrap);
-    log.scrollTop = log.scrollHeight;
-
-    if (record && !typing) recordTranscript(who, text);
-    return bubble;
-  }
-
-  function addUserLine(text) { return addLine(text, "user"); }
-  function addBotLine(text, opts) { return addLine(text, "bot", opts); }
-
-  function clearChat() {
-    log.textContent = "";
-    transcript.length = 0;
-    renderTranscriptList();
-    log.dataset.welcomed = "false";
-    ensureWelcome();
-  }
-
-  function ensureWelcome() {
-    if (log.dataset.welcomed === "true") return;
-    const welcome = t("welcome");
-    addBotLine(welcome, { i18nKey: "welcome" });
-    log.dataset.welcomed = "true";
-  }
-
-  const telemetrySampleRate = 0.25;
-
-  function sendTelemetry(eventType, detail = {}) {
-    if (consentState !== "accepted") return;
-    if (Math.random() > telemetrySampleRate) return;
-
+    // Basic config check (non-fatal, but shows status)
     try {
-      fetch(TELEMETRY_URL, {
-        method: "POST",
-        mode: "cors",
-        cache: "no-store",
-        credentials: "omit",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event: String(eventType || ""),
-          lang: currentLang,
-          ts: Date.now(),
-          detail: (detail && typeof detail === "object") ? detail : {}
-        })
-      }).catch(() => {});
-    } catch {}
-  }
-
-  const synth = ("speechSynthesis" in window) ? window.speechSynthesis : null;
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = Recognition ? new Recognition() : null;
-
-  let speechEnabled = false;
-  const VOICE_SESSION_MS = 45000;
-  let voiceSessionTimer = null;
-  let listening = false;
-  let lastVoiceTranscript = "";
-  let requestedRepeat = false;
-  let inFlight = false;
-
-  function setVoiceStatusKey(key) {
-    if (!voiceStatus) return;
-    if (key && I18N[key]) {
-      setTextWithDataset(voiceStatus, key);
-    } else {
-      setCustomText(voiceStatus, "");
+      requireConfigOrThrow();
+    } catch (e) {
+      console.error(e);
+      status(t("configError"), "warn");
+      // Also disable send to avoid confusing failures
+      if (UI.sendBtn) UI.sendBtn.disabled = true;
     }
   }
 
-  function updateListenUI() {
-    if (!listenCtrl) return;
-    const active = listening || speechEnabled;
-    listenCtrl.classList.toggle("active", active);
-    listenCtrl.setAttribute("aria-pressed", active ? "true" : "false");
-  }
-
-  function enableVoiceSession() {
-    if (!synth) return false;
-    speechEnabled = true;
-    clearTimeout(voiceSessionTimer);
-    voiceSessionTimer = setTimeout(() => {
-      speechEnabled = false;
-      try { synth.cancel(); } catch {}
-      updateListenUI();
-      setVoiceStatusKey();
-    }, VOICE_SESSION_MS);
-    return true;
-  }
-
-  function speak(text, lang) {
-    if (!synth || !speechEnabled) return;
-
-    const clean = String(text || "").replace(/\s+/g, " ").trim();
-    if (!clean) return;
-
-    try {
-      synth.cancel();
-      const toSpeak = clean.replace(/\bOPS\b/gi, "Ops");
-      const u = new SpeechSynthesisUtterance(toSpeak);
-      u.lang = (lang === "es") ? "es-ES" : "en-US";
-      synth.speak(u);
-      enableVoiceSession();
-    } catch {}
-  }
-
-  function requestSubmitIfInput() {
-    if (!form || !input) return false;
-    const msg = normalizeUserText(input.value);
-    if (!msg) return false;
-    input.value = msg;
-    try {
-      if (typeof form.requestSubmit === "function") form.requestSubmit();
-      else form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-      return true;
-    } catch {
-      try { form.submit(); return true; } catch { return false; }
-    }
-  }
-
-  function promptRepeat() {
-    if (requestedRepeat) return;
-    requestedRepeat = true;
-    const apology = t("repeatPrompt");
-    addBotLine(apology, { i18nKey: "repeatPrompt" });
-    speak(apology, currentLang);
-  }
-
-  function startListening() {
-    if (!recognition || listening) return;
-    if (consentState === "denied") return;
-
-    try {
-      recognition.lang = (currentLang === "es") ? "es-ES" : "en-US";
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-      lastVoiceTranscript = "";
-      requestedRepeat = false;
-
-      listening = true;
-      setVoiceStatusKey("listening");
-      updateListenUI();
-
-      recognition.onresult = (e) => {
-        const t = e?.results?.[0]?.[0]?.transcript;
-        const normalized = normalizeUserText(t);
-        if (normalized && input) {
-          lastVoiceTranscript = normalized;
-          input.value = normalized;
-        }
-      };
-
-      recognition.onerror = () => {
-        listening = false;
-        setVoiceStatusKey();
-        updateListenUI();
-        if (!lastVoiceTranscript) promptRepeat();
-      };
-
-      recognition.onend = () => {
-        listening = false;
-        setVoiceStatusKey();
-        updateListenUI();
-        if (lastVoiceTranscript) {
-          requestSubmitIfInput();
-        } else if (!requestedRepeat) {
-          promptRepeat();
-        }
-      };
-
-      recognition.start();
-    } catch {
-      listening = false;
-      setVoiceStatusKey();
-      updateListenUI();
-    }
-  }
-
-  function stopListening() {
-    if (!recognition || !listening) return;
-    try { recognition.stop(); } catch {}
-    listening = false;
-    setVoiceStatusKey();
-    updateListenUI();
-  }
-
-  consentState = readConsent();
-  if (consentState === "accepted") prefsApi?.setPersistenceAllowed(true);
-  if (consentState === "denied") prefsApi?.setPersistenceAllowed(false);
-
-  currentLang = prefsApi?.getLang?.() || currentLang;
-  currentTheme = prefsApi?.getTheme?.() || currentTheme;
-
-  setChatEnabled(consentState !== "denied");
-  applyConsentUI();
-  if (consentState === "denied") {
-    setLiveMessage("consentDeniedLive");
+  // Run when DOM ready
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
   } else {
-    clearLiveMessage();
+    init();
   }
-
-  document.addEventListener("ops:lang-change", (e) => {
-    const l = e?.detail?.lang;
-    currentLang = (l === "es") ? "es" : "en";
-    ensureWelcome();
-    renderTranscriptList();
-    setNet(true, "ready");
-  });
-
-  document.addEventListener("ops:theme-change", (e) => {
-    const t = e?.detail?.theme;
-    currentTheme = (t === "dark") ? "dark" : "light";
-  });
-
-  if (clearChatBtn) clearChatBtn.onclick = clearChat;
-
-  if (transcriptTrigger) transcriptTrigger.onclick = openTranscriptDrawer;
-  if (transcriptOverlay) transcriptOverlay.onclick = closeTranscriptDrawer;
-  if (transcriptClose) transcriptClose.onclick = closeTranscriptDrawer;
-  if (transcriptCopy) transcriptCopy.onclick = copyTranscriptNow;
-  if (clearTranscriptBtn) clearTranscriptBtn.onclick = () => { transcript.length = 0; renderTranscriptList(); };
-
-  if (privacyTrigger) privacyTrigger.onclick = () => openPolicyModal("policy-privacy");
-  if (termsTrigger) termsTrigger.onclick = () => openPolicyModal("policy-terms");
-  if (policyOverlay) policyOverlay.onclick = closePolicyModal;
-  if (btnClosePolicy) btnClosePolicy.onclick = closePolicyModal;
-  if (btnAcceptPrivacy) btnAcceptPrivacy.onclick = acceptPrivacy;
-  if (btnDenyPrivacy) btnDenyPrivacy.onclick = denyPrivacy;
-
-  if (consentAccept) consentAccept.onclick = () => handleConsent("accepted");
-  if (consentDeny) consentDeny.onclick = () => handleConsent("denied");
-
-  if (listenCtrl) listenCtrl.onclick = () => {
-    if (!recognition) {
-      setVoiceStatusKey("voiceUnavailable");
-      return;
-    }
-
-    enableVoiceSession();
-    updateListenUI();
-
-    if (listening) {
-      try { recognition.stop(); } catch {}
-      return;
-    }
-
-    startListening();
-  };
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      closeTranscriptDrawer();
-      closePolicyModal();
-    }
-  });
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden && listening && recognition) {
-      try { recognition.stop(); } catch {}
-    }
-  });
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if (inFlight) return;
-
-    const msg = normalizeUserText(input.value);
-    if (!msg) return;
-
-    if (!isFullyAuthorized()) {
-      const m = t("unauthorized");
-      addBotLine(m, { i18nKey: "unauthorized" });
-      sendTelemetry("auth_block", { reason: "origin_or_path" });
-      return;
-    }
-
-    if (looksSuspicious(msg)) {
-      const warn = t("suspiciousBlocked");
-      addBotLine(warn, { i18nKey: "suspiciousBlocked" });
-      speak(warn, currentLang);
-      sendTelemetry("client_suspicious");
-      return;
-    }
-
-    const hp1 = normalizeUserText(hpEmail?.value || "");
-    const hp2 = normalizeUserText(hpWebsite?.value || "");
-
-    addUserLine(msg);
-    input.value = "";
-    input.focus();
-
-    setNet(navigator.onLine, "sending");
-    if (sendBtn) sendBtn.disabled = true;
-    inFlight = true;
-
-    const botBubble = addBotLine("", { record: false, typing: true });
-
-    try {
-      const ctrl = new AbortController();
-      const timeout = setTimeout(() => ctrl.abort(), 15000);
-
-      const res = await fetch(API_URL, {
-        method: "POST",
-        mode: "cors",
-        cache: "no-store",
-        credentials: "omit",
-        redirect: "error",
-        referrerPolicy: "no-referrer",
-        headers: { "Content-Type": "application/json", "X-Ops-Asset-Id": ASSET_ID },
-        body: JSON.stringify({ message: msg, lang: currentLang, hp_email: hp1, hp_website: hp2 }),
-        signal: ctrl.signal
-      });
-
-      clearTimeout(timeout);
-
-      const raw = await res.text();
-      let data = null;
-      try { data = JSON.parse(raw); } catch {}
-
-      if (!res.ok) {
-        const fallback = t("gatewayError");
-        const errMsg = (data && (data.error || data.public_error)) ? String(data.error || data.public_error) : (raw || fallback);
-        if (errMsg === fallback) {
-          setTextWithDataset(botBubble, "gatewayError");
-        } else {
-          setCustomText(botBubble, errMsg);
-        }
-        recordTranscript("bot", errMsg);
-        speak(errMsg, currentLang);
-        sendTelemetry("api_error", { status: res.status });
-        setNet(false, "statusError");
-        return;
-      }
-
-      const replyLang = (data && data.lang === "es") ? "es" : currentLang;
-      const reply = (data && typeof data.reply === "string" && data.reply.trim())
-        ? data.reply.trim()
-        : t("noReply");
-
-      if (data && typeof data.reply === "string" && data.reply.trim()) {
-        setCustomText(botBubble, reply);
-      } else {
-        setTextWithDataset(botBubble, "noReply", replyLang);
-      }
-      recordTranscript("bot", reply);
-      speak(reply, replyLang);
-      setNet(true, "ready");
-    } catch {
-      const fallback = t("networkError");
-      setTextWithDataset(botBubble, "networkError");
-      recordTranscript("bot", fallback);
-      speak(fallback, currentLang);
-      sendTelemetry("network_error", { online: !!navigator.onLine });
-      setNet(false, "offline");
-      setLiveMessage("networkErrorLive");
-    } finally {
-      if (sendBtn) sendBtn.disabled = false;
-      inFlight = false;
-    }
-  });
-
-  if (!document.documentElement.getAttribute("data-theme")) {
-    document.documentElement.setAttribute("data-theme", currentTheme);
-  }
-
-  updateListenUI();
-  setNet(true, "ready");
-  ensureWelcome();
 })();
