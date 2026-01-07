@@ -1,381 +1,199 @@
-<!-- index.html -->
+<!-- index.html
+     OPS Online Support — Home + Chat Entry (v2)
+
+     Notes:
+     - No inline JS. Uses /assets/*.js
+     - Chat uses gateway endpoint (set in assets/chattia-ui.js config)
+     - Privacy/Consent modal required before enabling chat
+     - “Compliance-aligned” UX: no sensitive data, no card data, no passwords/OTPs
+-->
+
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>OPS Online Support</title>
 
-  <title data-en="Chattia for OPS" data-es="Chattia para OPS">Chattia for OPS</title>
-  <meta
-    name="description"
-    data-en="Chattia for OPS — secure, fast, accessible assistant UI."
-    data-es="Chattia para OPS: interfaz de asistente segura, rápida y accesible."
-    content="Chattia for OPS — secure, fast, accessible assistant UI." />
-  <link rel="canonical" href="https://www.chattia.io/" />
-  <link rel="alternate" href="https://www.chattia.io/" hreflang="en" data-hreflang="en" />
-  <link rel="alternate" href="https://www.chattia.io/?lang=es" hreflang="es" data-hreflang="es" />
-  <link rel="alternate" href="https://www.chattia.io/" hreflang="x-default" data-hreflang="x-default" />
+  <!-- Basic hardening (best delivered via headers, but meta helps on static hosting) -->
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="X-Frame-Options" content="DENY" />
 
-  <meta name="referrer" content="strict-origin-when-cross-origin" />
-  <meta name="color-scheme" content="light dark" />
-  <meta name="robots" content="index,follow" />
+  <!-- CSP: keep strict; update connect-src to your gateway -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    base-uri 'self';
+    object-src 'none';
+    frame-ancestors 'none';
+    form-action 'self';
+    img-src 'self' data:;
+    font-src 'self' data:;
+    style-src 'self';
+    script-src 'self';
+    connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev;
+    upgrade-insecure-requests;
+  " />
 
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; img-src 'self' data:; font-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev; worker-src 'self'; manifest-src 'self'; media-src 'self'; upgrade-insecure-requests; block-all-mixed-content" />
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
 
-  <link rel="preconnect" href="https://ops-gateway.grabem-holdem-nuts-right.workers.dev" crossorigin />
+  <!-- Theme + UI -->
+  <link rel="stylesheet" href="/assets/chattia-theme.css" />
+  <link rel="stylesheet" href="/assets/chattia-ui.css" />
 
-  <link rel="stylesheet" href="assets/chattia-theme.css" />
-  <link rel="stylesheet" href="assets/chattia-ui.css" />
-
-  <script defer src="assets/chattia-preferences.js"></script>
-  <script defer src="assets/chattia-ui.js"></script>
-  <script defer src="assets/chattia-head-lang.js"></script>
+  <!-- Language head helper (sets html[lang] early, no inline JS) -->
+  <script defer src="/assets/chattia-head-lang.js"></script>
 </head>
 
 <body>
-  <noscript>
-    <div class="noscript" data-en="This app requires JavaScript to run." data-es="Esta aplicación requiere JavaScript para ejecutarse.">
-      This app requires JavaScript to run.
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" role="banner">
+    <div class="brand">
+      <a class="brand-link" href="/" aria-label="OPS Online Support Home">
+        <span class="brand-mark" aria-hidden="true">OPS</span>
+        <span class="brand-text">OPS Online Support</span>
+      </a>
     </div>
-  </noscript>
 
-  <div
-    id="live-region"
-    role="status"
-    aria-live="assertive"
-    data-en=""
-    data-es=""
-    style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;clip:rect(1px, 1px, 1px, 1px);">
-  </div>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="/" class="nav-link" data-i18n="nav_home">Home</a>
+      <a href="/pages/about.html" class="nav-link" data-i18n="nav_about">About</a>
+      <a href="/pages/contact.html" class="nav-link" data-i18n="nav_contact">Contact</a>
+      <a href="/pages/policies.html" class="nav-link" data-i18n="nav_policies">Policies</a>
+    </nav>
 
-  <div class="shell app-shell">
-    <div class="layout">
-      <main class="panel" role="main" id="chat-root">
-        <section
-          class="chat chat-panel"
-          aria-label="Chat"
-          data-en-label="Chat"
-          data-es-label="Chat"
-          id="chat">
-          <div class="chat-head">
-            <div class="brand brand-inline">
-              <div class="brand-mark" aria-hidden="true"></div>
-              <div class="brand-text">
-                <div class="brand-title" data-en="Chattia" data-es="Chattia">Chattia</div>
-                <div class="brand-sub" data-en="Chat" data-es="Chat">Chat</div>
-              </div>
-            </div>
+    <div class="site-actions">
+      <!-- Language toggle (no “accept/deny” here; just a user preference) -->
+      <button class="btn btn-ghost" id="langToggle" type="button" aria-label="Change language">
+        <span aria-hidden="true">EN/ES</span>
+      </button>
 
-            <div class="chat-head-right">
-              <div class="status-row">
-                <div class="status" aria-label="Network status" data-en-label="Network status" data-es-label="Estado de la red">
-                  <span class="dot" id="netDot" aria-hidden="true"></span>
-                  <span id="netText" data-en="Ready" data-es="Listo">Ready</span>
-                </div>
-
-                <div class="quick-toggles" aria-label="Theme and language controls" data-en-label="Theme and language controls" data-es-label="Controles de tema e idioma">
-                  <div class="toggle-group" role="radiogroup" aria-label="Language selection" data-en-label="Language selection" data-es-label="Selección de idioma">
-                    <button
-                      type="button"
-                      class="quick-toggle"
-                      data-lang-btn="en"
-                      role="radio"
-                      aria-checked="true"
-                      aria-pressed="false"
-                      aria-label="Switch to English"
-                      data-en-label="Switch to English"
-                      data-es-label="Cambiar a inglés"
-                      data-en="EN"
-                      data-es="EN">EN</button>
-
-                    <button
-                      type="button"
-                      class="quick-toggle"
-                      data-lang-btn="es"
-                      role="radio"
-                      aria-checked="false"
-                      aria-pressed="false"
-                      aria-label="Switch to Spanish"
-                      data-en-label="Switch to Spanish"
-                      data-es-label="Cambiar a español"
-                      data-en="ES"
-                      data-es="ES">ES</button>
-                  </div>
-
-                  <div class="toggle-group" role="radiogroup" aria-label="Theme selection" data-en-label="Theme selection" data-es-label="Selección de tema">
-                    <button
-                      type="button"
-                      class="quick-toggle"
-                      data-theme-btn="light"
-                      role="radio"
-                      aria-checked="true"
-                      aria-pressed="false"
-                      aria-label="Switch to light theme"
-                      data-en-label="Switch to light theme"
-                      data-es-label="Cambiar a tema claro"
-                      data-en="Light"
-                      data-es="Claro">Light</button>
-
-                    <button
-                      type="button"
-                      class="quick-toggle"
-                      data-theme-btn="dark"
-                      role="radio"
-                      aria-checked="false"
-                      aria-pressed="false"
-                      aria-label="Switch to dark theme"
-                      data-en-label="Switch to dark theme"
-                      data-es-label="Cambiar a tema oscuro"
-                      data-en="Dark"
-                      data-es="Oscuro">Dark</button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="chat-utility-stack">
-                <div class="chat-actions" aria-label="Chat actions" data-en-label="Chat actions" data-es-label="Acciones del chat">
-                  <button
-                    type="button"
-                    class="pill-btn accent"
-                    id="clearChat"
-                    aria-label="Clear chat"
-                    data-en-label="Clear chat"
-                    data-es-label="Borrar chat">
-                    <span data-en="Clear" data-es="Borrar">Clear</span>
-                  </button>
-                </div>
-
-                <div class="voice-status" id="voice-status" aria-live="polite"></div>
-              </div>
-            </div>
-          </div>
-
-          <div id="chat-log" class="chat-log" aria-live="polite" aria-relevant="additions text"></div>
-
-          <div class="composer">
-            <div class="composer-note" role="note">
-              <span data-en="Chatbot responses may be incorrect" data-es="Las respuestas del chatbot pueden ser incorrectas">
-                Chatbot responses may be incorrect
-              </span>
-              <span aria-hidden="true">•</span>
-              <button class="policy-link-btn" type="button" id="privacyTrigger" data-action="privacy">
-                <span data-en="Privacy" data-es="Privacidad">Privacy</span>
-              </button>
-              <span aria-hidden="true">•</span>
-              <button class="policy-link-btn" type="button" id="termsTrigger" data-action="terms">
-                <span data-en="Terms" data-es="Términos">Terms</span>
-              </button>
-              <span aria-hidden="true">•</span>
-              <button class="policy-link-btn" type="button" id="transcriptTrigger" data-action="transcript">
-                <span data-en="Transcript" data-es="Transcripción">Transcript</span>
-              </button>
-            </div>
-
-            <form id="chatbot-input-row" class="input-row" autocomplete="off" novalidate>
-              <label class="input-label" for="chatbot-input" data-en="Chat" data-es="Chat">Chat</label>
-
-              <div class="input-shell">
-                <div class="hp-wrap" aria-hidden="true">
-                  <input id="hp_email" type="text" tabindex="-1" autocomplete="off" />
-                  <input id="hp_website" type="text" tabindex="-1" autocomplete="off" />
-                </div>
-
-                <input
-                  id="chatbot-input"
-                  class="input"
-                  type="text"
-                  maxlength="256"
-                  required
-                  spellcheck="false"
-                  autocapitalize="off"
-                  autocomplete="off"
-                  inputmode="text"
-                  placeholder="Type a message..."
-                  data-en-placeholder="Type a message..."
-                  data-es-placeholder="Escribe un mensaje..." />
-
-                <button
-                  type="button"
-                  class="mic-inline"
-                  id="listenCtrl"
-                  aria-label="Voice input"
-                  data-en-label="Voice input"
-                  data-es-label="Entrada de voz">
-                  <svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.93V21h2v-3.07A7 7 0 0 0 19 11h-2Z"></path>
-                  </svg>
-                </button>
-              </div>
-
-              <button
-                id="chatbot-send"
-                class="send-btn"
-                type="submit"
-                aria-label="Send"
-                data-en-label="Send"
-                data-es-label="Enviar">
-                <span data-en="Send" data-es="Enviar">Send</span>
-              </button>
-            </form>
-
-            <div
-              class="consent-banner"
-              id="consent-banner"
-              role="region"
-              aria-label="Privacy consent"
-              data-en-label="Privacy consent"
-              data-es-label="Consentimiento de privacidad">
-              <div class="consent-text">
-                <strong data-en="Privacy & consent" data-es="Privacidad y consentimiento">Privacy & consent</strong>
-                <div id="consent-note" class="consent-note"
-                  data-en="Consent is required to use the chat. Open Privacy to accept."
-                  data-es="Se requiere consentimiento para usar el chat. Abre Privacidad para aceptar.">
-                  Consent is required to use the chat. Open Privacy to accept.
-                </div>
-              </div>
-
-              <div class="consent-actions">
-                <button id="consent-deny" class="btn" type="button" data-en="Deny" data-es="Rechazar">Deny</button>
-                <button id="consent-accept" class="btn btn-primary" type="button" data-en="Accept" data-es="Aceptar">Accept</button>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-    </div>
-  </div>
-
-  <div id="transcriptOverlay" class="drawer-overlay" aria-hidden="true"></div>
-  <aside
-    id="transcriptDrawer"
-    class="drawer"
-    role="dialog"
-    aria-modal="true"
-    aria-label="Transcript drawer"
-    data-en-label="Transcript drawer"
-    data-es-label="Panel de transcripción"
-    hidden>
-    <div class="drawer-head">
-      <div class="drawer-title" data-en="Transcript" data-es="Transcripción">Transcript</div>
-      <button
-        id="transcriptClose"
-        class="pill-btn"
-        type="button"
-        aria-label="Close transcript"
-        data-en-label="Close transcript"
-        data-es-label="Cerrar transcripción">
-        <span data-en="Close" data-es="Cerrar">Close</span>
+      <!-- Theme toggle -->
+      <button class="btn btn-ghost" id="themeToggle" type="button" aria-label="Toggle theme">
+        <span aria-hidden="true">☾</span>
       </button>
     </div>
+  </header>
 
-    <div class="drawer-body">
-      <div class="drawer-actions">
-        <button type="button" id="transcript-copy" class="pill-btn" aria-label="Copy transcript"
-          data-en-label="Copy transcript" data-es-label="Copiar transcripción">
-          <span data-en="Copy" data-es="Copiar">Copy</span>
-        </button>
+  <main id="main" class="site-main" role="main">
+    <section class="hero">
+      <h1 class="hero-title" data-i18n="hero_title">Reliable CX, Operations, and Support Workflows</h1>
+      <p class="hero-subtitle" data-i18n="hero_subtitle">
+        We help organizations run smoother through customer experience support, back-office operations help, and technical support intake.
+      </p>
 
-        <button
-          type="button"
-          id="clearTranscript"
-          class="pill-btn accent"
-          aria-label="Clear transcript"
-          data-en-label="Clear transcript"
-          data-es-label="Limpiar transcripción">
-          <span data-en="Clear Transcript" data-es="Limpiar transcripción">Clear Transcript</span>
-        </button>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="/pages/contact.html" data-i18n="cta_contact">Contact / Request a Quote</a>
+        <a class="btn btn-secondary" href="/pages/policies.html#careers" data-i18n="cta_careers">Careers / Join Us</a>
       </div>
 
-      <div id="transcriptList" class="transcript-list" role="region" aria-live="polite"></div>
+      <p class="hero-note" data-i18n="hero_note">
+        For security: do not share passwords, one-time codes, banking info, or card numbers in chat.
+      </p>
+    </section>
+
+    <section class="cards" aria-label="Services">
+      <article class="card">
+        <h2 data-i18n="svc_cx_title">Customer Experience (CX)</h2>
+        <p data-i18n="svc_cx_body">Inbox triage, customer questions, follow-ups, and service workflows.</p>
+      </article>
+
+      <article class="card">
+        <h2 data-i18n="svc_cc_title">Contact Center Support</h2>
+        <p data-i18n="svc_cc_body">Intake, tagging, escalation, and resolution tracking.</p>
+      </article>
+
+      <article class="card">
+        <h2 data-i18n="svc_ops_title">Business Operations</h2>
+        <p data-i18n="svc_ops_body">Back-office coordination, documentation, and process support.</p>
+      </article>
+
+      <article class="card">
+        <h2 data-i18n="svc_it_title">IT Support Intake</h2>
+        <p data-i18n="svc_it_body">Issue capture, basic troubleshooting steps, and routing to the right team.</p>
+      </article>
+    </section>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-links">
+      <a href="/pages/policies.html" data-i18n="footer_policies">Privacy & Terms</a>
+      <a href="/pages/contact.html" data-i18n="footer_contact">Contact</a>
+      <a href="/pages/about.html" data-i18n="footer_about">About</a>
     </div>
+    <div class="footer-meta">
+      <span aria-hidden="true">©</span>
+      <span id="year"></span>
+      <span>OPS Online Support</span>
+    </div>
+  </footer>
+
+  <!-- Floating Action Buttons -->
+  <div class="fab-stack" aria-label="Quick actions">
+    <a class="fab" id="fabContact" href="/pages/contact.html" data-i18n="fab_contact" aria-label="Contact Us">Contact</a>
+    <a class="fab" id="fabJoin" href="/pages/policies.html#careers" data-i18n="fab_join" aria-label="Join Us">Join</a>
+    <button class="fab fab-accent" id="fabChat" type="button" data-i18n="fab_chat" aria-label="Open chat">Chat</button>
+  </div>
+
+  <!-- Privacy & Consent Modal (chat stays disabled until accepted) -->
+  <dialog class="modal" id="consentModal" aria-labelledby="consentTitle">
+    <form method="dialog" class="modal-card">
+      <h2 id="consentTitle" data-i18n="consent_title">Privacy & Consent</h2>
+
+      <p class="modal-text" data-i18n="consent_body">
+        Chat interactions may be used to improve the chatbot experience. Please do not enter sensitive personal information.
+        OPS Online Support does not intentionally collect payment card data, banking info, passwords, or one-time codes.
+      </p>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="consentDeny" value="deny" type="submit" data-i18n="consent_deny">Deny</button>
+        <button class="btn btn-primary" id="consentAccept" value="accept" type="submit" data-i18n="consent_accept">Accept</button>
+      </div>
+
+      <p class="modal-footnote" data-i18n="consent_note">
+        If you deny consent, chat will remain disabled until you accept.
+      </p>
+    </form>
+  </dialog>
+
+  <!-- Chat Panel (slides in from right) -->
+  <aside class="chat-drawer" id="chatDrawer" aria-label="OPS Assistant" aria-hidden="true">
+    <header class="chat-header">
+      <div class="chat-title">
+        <strong data-i18n="chat_title">OPS Assistant</strong>
+        <span class="chat-subtitle" data-i18n="chat_subtitle">Website help • Contact • Careers</span>
+      </div>
+      <button class="btn btn-ghost" id="chatClose" type="button" aria-label="Close chat">✕</button>
+    </header>
+
+    <div class="chat-body" id="chatBody" role="log" aria-live="polite" aria-relevant="additions"></div>
+
+    <form class="chat-input" id="chatForm">
+      <!-- Honeypot fields (hidden by CSS) -->
+      <input class="hp" type="text" name="hp_email" id="hp_email" autocomplete="off" tabindex="-1" aria-hidden="true" />
+      <input class="hp" type="text" name="hp_website" id="hp_website" autocomplete="off" tabindex="-1" aria-hidden="true" />
+
+      <label class="sr-only" for="chatMessage" data-i18n="chat_label">Your message</label>
+      <input id="chatMessage" name="message" type="text" maxlength="256" autocomplete="off"
+             placeholder="Type your message…" data-i18n-placeholder="chat_placeholder" />
+
+      <button class="btn btn-primary" type="submit" data-i18n="chat_send">Send</button>
+    </form>
+
+    <p class="chat-disclaimer" data-i18n="chat_disclaimer">
+      Do not share passwords, OTP codes, banking info, or card numbers in chat. Use Contact for sensitive matters.
+    </p>
   </aside>
 
-  <div id="policyOverlay" class="modal-overlay" aria-hidden="true"></div>
-  <section
-    id="policyModal"
-    class="modal card"
-    role="dialog"
-    aria-modal="true"
-    aria-label="Privacy, consent, and terms"
-    data-en-label="Privacy, consent, and terms"
-    data-es-label="Privacidad, consentimiento y términos"
-    hidden>
-    <h2 data-en="Privacy, Consent, and Terms" data-es="Privacidad, consentimiento y términos">Privacy, Consent, and Terms</h2>
+  <!-- App scripts -->
+  <script defer src="/assets/chattia-preferences.js"></script>
+  <script defer src="/assets/chattia-ui.js"></script>
 
-    <h3 id="policy-privacy" data-en="Privacy &amp; Consent" data-es="Privacidad y consentimiento">Privacy &amp; Consent</h3>
-    <p
-      data-en="Chat interactions may be used to improve and train the chatbot experience. Please do not enter sensitive personal information."
-      data-es="Las interacciones de chat pueden usarse para mejorar y entrenar la experiencia del chatbot. Por favor, no ingreses información personal sensible.">
-      Chat interactions may be used to improve and train the chatbot experience. Please do not enter sensitive personal information.
-    </p>
-
-    <ul>
-      <li
-        data-en="No PII collection: Chattia and OPS do not intentionally collect personally identifiable information (PII). If you choose to share PII, it may be processed as part of your conversation."
-        data-es="Sin recolección de PII: Chattia y OPS no recopilan intencionalmente información personal identificable (PII). Si decides compartir PII, puede procesarse como parte de tu conversación.">
-        No PII collection: Chattia and OPS do not intentionally collect personally identifiable information (PII). If you choose to share PII, it may be processed as part of your conversation.
-      </li>
-
-      <li
-        data-en="If you deny consent, chat will be disabled until you accept."
-        data-es="Si rechazas el consentimiento, el chat se deshabilitará hasta que aceptes.">
-        If you deny consent, chat will be disabled until you accept.
-      </li>
-    </ul>
-
-    <h3 id="policy-terms" data-en="Terms &amp; Conditions" data-es="Términos y condiciones">Terms &amp; Conditions</h3>
-    <ul>
-      <li
-        data-en="Messages may be used to improve or train the chatbot."
-        data-es="Los mensajes pueden usarse para mejorar o entrenar el chatbot.">
-        Messages may be used to improve or train the chatbot.
-      </li>
-
-      <li
-        data-en="Chattia and OPS do not intentionally collect PII. Please avoid sharing PII."
-        data-es="Chattia y OPS no recopilan intencionalmente PII. Por favor, evita compartir PII.">
-        Chattia and OPS do not intentionally collect PII. Please avoid sharing PII.
-      </li>
-
-      <li
-        data-en="If you enter PII, it may be processed as part of the chat text."
-        data-es="Si ingresas PII, puede procesarse como parte del texto del chat.">
-        If you enter PII, it may be processed as part of the chat text.
-      </li>
-    </ul>
-
-    <h3 data-en="Fair Use" data-es="Uso justo">Fair Use</h3>
-    <ul>
-      <li data-en="No abuse, harassment, or illegal content." data-es="No abuso, acoso o contenido ilegal.">
-        No abuse, harassment, or illegal content.
-      </li>
-      <li data-en="No attempts to exploit, bypass security, or spam." data-es="No intentes explotar, evadir seguridad o hacer spam.">
-        No attempts to exploit, bypass security, or spam.
-      </li>
-    </ul>
-
-    <h3 data-en="Availability &amp; Accuracy" data-es="Disponibilidad y precisión">Availability &amp; Accuracy</h3>
-    <ul>
-      <li data-en="Chatbot responses may be incorrect; use at your own risk." data-es="Las respuestas del chatbot pueden ser incorrectas; úsalo bajo tu propio riesgo.">
-        Chatbot responses may be incorrect; use at your own risk.
-      </li>
-      <li data-en="Service is provided “as-is” without warranties." data-es="El servicio se proporciona “tal cual” sin garantías.">
-        Service is provided “as-is” without warranties.
-      </li>
-    </ul>
-
-    <h3 data-en="Security" data-es="Seguridad">Security</h3>
-    <ul>
-      <li data-en="Anti-abuse protections may be used." data-es="Pueden aplicarse protecciones contra abuso.">
-        Anti-abuse protections may be used.
-      </li>
-    </ul>
-
-    <div class="modal-actions">
-      <button class="btn" id="btnDenyPrivacy" type="button" data-en="Deny" data-es="Rechazar">Deny</button>
-      <button class="btn btn-primary" id="btnAcceptPrivacy" type="button" data-en="Accept" data-es="Aceptar">Accept</button>
-      <button class="btn" id="btnClosePolicy" type="button" data-en="Close" data-es="Cerrar">Close</button>
+  <noscript>
+    <div class="noscript">
+      This site works best with JavaScript enabled. You can still use the Contact and Policies pages without chat.
     </div>
-  </section>
+  </noscript>
 </body>
 </html>
