@@ -1,20 +1,13 @@
 /* worker/assistant-template.js
-   OPS ONLINE ASSISTANT — BRAIN (v3.1)
-   Called ONLY by ops-gateway via Service Binding (env.BRAIN.fetch)
+   OPS ONLINE ASSISTANT — BRAIN (v3.2)
+   Called by ops-gateway via Service Binding (env.BRAIN.fetch)
 
-   Changes per your request:
-   - Replies are shorter (tokens cut ~50%)
-   - Focused ONLY on opsonlinesupport.com CX + lead generation + careers path
-   - Turnstile: not used
+   Goals:
+   - Short replies (token-cut)
+   - Scope locked to opsonlinesupport.com CX + lead gen + careers path
    - Strong HMAC verification (ts + nonce + method + path + bodySha)
-   - Optional nonce replay cache (KV, if you bind OPS_NONCE or reuse OPS_RL)
-
-   REQUIRED:
-   - Secret: HAND_SHAKE (same value as Gateway)
-   - Workers AI binding on Brain: AI (for chat model)  [optional but recommended]
-
-   OPTIONAL:
-   - KV namespace: OPS_NONCE (preferred) OR OPS_RL (fallback) for replay cache
+   - Optional replay cache (KV) if OPS_NONCE or OPS_RL is bound
+   - Basic DLP: block payment cards (never collect)
 */
 
 import { OPS_SITE, OPS_SITE_RULES_EN, OPS_SITE_RULES_ES } from "./ops-site-content.js";
@@ -25,11 +18,57 @@ const MAX_BODY_BYTES = 16_384;
 const MAX_MSG_CHARS = 256;
 const MAX_HISTORY_ITEMS = 12;
 
-// anti-replay window
+// Anti-replay / signature window
 const SIG_MAX_SKEW_MS = 5 * 60 * 1000;
 
-// tokens cut ~50% (previous was ~1548)
+// Keep responses shorter
 const MAX_OUTPUT_TOKENS = 774;
+
+// Defensive caps
+const MAX_REPLY_CHARS = 900;
+
+// API headers (OWASP-friendly)
+const API_CSP = [
+  "default-src 'none'",
+  "base-uri 'none'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "form-action 'none'"
+].join("; ");
+
+const PERMISSIONS_POLICY = [
+  "accelerometer=()","autoplay=()","camera=()","display-capture=()","encrypted-media=()","fullscreen=()",
+  "geolocation=()","gyroscope=()","magnetometer=()","microphone=()","midi=()","payment=()",
+  "picture-in-picture=()","publickey-credentials-get=()","screen-wake-lock=()","usb=()","bluetooth=()",
+  "clipboard-read=()","clipboard-write=()","gamepad=()","hid=()","idle-detection=()","serial=()",
+  "web-share=()","xr-spatial-tracking=()"
+].join(", ");
+
+function securityHeaders() {
+  return {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store, max-age=0",
+    "Pragma": "no-cache",
+    "Content-Security-Policy": API_CSP,
+    "Permissions-Policy": PERMISSIONS_POLICY,
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "X-Permitted-Cross-Domain-Policies": "none",
+    "X-DNS-Prefetch-Control": "off",
+    "X-XSS-Protection": "0",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "X-Robots-Tag": "noindex, nofollow"
+  };
+}
+
+function json(status, obj, extra = {}) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { ...securityHeaders(), ...extra }
+  });
+}
 
 function systemPrompt(lang) {
   const rules = (lang === "es") ? OPS_SITE_RULES_ES : OPS_SITE_RULES_EN;
@@ -42,7 +81,6 @@ function systemPrompt(lang) {
 
   const servicesText = services.map(s => `- ${s}`).join("\n");
 
-  // Keep it compact: rules + minimal KB
   return `
 ${rules}
 
@@ -65,27 +103,6 @@ Calls to action:
 `.trim();
 }
 
-/* -------------------- Response helpers -------------------- */
-
-function securityHeaders() {
-  return {
-    "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store, max-age=0",
-    "Pragma": "no-cache",
-    "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
-    "X-Frame-Options": "DENY",
-    "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
-  };
-}
-
-function json(status, obj, extra = {}) {
-  return new Response(JSON.stringify(obj), {
-    status,
-    headers: { ...securityHeaders(), ...extra }
-  });
-}
-
 /* -------------------- Body helpers -------------------- */
 
 async function readBodyLimitedArrayBuffer(request) {
@@ -96,6 +113,10 @@ async function readBodyLimitedArrayBuffer(request) {
   if (!ab || ab.byteLength === 0) return null;
   if (ab.byteLength > MAX_BODY_BYTES) return null;
   return ab;
+}
+
+function safeJsonParse(text) {
+  try { return JSON.parse(text); } catch { return null; }
 }
 
 function normalizeUserText(s) {
@@ -118,10 +139,6 @@ function looksSuspicious(s) {
     "<form", "<input", "<textarea"
   ];
   return bad.some(p => t.includes(p));
-}
-
-function safeJsonParse(text) {
-  try { return JSON.parse(text); } catch { return null; }
 }
 
 function sanitizeHistory(historyIn) {
@@ -206,10 +223,32 @@ async function hmacSha256Hex(secret, message) {
   return bytesToHex(new Uint8Array(sig));
 }
 
-async function verifyGatewaySignature(request, env, rawBodyAb) {
+function isHexLower(s, len) {
+  const v = String(s || "");
+  if (v.length !== len) return false;
+  return /^[0-9a-f]+$/.test(v);
+}
+
+function isNonceHex(s) {
+  const v = String(s || "");
+  // Gateway uses 16 bytes => 32 hex chars; allow 32..64 to be tolerant
+  return /^[0-9a-f]{32,64}$/.test(v);
+}
+
+async function verifyGatewaySignature(request, env, rawBodyAb, expectedMethod, expectedPath) {
   const secret = String(env.HAND_SHAKE || "");
   if (!secret) {
     return { ok: false, status: 500, code: "NO_HAND_SHAKE", publicMsg: "Assistant configuration error." };
+  }
+
+  const method = request.method.toUpperCase();
+  const path = new URL(request.url).pathname || "/";
+
+  if (method !== expectedMethod) {
+    return { ok: false, status: 401, code: "BAD_METHOD", publicMsg: "Unauthorized request." };
+  }
+  if (path !== expectedPath) {
+    return { ok: false, status: 401, code: "BAD_PATH", publicMsg: "Unauthorized request." };
   }
 
   const ts = String(request.headers.get("X-Ops-Ts") || "");
@@ -231,8 +270,10 @@ async function verifyGatewaySignature(request, env, rawBodyAb) {
     return { ok: false, status: 401, code: "STALE_TS", publicMsg: "Unauthorized request." };
   }
 
-  const path = new URL(request.url).pathname || "/";
-  const method = request.method.toUpperCase();
+  // Strict formatting checks (avoid weird inputs)
+  if (!isNonceHex(nonce)) return { ok: false, status: 401, code: "BAD_NONCE", publicMsg: "Unauthorized request." };
+  if (!isHexLower(bodyShaHdr, 64)) return { ok: false, status: 401, code: "BAD_BODY_SHA", publicMsg: "Unauthorized request." };
+  if (!/^[0-9a-f]{64}$/.test(sigHdr)) return { ok: false, status: 401, code: "BAD_SIG_FMT", publicMsg: "Unauthorized request." };
 
   const bodySha = await sha256HexFromArrayBuffer(rawBodyAb);
   if (!timingSafeEqualHex(bodySha, bodyShaHdr)) {
@@ -246,13 +287,15 @@ async function verifyGatewaySignature(request, env, rawBodyAb) {
     return { ok: false, status: 401, code: "BAD_SIG", publicMsg: "Unauthorized request." };
   }
 
-  // Optional replay cache (bind OPS_NONCE preferred; OPS_RL fallback)
+  // Optional replay cache: key by nonce (ts already bound into sig)
+  // TTL should cover skew window (5m) + buffer
   const kv = env.OPS_NONCE || env.OPS_RL;
   if (kv && typeof kv.get === "function" && typeof kv.put === "function") {
-    const k = `nonce:${ts}:${nonce}`;
+    const k = `nonce:${nonce}`;
     const seen = await kv.get(k);
     if (seen) return { ok: false, status: 401, code: "REPLAY", publicMsg: "Unauthorized request." };
-    await kv.put(k, "1", { expirationTtl: 600 });
+    // KV requires expirationTtl >= 60
+    await kv.put(k, "1", { expirationTtl: 10 * 60 });
   }
 
   return { ok: true };
@@ -260,16 +303,41 @@ async function verifyGatewaySignature(request, env, rawBodyAb) {
 
 /* -------------------- AI response (concise) -------------------- */
 
-function fallbackReply(lang, message) {
+function fallbackReply(lang) {
   if (lang === "es") {
-    return "Puedo ayudarte con información general sobre OPS Online Support y guiarte a Contacto o Carreras/Únete en opsonlinesupport.com. ¿Buscas servicios para tu negocio o quieres postular a un puesto?";
+    return "Puedo ayudarte con información general de OPS Online Support y guiarte a Contacto o Carreras/Únete en opsonlinesupport.com. ¿Buscas servicios para tu negocio o deseas postular?";
   }
-  return "I can help with OPS Online Support website info and guide you to Contact or Careers/Join Us on opsonlinesupport.com. Are you looking for services for your business, or applying for a role?";
+  return "I can help with OPS Online Support info and guide you to Contact or Careers/Join Us on opsonlinesupport.com. Are you looking for business services or applying for a role?";
+}
+
+function normalizeReply(reply, lang) {
+  let out = String(reply || "").replace(/\s+/g, " ").trim();
+
+  // Strip code fences if a model ignores instructions
+  out = out.replace(/```[\s\S]*?```/g, "").trim();
+
+  // Soft remove common bullet markers (model should avoid them)
+  out = out.replace(/\s(?:•|\-|\*)\s/g, " ").replace(/\s+/g, " ").trim();
+
+  if (out.length > MAX_REPLY_CHARS) out = out.slice(0, MAX_REPLY_CHARS).trim();
+
+  // Ensure a clear next step if missing
+  const hasSite = out.toLowerCase().includes("opsonlinesupport.com");
+  const hasContact = /contact|contacto/i.test(out);
+  const hasCareers = /careers|join us|carreras|únete/i.test(out);
+
+  if (!hasSite && !(hasContact || hasCareers)) {
+    out += (lang === "es")
+      ? " Para continuar, usa la página de Contacto o Carreras/Únete en opsonlinesupport.com."
+      : " Next step: please use the Contact page or Careers/Join Us on opsonlinesupport.com.";
+  }
+
+  return out || fallbackReply(lang);
 }
 
 async function runChat(env, lang, history, message) {
   const ai = env.AI;
-  if (!ai || typeof ai.run !== "function") return fallbackReply(lang, message);
+  if (!ai || typeof ai.run !== "function") return fallbackReply(lang);
 
   const msgs = [{ role: "system", content: systemPrompt(lang) }];
 
@@ -294,10 +362,10 @@ async function runChat(env, lang, history, message) {
       (typeof out?.result === "string" && out.result.trim()) ? out.result.trim() :
       "";
 
-    return reply || fallbackReply(lang, message);
+    return normalizeReply(reply || fallbackReply(lang), lang);
   } catch (e) {
     console.error("Brain AI run failed:", e);
-    return fallbackReply(lang, message);
+    return fallbackReply(lang);
   }
 }
 
@@ -310,7 +378,7 @@ async function handleOpsOnlineChat(request, env) {
   const raw = await readBodyLimitedArrayBuffer(request);
   if (!raw) return json(413, { ok: false, error: "Request too large or empty." });
 
-  const verify = await verifyGatewaySignature(request, env, raw);
+  const verify = await verifyGatewaySignature(request, env, raw, "POST", "/api/ops-online-chat");
   if (!verify.ok) return json(verify.status, { ok: false, error: verify.publicMsg, error_code: verify.code });
 
   const bodyText = new TextDecoder().decode(raw);
@@ -319,8 +387,12 @@ async function handleOpsOnlineChat(request, env) {
   if (containsLikelyCardNumber(bodyText)) {
     return json(400, {
       ok: false,
-      error: "For security, do not share card details in chat. Please use the site contact page."
+      error: "For security, do not share card details in chat. Please use the site Contact page."
     });
+  }
+
+  if (looksSuspicious(bodyText)) {
+    return json(400, { ok: false, error: "Request blocked.", error_code: "SUSPECT_BODY" });
   }
 
   const payload = safeJsonParse(bodyText);
@@ -338,8 +410,8 @@ async function handleOpsOnlineChat(request, env) {
     });
   }
 
-  if (looksSuspicious(message) || looksSuspicious(bodyText)) {
-    return json(400, { ok: false, lang, error: lang === "es" ? "Solicitud bloqueada." : "Request blocked." });
+  if (looksSuspicious(message)) {
+    return json(400, { ok: false, lang, error: lang === "es" ? "Solicitud bloqueada." : "Request blocked.", error_code: "SUSPECT_TEXT" });
   }
 
   const reply = await runChat(env, lang, history, message);
