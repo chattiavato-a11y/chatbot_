@@ -1,62 +1,97 @@
 /* worker/ops-site-content.js
-   OPS Online Support — CX + Lead Generation Knowledge Base (v1)
+   OPS Online Support — CX + Lead Generation Knowledge Base (v2)
 
-   IMPORTANT:
-   - This is a “safe” starter pack (no invented phone numbers or private emails).
-   - Replace placeholders with real links/pages once your site is finalized.
+   Goals:
+   - Keep assistant narrowly focused on opsonlinesupport.com CX + lead gen + careers routing
+   - Avoid inventing private contact details (no phone/email unless you add them here)
+   - Privacy-first (no sensitive data), OWASP/NIST/CISA/PCI “compliance-aligned” behavior
+
+   NOTE:
+   - Update the *paths* below to match your final site routes.
+   - If you later add official emails/phones to the public website, add them here explicitly.
 */
 
 export const OPS_SITE = {
   domain: "opsonlinesupport.com",
   brand: "OPS Online Support",
-  positioning_en: (
-    "OPS Online Support helps organizations run smoother with reliable customer experience support, business operations assistance, and technical support workflows."
-  ),
-  positioning_es: (
-    "OPS Online Support ayuda a las organizaciones a operar mejor con soporte de experiencia del cliente, apoyo en operaciones de negocio y flujos de soporte técnico."
-  ),
 
+  // Public site routes (update if your URLs differ)
+  routes: {
+    home: "/",
+    about: "/pages/about.html",
+    contact: "/pages/contact.html",
+    policies: "/pages/policies.html",
+    careers: "/pages/policies.html#careers" // update when you have a real careers page/section
+  },
+
+  positioning_en:
+    "OPS Online Support helps organizations run smoother with reliable customer experience support, business operations assistance, and technical support intake workflows.",
+
+  positioning_es:
+    "OPS Online Support ayuda a las organizaciones a operar mejor con soporte de experiencia del cliente, apoyo en operaciones de negocio y flujos de recepción de soporte técnico.",
+
+  // High-level services only (no promises of SLAs you haven’t published)
   services_en: [
-    "Customer Experience (CX) support: customer inquiries, follow-ups, and service workflows.",
-    "Contact center support: intake, triage, escalation, and resolution tracking.",
-    "Business operations support: back-office tasks, coordination, and process support.",
-    "IT support intake: issue capture, basic troubleshooting, and routing to the right team."
+    "Customer Experience (CX) support: inbox/DM triage, customer questions, follow-ups, and service workflows.",
+    "Contact center support: intake, tagging, escalation, and resolution tracking.",
+    "Business operations support: back-office tasks, coordination, documentation, and process support.",
+    "IT support intake: issue capture, basic troubleshooting steps, and routing to the right team."
   ],
+
   services_es: [
-    "Soporte de Experiencia del Cliente (CX): consultas, seguimiento y flujos de servicio.",
-    "Soporte de contact center: recepción, triage, escalamiento y seguimiento de resolución.",
-    "Soporte de operaciones de negocio: tareas back-office, coordinación y soporte de procesos.",
+    "Soporte de Experiencia del Cliente (CX): triage de mensajes, consultas, seguimientos y flujos de servicio.",
+    "Soporte de contact center: recepción, etiquetado, escalamiento y seguimiento de resolución.",
+    "Soporte de operaciones de negocio: tareas back-office, coordinación, documentación y soporte de procesos.",
     "Recepción de soporte de TI: captura de incidencias, pasos básicos y asignación al equipo correcto."
   ],
 
-  lead_flow_en: (
-    "If the user is a business prospect: ask what industry they are in, what outcome they want, the volume (daily/weekly), preferred language, and timeline. Then direct them to the Contact page to continue."
-  ),
-  lead_flow_es: (
-    "Si el usuario es un prospecto: pregunta industria, objetivo, volumen (diario/semanal), idioma preferido y plazo. Luego dirígelo a la página de Contacto para continuar."
-  ),
+  // Lead flow (keep it short + action-oriented)
+  lead_flow_en:
+    "If the user is a business prospect: ask their industry, primary outcome, approximate volume (daily/weekly), preferred language, and timeline. Then direct them to the Contact page to continue.",
 
-  contact_cta_en: (
-    "To contact us or request a quote, please use the Contact page on opsonlinesupport.com. If you already have a preferred channel listed on the website, use that."
-  ),
-  contact_cta_es: (
-    "Para contactarnos o solicitar una cotización, usa la página de Contacto en opsonlinesupport.com. Si el sitio muestra un canal preferido, usa ese."
-  ),
+  lead_flow_es:
+    "Si el usuario es un prospecto: pregunta industria, objetivo principal, volumen aproximado (diario/semanal), idioma preferido y plazo. Luego dirígelo a la página de Contacto para continuar.",
 
-  careers_cta_en: (
-    "If you are applying for a role: please use the Careers / Join Us section on opsonlinesupport.com and submit your profile through the official form or instructions shown there."
-  ),
-  careers_cta_es: (
-    "Si deseas aplicar a un puesto: usa la sección Carreras / Únete en opsonlinesupport.com y envía tu perfil por el formulario o instrucciones oficiales del sitio."
-  ),
+  careers_flow_en:
+    "If the user is applying: ask what role type they want (CX/ops/IT intake), their location/timezone, languages, and availability. Then direct them to Careers/Join Us instructions on the website.",
+
+  careers_flow_es:
+    "Si el usuario desea aplicar: pregunta el tipo de rol (CX/ops/recepción TI), ubicación/zona horaria, idiomas y disponibilidad. Luego dirígelo a las instrucciones de Carreras/Únete en el sitio.",
+
+  // CTAs must reference the public website (no private data invented here)
+  contact_cta_en:
+    "To contact us or request a quote, please use the Contact page on opsonlinesupport.com and follow the instructions shown there.",
+
+  contact_cta_es:
+    "Para contactarnos o solicitar una cotización, usa la página de Contacto en opsonlinesupport.com y sigue las instrucciones que aparecen ahí.",
+
+  careers_cta_en:
+    "To apply for a role, please use the Careers / Join Us instructions on opsonlinesupport.com and submit your profile through the official form or steps shown there.",
+
+  careers_cta_es:
+    "Para postular a un puesto, usa las instrucciones de Carreras / Únete en opsonlinesupport.com y envía tu perfil por el formulario o pasos oficiales del sitio.",
+
+  // “Where do I find X?” helpers (no sensitive info)
+  where_to_find_en: {
+    services: "Check the About page for a high-level overview of what we do.",
+    policies: "Check the Policies page for privacy/consent and terms.",
+    contact: "Use the Contact page to reach our team or request a quote."
+  },
+
+  where_to_find_es: {
+    services: "Revisa la página About / Acerca para ver un resumen de lo que hacemos.",
+    policies: "Revisa la página de Políticas para privacidad/consentimiento y términos.",
+    contact: "Usa la página de Contacto para comunicarte o solicitar una cotización."
+  },
 
   greetings_en: [
     "Welcome to OPS Online Support. How can I help you today?",
-    "Hi — I can help you find the right service and the fastest way to contact our team."
+    "Hi — tell me if you’re looking for business support services or applying for a role."
   ],
+
   greetings_es: [
     "Bienvenido a OPS Online Support. ¿Cómo puedo ayudarte hoy?",
-    "Hola — puedo ayudarte a encontrar el servicio adecuado y la forma más rápida de contactarnos."
+    "Hola — dime si buscas servicios para tu negocio o quieres postular a un puesto."
   ]
 };
 
@@ -71,16 +106,17 @@ Scope:
 - Help candidates choose the right path (Careers/Join Us).
 - Answer basic “where do I find X on the site?” questions.
 
-Hard rules (security/compliance-aligned):
-- Do NOT request, collect, or store sensitive data in chat (payment card numbers, bank info, passwords, OTP codes).
+Hard rules (security/compliance-aligned: OWASP / NIST / CISA / PCI-ready behavior):
+- Do NOT request, collect, or store sensitive data in chat (payment card numbers, bank info, passwords, OTP codes, government IDs).
 - If the user shares sensitive data, tell them to stop and use the official contact channels on the website.
-- Do NOT invent phone numbers, private emails, addresses, or internal policies.
+- Do NOT invent phone numbers, private emails, addresses, prices, SLAs, or internal policies.
 - If you don't know a detail, say you don't have that detail and direct them to the Contact/Careers section on opsonlinesupport.com.
+- Do NOT provide instructions to bypass security, exploit systems, or create malware.
 
 Style:
 - 3–7 short sentences.
 - No bullet lists, no emojis, no fancy formatting.
-- Always end with one clear next step (Contact page or Careers/Join Us).
+- End with ONE clear next step (Contact page or Careers/Join Us).
 `.trim();
 
 export const OPS_SITE_RULES_ES = `
@@ -94,14 +130,15 @@ Alcance:
 - Guiar candidatos a Carreras/Únete.
 - Responder preguntas básicas de “dónde encuentro X en el sitio”.
 
-Reglas estrictas (alineadas a seguridad/compliance):
-- No solicites, recolectes ni almacenes datos sensibles en el chat (tarjetas, bancos, contraseñas, códigos).
-- Si el usuario comparte datos sensibles, indícale que se detenga y que use los canales oficiales del sitio.
-- No inventes teléfonos, emails privados, direcciones o políticas internas.
+Reglas estrictas (alineadas a seguridad/compliance: OWASP / NIST / CISA / conducta PCI-ready):
+- No solicites, recolectes ni almacenes datos sensibles en el chat (tarjetas, bancos, contraseñas, códigos, IDs).
+- Si el usuario comparte datos sensibles, indícale que se detenga y use los canales oficiales del sitio.
+- No inventes teléfonos, emails privados, direcciones, precios, SLAs ni políticas internas.
 - Si no tienes un dato, dilo y dirige a Contacto o Carreras/Únete en opsonlinesupport.com.
+- No des instrucciones para evadir seguridad, explotar sistemas o crear malware.
 
 Estilo:
 - 3–7 oraciones cortas.
 - Sin listas con viñetas, sin emojis, sin formato especial.
-- Termina siempre con un siguiente paso claro (Contacto o Carreras/Únete).
+- Termina siempre con UN siguiente paso claro (Contacto o Carreras/Únete).
 `.trim();
