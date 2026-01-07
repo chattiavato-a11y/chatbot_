@@ -22,6 +22,8 @@
   const input = qs("#chatbot-input");
   const sendBtn = qs("#chatbot-send");
 
+  const liveRegion = qs("#live-region");
+
   const listenCtrl = qs("#listenCtrl");
   const voiceStatus = qs("#voice-status");
 
@@ -63,13 +65,94 @@
 
   const transcript = [];
 
+  const I18N = {
+    ready: { en: "Ready", es: "Listo" },
+    sending: { en: "Sending…", es: "Enviando…" },
+    statusError: { en: "Error", es: "Error" },
+    offline: { en: "Offline", es: "Sin conexión" },
+    welcome: {
+      en: "Chattia for OPS is ready. Type or use the mic to chat.",
+      es: "Chattia para OPS está listo. Escribe o usa el micrófono para chatear."
+    },
+    transcriptEmpty: { en: "No transcript yet.", es: "No hay transcripción todavía." },
+    roleUser: { en: "End User", es: "Usuario" },
+    roleBot: { en: "Chatbot", es: "Chatbot" },
+    listening: { en: "Listening…", es: "Escuchando…" },
+    voiceUnavailable: {
+      en: "Voice input not available in this browser.",
+      es: "La entrada de voz no está disponible en este navegador."
+    },
+    repeatPrompt: {
+      en: "My apologies, would you please repeat that? I'm sorry, I didn't get that.",
+      es: "Disculpame, ¿podrías repetir eso? No te escuché."
+    },
+    unauthorized: {
+      en: "This assistant only accepts messages from authorized sites.",
+      es: "Este asistente solo acepta mensajes desde sitios autorizados."
+    },
+    suspiciousBlocked: {
+      en: "Message blocked for security. Please write without tags or scripts.",
+      es: "Mensaje bloqueado por seguridad. Escribe sin etiquetas o scripts."
+    },
+    gatewayError: { en: "OPS gateway error.", es: "Error del gateway de OPS." },
+    noReply: { en: "No reply.", es: "Sin respuesta." },
+    networkError: { en: "Can’t reach OPS assistant.", es: "No puedo conectar con el asistente OPS." },
+    consentDeniedLive: {
+      en: "Consent denied. Chat is disabled until you accept privacy terms.",
+      es: "Consentimiento rechazado. El chat está deshabilitado hasta que aceptes la privacidad."
+    },
+    networkErrorLive: {
+      en: "Network error. Please check your connection and try again.",
+      es: "Error de red. Verifica tu conexión y vuelve a intentarlo."
+    }
+  };
+
   const clamp = (s, n) => (typeof s === "string" ? s.slice(0, n) : "");
   const safeText = (s) => clamp(String(s || ""), MAX_INPUT_CHARS);
 
-  function setNet(ok, enText, esText) {
+  function t(key, lang = currentLang) {
+    const entry = I18N[key];
+    if (!entry) return "";
+    return (lang === "es") ? entry.es : entry.en;
+  }
+
+  function setCustomText(el, text) {
+    if (!el) return;
+    const normalized = String(text || "");
+    el.dataset.en = normalized;
+    el.dataset.es = normalized;
+    el.textContent = normalized;
+  }
+
+  function setTextWithDataset(el, key, lang = currentLang) {
+    const entry = I18N[key];
+    if (!el || !entry) return "";
+    const text = (lang === "es") ? entry.es : entry.en;
+    el.dataset.en = entry.en;
+    el.dataset.es = entry.es;
+    el.textContent = text;
+    return text;
+  }
+
+  function setLiveMessage(key) {
+    if (!liveRegion || !I18N[key]) return;
+    setTextWithDataset(liveRegion, key);
+  }
+
+  function clearLiveMessage() {
+    if (!liveRegion) return;
+    setCustomText(liveRegion, "");
+  }
+
+  function setNet(ok, statusKey, overrideText) {
     if (!netDot || !netText) return;
     netDot.style.background = ok ? "rgba(44,242,162,.9)" : "rgba(255,59,143,.9)";
-    netText.textContent = (currentLang === "es") ? (esText || enText || "") : (enText || esText || "");
+
+    if (statusKey && I18N[statusKey]) {
+      setTextWithDataset(netText, statusKey);
+    } else if (overrideText) {
+      setCustomText(netText, overrideText);
+    }
   }
 
   function normalizeUserText(s) {
@@ -125,9 +208,11 @@
     if (next === "accepted") {
       prefsApi?.setPersistenceAllowed(true);
       setChatEnabled(true);
+      clearLiveMessage();
     } else if (next === "denied") {
       prefsApi?.setPersistenceAllowed(false);
       setChatEnabled(false);
+      setLiveMessage("consentDeniedLive");
     }
 
     applyConsentUI();
@@ -216,7 +301,7 @@
     if (!transcript.length) {
       const empty = document.createElement("div");
       empty.className = "transcript-empty";
-      empty.textContent = (currentLang === "es") ? "No hay transcripción todavía." : "No transcript yet.";
+      setTextWithDataset(empty, "transcriptEmpty");
       transcriptList.appendChild(empty);
       return;
     }
@@ -227,9 +312,8 @@
 
       const who = document.createElement("div");
       who.className = "transcript-who";
-      who.textContent = item.role === "user"
-        ? (currentLang === "es" ? "Usuario" : "End User")
-        : (currentLang === "es" ? "Chatbot" : "Chatbot");
+      const whoKey = item.role === "user" ? "roleUser" : "roleBot";
+      setTextWithDataset(who, whoKey);
 
       const txt = document.createElement("div");
       txt.className = "transcript-text";
@@ -249,9 +333,7 @@
 
   function copyTranscriptNow() {
     const txt = transcript.map((item) => {
-      const roleLabel = item.role === "user"
-        ? (currentLang === "es" ? "Usuario" : "End User")
-        : (currentLang === "es" ? "Chatbot" : "Chatbot");
+      const roleLabel = t(item.role === "user" ? "roleUser" : "roleBot");
       return `${roleLabel}: ${item.text}`;
     }).join("\n\n");
     if (!txt) return;
@@ -312,6 +394,7 @@
     const o = (opts && typeof opts === "object") ? opts : {};
     const record = (o.record !== false);
     const typing = (o.typing === true);
+    const i18nKey = o.i18nKey;
 
     const wrap = document.createElement("div");
     wrap.className = `msg ${who}`;
@@ -330,6 +413,13 @@
       bubble.appendChild(t);
     } else {
       bubble.textContent = text;
+      if (i18nKey && I18N[i18nKey]) {
+        bubble.dataset.en = I18N[i18nKey].en;
+        bubble.dataset.es = I18N[i18nKey].es;
+      } else {
+        bubble.dataset.en = text;
+        bubble.dataset.es = text;
+      }
     }
 
     const meta = document.createElement("div");
@@ -359,10 +449,8 @@
 
   function ensureWelcome() {
     if (log.dataset.welcomed === "true") return;
-    const welcome = (currentLang === "es")
-      ? "Chattia para OPS está listo. Escribe o usa el micrófono para chatear."
-      : "Chattia for OPS is ready. Type or use the mic to chat.";
-    addBotLine(welcome);
+    const welcome = t("welcome");
+    addBotLine(welcome, { i18nKey: "welcome" });
     log.dataset.welcomed = "true";
   }
 
@@ -401,9 +489,13 @@
   let requestedRepeat = false;
   let inFlight = false;
 
-  function setVoiceStatus(en, es) {
+  function setVoiceStatusKey(key) {
     if (!voiceStatus) return;
-    voiceStatus.textContent = (currentLang === "es") ? (es || en || "") : (en || es || "");
+    if (key && I18N[key]) {
+      setTextWithDataset(voiceStatus, key);
+    } else {
+      setCustomText(voiceStatus, "");
+    }
   }
 
   function updateListenUI() {
@@ -421,7 +513,7 @@
       speechEnabled = false;
       try { synth.cancel(); } catch {}
       updateListenUI();
-      setVoiceStatus("", "");
+      setVoiceStatusKey();
     }, VOICE_SESSION_MS);
     return true;
   }
@@ -459,10 +551,8 @@
   function promptRepeat() {
     if (requestedRepeat) return;
     requestedRepeat = true;
-    const apology = (currentLang === "es")
-      ? "Disculpame, ¿podrías repetir eso? No te escuché."
-      : "My apologies, would you please repeat that? I'm sorry, I didn't get that.";
-    addBotLine(apology);
+    const apology = t("repeatPrompt");
+    addBotLine(apology, { i18nKey: "repeatPrompt" });
     speak(apology, currentLang);
   }
 
@@ -478,7 +568,7 @@
       requestedRepeat = false;
 
       listening = true;
-      setVoiceStatus("Listening…", "Escuchando…");
+      setVoiceStatusKey("listening");
       updateListenUI();
 
       recognition.onresult = (e) => {
@@ -492,14 +582,14 @@
 
       recognition.onerror = () => {
         listening = false;
-        setVoiceStatus("", "");
+        setVoiceStatusKey();
         updateListenUI();
         if (!lastVoiceTranscript) promptRepeat();
       };
 
       recognition.onend = () => {
         listening = false;
-        setVoiceStatus("", "");
+        setVoiceStatusKey();
         updateListenUI();
         if (lastVoiceTranscript) {
           requestSubmitIfInput();
@@ -511,7 +601,7 @@
       recognition.start();
     } catch {
       listening = false;
-      setVoiceStatus("", "");
+      setVoiceStatusKey();
       updateListenUI();
     }
   }
@@ -520,7 +610,7 @@
     if (!recognition || !listening) return;
     try { recognition.stop(); } catch {}
     listening = false;
-    setVoiceStatus("", "");
+    setVoiceStatusKey();
     updateListenUI();
   }
 
@@ -533,13 +623,18 @@
 
   setChatEnabled(consentState !== "denied");
   applyConsentUI();
+  if (consentState === "denied") {
+    setLiveMessage("consentDeniedLive");
+  } else {
+    clearLiveMessage();
+  }
 
   document.addEventListener("ops:lang-change", (e) => {
     const l = e?.detail?.lang;
     currentLang = (l === "es") ? "es" : "en";
     ensureWelcome();
     renderTranscriptList();
-    setNet(true, "Ready", "Listo");
+    setNet(true, "ready");
   });
 
   document.addEventListener("ops:theme-change", (e) => {
@@ -567,10 +662,7 @@
 
   if (listenCtrl) listenCtrl.onclick = () => {
     if (!recognition) {
-      setVoiceStatus(
-        "Voice input not available in this browser.",
-        "La entrada de voz no está disponible en este navegador."
-      );
+      setVoiceStatusKey("voiceUnavailable");
       return;
     }
 
@@ -606,19 +698,15 @@
     if (!msg) return;
 
     if (!isFullyAuthorized()) {
-      const m = (currentLang === "es")
-        ? "Este asistente solo acepta mensajes desde sitios autorizados."
-        : "This assistant only accepts messages from authorized sites.";
-      addBotLine(m);
+      const m = t("unauthorized");
+      addBotLine(m, { i18nKey: "unauthorized" });
       sendTelemetry("auth_block", { reason: "origin_or_path" });
       return;
     }
 
     if (looksSuspicious(msg)) {
-      const warn = (currentLang === "es")
-        ? "Mensaje bloqueado por seguridad. Escribe sin etiquetas o scripts."
-        : "Message blocked for security. Please write without tags or scripts.";
-      addBotLine(warn);
+      const warn = t("suspiciousBlocked");
+      addBotLine(warn, { i18nKey: "suspiciousBlocked" });
       speak(warn, currentLang);
       sendTelemetry("client_suspicious");
       return;
@@ -631,7 +719,7 @@
     input.value = "";
     input.focus();
 
-    setNet(navigator.onLine, "Sending…", "Enviando…");
+    setNet(navigator.onLine, "sending");
     if (sendBtn) sendBtn.disabled = true;
     inFlight = true;
 
@@ -660,32 +748,41 @@
       try { data = JSON.parse(raw); } catch {}
 
       if (!res.ok) {
-        const fallback = (currentLang === "es") ? "Error del gateway de OPS." : "OPS gateway error.";
+        const fallback = t("gatewayError");
         const errMsg = (data && (data.error || data.public_error)) ? String(data.error || data.public_error) : (raw || fallback);
-        botBubble.textContent = errMsg;
+        if (errMsg === fallback) {
+          setTextWithDataset(botBubble, "gatewayError");
+        } else {
+          setCustomText(botBubble, errMsg);
+        }
         recordTranscript("bot", errMsg);
         speak(errMsg, currentLang);
         sendTelemetry("api_error", { status: res.status });
-        setNet(false, "Error", "Error");
+        setNet(false, "statusError");
         return;
       }
 
       const replyLang = (data && data.lang === "es") ? "es" : currentLang;
       const reply = (data && typeof data.reply === "string" && data.reply.trim())
         ? data.reply.trim()
-        : (currentLang === "es" ? "Sin respuesta." : "No reply.");
+        : t("noReply");
 
-      botBubble.textContent = reply;
+      if (data && typeof data.reply === "string" && data.reply.trim()) {
+        setCustomText(botBubble, reply);
+      } else {
+        setTextWithDataset(botBubble, "noReply", replyLang);
+      }
       recordTranscript("bot", reply);
       speak(reply, replyLang);
-      setNet(true, "Ready", "Listo");
+      setNet(true, "ready");
     } catch {
-      const fallback = (currentLang === "es") ? "No puedo conectar con el asistente OPS." : "Can’t reach OPS assistant.";
-      botBubble.textContent = fallback;
+      const fallback = t("networkError");
+      setTextWithDataset(botBubble, "networkError");
       recordTranscript("bot", fallback);
       speak(fallback, currentLang);
       sendTelemetry("network_error", { online: !!navigator.onLine });
-      setNet(false, "Offline", "Sin conexión");
+      setNet(false, "offline");
+      setLiveMessage("networkErrorLive");
     } finally {
       if (sendBtn) sendBtn.disabled = false;
       inFlight = false;
@@ -697,6 +794,6 @@
   }
 
   updateListenUI();
-  setNet(true, "Ready", "Listo");
+  setNet(true, "ready");
   ensureWelcome();
 })();
