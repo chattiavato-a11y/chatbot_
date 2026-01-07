@@ -1,198 +1,192 @@
+<!-- pages/about.html
+     OPS Online Support — About (v2)
+     - No inline JS
+     - Uses shared assets for theme/UI/lang/preferences/chat
+-->
+
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title data-en="About • OPS Online Support" data-es="Acerca de • Soporte en línea de OPS">About • OPS Online Support</title>
-  <meta
-    name="description"
-    data-en="About Chattia for OPS and the design principles behind the assistant experience."
-    data-es="Acerca de Chattia para OPS y los principios de diseño detrás de la experiencia del asistente."
-    content="About Chattia for OPS and the design principles behind the assistant experience." />
-  <link rel="canonical" href="https://www.chattia.io/ops-online-support/pages/about.html" />
-  <link rel="alternate" href="https://www.chattia.io/ops-online-support/pages/about.html" hreflang="en" data-hreflang="en" />
-  <link rel="alternate" href="https://www.chattia.io/ops-online-support/pages/about.html?lang=es" hreflang="es" data-hreflang="es" />
-  <link rel="alternate" href="https://www.chattia.io/ops-online-support/pages/about.html" hreflang="x-default" data-hreflang="x-default" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>About • OPS Online Support</title>
 
-  <link rel="stylesheet" href="../assets/chattia-theme.css" />
-  <link rel="stylesheet" href="../assets/chattia-ui.css" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="X-Frame-Options" content="DENY" />
 
-  <script src="../assets/chattia-preferences.js" defer></script>
-  <script defer>
-    (() => {
-      const titleEl = document.querySelector("title[data-en][data-es]");
-      const descEl = document.querySelector('meta[name="description"][data-en][data-es]');
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    base-uri 'self';
+    object-src 'none';
+    frame-ancestors 'none';
+    form-action 'self';
+    img-src 'self' data:;
+    font-src 'self' data:;
+    style-src 'self';
+    script-src 'self';
+    connect-src 'self' https://ops-gateway.grabem-holdem-nuts-right.workers.dev;
+    upgrade-insecure-requests;
+  " />
 
-      const applyHeadLang = (lang) => {
-        const toES = (lang === "es");
-        if (titleEl) document.title = toES ? titleEl.dataset.es : titleEl.dataset.en;
-        if (descEl) descEl.setAttribute("content", toES ? descEl.dataset.es : descEl.dataset.en);
-      };
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/assets/chattia-theme.css" />
+  <link rel="stylesheet" href="/assets/chattia-ui.css" />
 
-      applyHeadLang(document.documentElement.lang === "es" ? "es" : "en");
-      document.addEventListener("ops:lang-change", (event) => applyHeadLang(event.detail?.lang || "en"));
-    })();
-  </script>
+  <script defer src="/assets/chattia-head-lang.js"></script>
 </head>
+
 <body>
-  <div class="content-shell">
-    <header class="content-header">
-      <div>
-        <p class="content-meta" data-en="OPS Online Support" data-es="Soporte en línea de OPS">OPS Online Support</p>
-        <h1 data-en="About Chattia for OPS" data-es="Acerca de Chattia para OPS">About Chattia for OPS</h1>
-        <p
-          class="content-meta"
-          data-en="Human-centered, secure-by-design support assistant."
-          data-es="Asistente de soporte centrado en las personas y seguro desde el diseño.">
-          Human-centered, secure-by-design support assistant.
-        </p>
-      </div>
-      <div class="quick-toggles" aria-label="Theme and language controls" data-en-label="Theme and language controls" data-es-label="Controles de tema e idioma">
-        <div class="toggle-group" role="radiogroup" aria-label="Language selection" data-en-label="Language selection" data-es-label="Selección de idioma">
-          <button
-            type="button"
-            class="quick-toggle"
-            data-lang-btn="en"
-            role="radio"
-            aria-checked="true"
-            aria-pressed="false"
-            aria-label="Switch to English"
-            data-en-label="Switch to English"
-            data-es-label="Cambiar a inglés"
-            data-en="EN"
-            data-es="EN">EN</button>
-          <button
-            type="button"
-            class="quick-toggle"
-            data-lang-btn="es"
-            role="radio"
-            aria-checked="false"
-            aria-pressed="false"
-            aria-label="Switch to Spanish"
-            data-en-label="Switch to Spanish"
-            data-es-label="Cambiar a español"
-            data-en="ES"
-            data-es="ES">ES</button>
-        </div>
-        <div class="toggle-group" role="radiogroup" aria-label="Theme selection" data-en-label="Theme selection" data-es-label="Selección de tema">
-          <button
-            type="button"
-            class="quick-toggle"
-            data-theme-btn="light"
-            role="radio"
-            aria-checked="true"
-            aria-pressed="false"
-            aria-label="Switch to light theme"
-            data-en-label="Switch to light theme"
-            data-es-label="Cambiar a tema claro"
-            data-en="Light"
-            data-es="Claro">Light</button>
-          <button
-            type="button"
-            class="quick-toggle"
-            data-theme-btn="dark"
-            role="radio"
-            aria-checked="false"
-            aria-pressed="false"
-            aria-label="Switch to dark theme"
-            data-en-label="Switch to dark theme"
-            data-es-label="Cambiar a tema oscuro"
-            data-en="Dark"
-            data-es="Oscuro">Dark</button>
-        </div>
-      </div>
-    </header>
+  <a class="skip-link" href="#main">Skip to content</a>
 
-    <div class="content-grid">
-      <section class="content-card">
-        <h2 data-en="Mission" data-es="Misión">Mission</h2>
-        <p
-          data-en="Deliver fast, safe, multilingual assistance that respects user privacy while staying aligned to regulatory guardrails."
-          data-es="Brindar asistencia rápida, segura y multilingüe que respete la privacidad del usuario, manteniéndose alineada con los controles regulatorios.">
-          Deliver fast, safe, multilingual assistance that respects user privacy while staying aligned to regulatory guardrails.
-        </p>
-        <ul class="content-list">
-          <li
-            data-en="Accessible UX built around WCAG 2.1 AA guidance and responsive layouts."
-            data-es="UX accesible basada en las pautas WCAG 2.1 AA y diseños responsivos.">
-            Accessible UX built around WCAG 2.1 AA guidance and responsive layouts.
-          </li>
-          <li
-            data-en="Security-first defaults: CSP, Turnstile, input normalization, and consent-aware preferences."
-            data-es="Valores predeterminados de seguridad primero: CSP, Turnstile, normalización de entradas y preferencias con consentimiento.">
-            Security-first defaults: CSP, Turnstile, input normalization, and consent-aware preferences.
-          </li>
-          <li
-            data-en="Continuous improvement from telemetry signals while minimizing data collected."
-            data-es="Mejora continua a partir de señales de telemetría, minimizando los datos recopilados.">
-            Continuous improvement from telemetry signals while minimizing data collected.
-          </li>
-        </ul>
-      </section>
-
-      <section class="content-card">
-        <h2 data-en="What powers the experience" data-es="Qué impulsa la experiencia">What powers the experience</h2>
-        <ul class="content-list">
-          <li
-            data-en="Cloud-native delivery with edge security controls and origin allowlists."
-            data-es="Entrega nativa en la nube con controles de seguridad en el edge y listas de permitidos del origen.">
-            Cloud-native delivery with edge security controls and origin allowlists.
-          </li>
-          <li
-            data-en="Voice input/output readiness through the Web Speech API."
-            data-es="Preparación para entrada/salida por voz mediante la API Web Speech.">
-            Voice input/output readiness through the Web Speech API.
-          </li>
-          <li
-            data-en="Localization toggles for English and Spanish with persistent settings after consent."
-            data-es="Interruptores de localización para inglés y español con ajustes persistentes después del consentimiento.">
-            Localization toggles for English and Spanish with persistent settings after consent.
-          </li>
-          <li
-            data-en="Modular assets that separate theming (backgrounds and tokens) from UI logic."
-            data-es="Activos modulares que separan el tema (fondos y tokens) de la lógica de la interfaz.">
-            Modular assets that separate theming (backgrounds and tokens) from UI logic.
-          </li>
-        </ul>
-      </section>
-
-      <section class="content-card">
-        <h2 data-en="How to engage" data-es="Cómo interactuar">How to engage</h2>
-        <ul class="content-list">
-          <li
-            data-en="Use the chat for quick answers and operational support."
-            data-es="Usa el chat para respuestas rápidas y soporte operativo.">
-            Use the chat for quick answers and operational support.
-          </li>
-          <li
-            data-en="Open the consent and T&amp;C modals from the chat footer for full context."
-            data-es="Abre los modales de consentimiento y T&amp;C desde el pie del chat para ver el contexto completo.">
-            Open the consent and T&amp;C modals from the chat footer for full context.
-          </li>
-          <li
-            data-en="Submit security or privacy questions through the Contact page."
-            data-es="Envía preguntas de seguridad o privacidad a través de la página de Contacto.">
-            Submit security or privacy questions through the Contact page.
-          </li>
-        </ul>
-        <div class="content-actions">
-          <a
-            class="pill-link"
-            href="../index.html"
-            data-en="Back to Chat"
-            data-es="Volver al Chat">
-            Back to Chat
-          </a>
-        </div>
-      </section>
+  <header class="site-header" role="banner">
+    <div class="brand">
+      <a class="brand-link" href="/" aria-label="OPS Online Support Home">
+        <span class="brand-mark" aria-hidden="true">OPS</span>
+        <span class="brand-text">OPS Online Support</span>
+      </a>
     </div>
 
-    <footer
-      class="content-meta"
-      data-en="OPS Online Support • Secure by design"
-      data-es="OPS Online Support • Seguro desde el diseño">
-      OPS Online Support • Secure by design
-    </footer>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="/" class="nav-link" data-i18n="nav_home">Home</a>
+      <a href="/pages/about.html" class="nav-link is-active" aria-current="page" data-i18n="nav_about">About</a>
+      <a href="/pages/contact.html" class="nav-link" data-i18n="nav_contact">Contact</a>
+      <a href="/pages/policies.html" class="nav-link" data-i18n="nav_policies">Policies</a>
+    </nav>
+
+    <div class="site-actions">
+      <button class="btn btn-ghost" id="langToggle" type="button" aria-label="Change language">
+        <span aria-hidden="true">EN/ES</span>
+      </button>
+      <button class="btn btn-ghost" id="themeToggle" type="button" aria-label="Toggle theme">
+        <span aria-hidden="true">☾</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="main" class="site-main" role="main">
+    <section class="page-hero">
+      <h1 class="page-title" data-i18n="about_title">About OPS Online Support</h1>
+      <p class="page-subtitle" data-i18n="about_subtitle">
+        We help organizations run smoother with reliable customer experience support, business operations assistance, and technical support intake.
+      </p>
+    </section>
+
+    <section class="content-grid" aria-label="About content">
+      <article class="content-card">
+        <h2 data-i18n="about_what_title">What we do</h2>
+        <p data-i18n="about_what_body">
+          OPS Online Support provides structured CX and operations support that helps teams reduce backlog, respond faster, and keep work organized.
+          We focus on clear intake, triage, follow-ups, and handoffs so issues move to resolution.
+        </p>
+      </article>
+
+      <article class="content-card">
+        <h2 data-i18n="about_how_title">How we work</h2>
+        <p data-i18n="about_how_body">
+          We start by understanding your workflow and the outcome you want, then align staffing and process to your volume and timeline.
+          For security, we avoid collecting sensitive information in chat and guide users to official site channels for anything private.
+        </p>
+      </article>
+
+      <article class="content-card">
+        <h2 data-i18n="about_who_title">Who this is for</h2>
+        <p data-i18n="about_who_body">
+          Businesses that need consistent customer communications, better ticket handling, back-office coordination, or a clean IT support intake path.
+          If you are exploring a role with OPS, use the Careers / Join Us guidance on the Policies page.
+        </p>
+      </article>
+
+      <article class="content-card">
+        <h2 data-i18n="about_next_title">Next steps</h2>
+        <p data-i18n="about_next_body">
+          If you’re a business, tell us your industry, desired outcome, weekly volume, preferred language, and timeline.
+          Then continue via the Contact page so the team can follow up through the official channel listed on the website.
+        </p>
+        <div class="inline-ctas">
+          <a class="btn btn-primary" href="/pages/contact.html" data-i18n="cta_contact">Contact / Request a Quote</a>
+          <a class="btn btn-secondary" href="/pages/policies.html#careers" data-i18n="cta_careers">Careers / Join Us</a>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-links">
+      <a href="/pages/policies.html" data-i18n="footer_policies">Privacy & Terms</a>
+      <a href="/pages/contact.html" data-i18n="footer_contact">Contact</a>
+      <a href="/pages/about.html" data-i18n="footer_about">About</a>
+    </div>
+    <div class="footer-meta">
+      <span aria-hidden="true">©</span>
+      <span id="year"></span>
+      <span>OPS Online Support</span>
+    </div>
+  </footer>
+
+  <!-- Floating Action Buttons -->
+  <div class="fab-stack" aria-label="Quick actions">
+    <a class="fab" id="fabContact" href="/pages/contact.html" data-i18n="fab_contact" aria-label="Contact Us">Contact</a>
+    <a class="fab" id="fabJoin" href="/pages/policies.html#careers" data-i18n="fab_join" aria-label="Join Us">Join</a>
+    <button class="fab fab-accent" id="fabChat" type="button" data-i18n="fab_chat" aria-label="Open chat">Chat</button>
   </div>
+
+  <!-- Privacy & Consent Modal (chat stays disabled until accepted) -->
+  <dialog class="modal" id="consentModal" aria-labelledby="consentTitle">
+    <form method="dialog" class="modal-card">
+      <h2 id="consentTitle" data-i18n="consent_title">Privacy & Consent</h2>
+
+      <p class="modal-text" data-i18n="consent_body">
+        Chat interactions may be used to improve the chatbot experience. Please do not enter sensitive personal information.
+        OPS Online Support does not intentionally collect payment card data, banking info, passwords, or one-time codes.
+      </p>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="consentDeny" value="deny" type="submit" data-i18n="consent_deny">Deny</button>
+        <button class="btn btn-primary" id="consentAccept" value="accept" type="submit" data-i18n="consent_accept">Accept</button>
+      </div>
+
+      <p class="modal-footnote" data-i18n="consent_note">
+        If you deny consent, chat will remain disabled until you accept.
+      </p>
+    </form>
+  </dialog>
+
+  <!-- Chat Panel -->
+  <aside class="chat-drawer" id="chatDrawer" aria-label="OPS Assistant" aria-hidden="true">
+    <header class="chat-header">
+      <div class="chat-title">
+        <strong data-i18n="chat_title">OPS Assistant</strong>
+        <span class="chat-subtitle" data-i18n="chat_subtitle">Website help • Contact • Careers</span>
+      </div>
+      <button class="btn btn-ghost" id="chatClose" type="button" aria-label="Close chat">✕</button>
+    </header>
+
+    <div class="chat-body" id="chatBody" role="log" aria-live="polite" aria-relevant="additions"></div>
+
+    <form class="chat-input" id="chatForm">
+      <input class="hp" type="text" name="hp_email" id="hp_email" autocomplete="off" tabindex="-1" aria-hidden="true" />
+      <input class="hp" type="text" name="hp_website" id="hp_website" autocomplete="off" tabindex="-1" aria-hidden="true" />
+
+      <label class="sr-only" for="chatMessage" data-i18n="chat_label">Your message</label>
+      <input id="chatMessage" name="message" type="text" maxlength="256" autocomplete="off"
+             placeholder="Type your message…" data-i18n-placeholder="chat_placeholder" />
+
+      <button class="btn btn-primary" type="submit" data-i18n="chat_send">Send</button>
+    </form>
+
+    <p class="chat-disclaimer" data-i18n="chat_disclaimer">
+      Do not share passwords, OTP codes, banking info, or card numbers in chat. Use Contact for sensitive matters.
+    </p>
+  </aside>
+
+  <script defer src="/assets/chattia-preferences.js"></script>
+  <script defer src="/assets/chattia-ui.js"></script>
+
+  <noscript>
+    <div class="noscript">
+      This page works best with JavaScript enabled. You can still navigate to Contact and Policies without chat.
+    </div>
+  </noscript>
 </body>
 </html>
