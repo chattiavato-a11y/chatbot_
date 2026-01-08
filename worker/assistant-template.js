@@ -23,8 +23,8 @@
    - Secret/var:       OPS_ASSET_IDS (comma-separated) OR ASSET_ID (single)
      UI must send:     X-Ops-Asset-Id
 
-   NOTE:
-   - Turnstile intentionally removed.
+   OPTIONAL:
+   - Secret/var:       TURNSTILE_SECRET (enables Turnstile verification)
 */
 
 const ALLOWED_ORIGINS = new Set([
@@ -147,6 +147,27 @@ function looksSuspicious(s) {
 
 function hasDataUriBase64(s) {
   return /data:\s*[^;]+;\s*base64\s*,/i.test(String(s || ""));
+}
+
+async function verifyTurnstile(env, token, clientIp) {
+  const secret = env.TURNSTILE_SECRET || "";
+  if (!secret) return { ok: true, skipped: true };
+
+  const trimmed = String(token || "").trim();
+  if (!trimmed) return { ok: false, reason: "missing" };
+
+  const form = new URLSearchParams();
+  form.set("secret", secret);
+  form.set("response", trimmed);
+  if (clientIp) form.set("remoteip", clientIp);
+
+  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    body: form
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data || data.success !== true) return { ok: false, reason: "invalid" };
+  return { ok: true };
 }
 
 async function readBodyArrayBufferLimited(request, limitBytes) {
@@ -500,6 +521,20 @@ export default {
     if (hpEmail || hpWebsite) {
       await logEvent(ctx, env, { type: "HONEYPOT_TRIP", ip_tag: tag, origin_seen: origin, path: pathname, request_id: reqId });
       return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "HONEYPOT", request_id: reqId }, reqId);
+    }
+
+    const turnstileToken = String(payload.turnstile_token || "").trim();
+    const turnstileCheck = await verifyTurnstile(env, turnstileToken, clientIp);
+    if (!turnstileCheck.ok) {
+      await logEvent(ctx, env, {
+        type: "TURNSTILE_BLOCK",
+        reason: turnstileCheck.reason,
+        ip_tag: tag,
+        origin_seen: origin,
+        path: pathname,
+        request_id: reqId
+      });
+      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "TURNSTILE", request_id: reqId }, reqId);
     }
 
     const lang = (payload.lang === "es") ? "es" : "en";
