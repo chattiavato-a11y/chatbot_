@@ -55,11 +55,9 @@
       consent_note: "If you deny consent, chat will remain disabled until you accept.",
 
       chat_title: "Chattia",
-      chat_subtitle:
-        "Hi, I'm Chattia your dedicated OPS Assistant, ready to answer all your inquiries. " +
-        "But before we continue, please: Do not share passwords, OTP codes, banking info, or card numbers in chat.",
       chat_lang_toggle_text: "EN/ES",
       chat_theme_toggle_text: "Dark/Light",
+      chat_clear: "Clear",
       chat_label: "Your message",
       chat_placeholder: "Type your message…",
       chat_send: "Send"
@@ -77,11 +75,9 @@
       consent_note: "Si niegas el consentimiento, el chat quedará deshabilitado hasta que aceptes.",
 
       chat_title: "Chattia",
-      chat_subtitle:
-        "Hola, soy Chattia, tu asistente de OPS dedicada y lista para responder todas tus consultas. " +
-        "Pero antes de continuar, por favor: No compartas contraseñas, códigos OTP, información bancaria ni números de tarjeta en el chat.",
       chat_lang_toggle_text: "EN/ES",
       chat_theme_toggle_text: "Oscuro/Claro",
+      chat_clear: "Borrar",
       chat_label: "Tu mensaje",
       chat_placeholder: "Escribe tu mensaje…",
       chat_send: "Enviar"

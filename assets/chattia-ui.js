@@ -119,6 +119,7 @@
     // Toggles
     langToggle: $("#langToggle"),
     themeToggle: $("#themeToggle"),
+    chatClear: $("#chatClear"),
 
     // FABs
     fabChat: $("#fabChat")
@@ -218,6 +219,12 @@
     try {
       writeLS(LS.TRANSCRIPT, JSON.stringify(state.transcript.slice(-200)));
     } catch {}
+  }
+
+  function clearTranscript() {
+    state.transcript = [];
+    if (UI.chatBody) UI.chatBody.innerHTML = "";
+    try { localStorage.removeItem(LS.TRANSCRIPT); } catch {}
   }
 
   /* -------------------- Theme -------------------- */
@@ -504,6 +511,12 @@
       });
     }
 
+    if (UI.chatClear) {
+      UI.chatClear.addEventListener("click", () => {
+        clearTranscript();
+      });
+    }
+
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       closeChatDrawer({ returnFocus: false });
@@ -519,7 +532,7 @@
 
     state.theme = prefs && typeof prefs.getTheme === "function"
       ? prefs.getTheme()
-      : readLS(LS.THEME, "dark") === "light" ? "light" : "dark";
+      : readLS(LS.THEME, "light") === "light" ? "light" : "dark";
 
     state.lang = prefs && typeof prefs.getLang === "function"
       ? prefs.getLang()
