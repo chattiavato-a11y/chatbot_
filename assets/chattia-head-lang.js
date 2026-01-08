@@ -44,7 +44,7 @@
   // Minimal i18n strings used by the chat-only UI
   const I18N = {
     en: {
-      fab_chat: "Chat",
+      fab_chat: "Chattia",
 
       consent_title: "Privacy & Consent",
       consent_body:
@@ -64,7 +64,7 @@
     },
 
     es: {
-      fab_chat: "Chat",
+      fab_chat: "Chattia",
 
       consent_title: "Privacidad y consentimiento",
       consent_body:
