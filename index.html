@@ -13,7 +13,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>OPS Online Support • Chat</title>
+  <title>Chattia • Chat</title>
 
   <!-- Basic hardening (best delivered via headers, but meta helps on static hosting) -->
   <meta name="referrer" content="no-referrer" />
@@ -50,18 +50,7 @@
 </head>
 
 <body>
-  <div class="app">
-    <header class="topbar" aria-label="Chat controls">
-      <div class="nav-actions">
-        <button class="btn btn-ghost" id="langToggle" type="button" data-i18n="chat_lang_toggle_text" aria-label="Change language">
-          EN/ES
-        </button>
-        <button class="btn btn-ghost" id="themeToggle" type="button" data-i18n="chat_theme_toggle_text" aria-label="Toggle theme">
-          Dark/Light
-        </button>
-      </div>
-    </header>
-  </div>
+  <div class="app"></div>
 
   <!-- Floating Action Button -->
   <div class="fab-stack" aria-label="Quick actions">
@@ -90,13 +79,26 @@
   </dialog>
 
   <!-- Chat Panel -->
-  <aside class="chat-drawer" id="chatDrawer" aria-label="OPS Assistant" aria-hidden="true">
+  <aside class="chat-drawer" id="chatDrawer" aria-label="Chattia" aria-hidden="true">
     <header class="chat-header">
       <div class="chat-title">
-        <strong data-i18n="chat_title">OPS Assistant</strong>
-        <span class="chat-subtitle" data-i18n="chat_subtitle">Chat support • Routing help</span>
+        <strong data-i18n="chat_title">Chattia</strong>
+        <span class="chat-subtitle" data-i18n="chat_subtitle">
+          Hi, I'm Chattia your dedicated OPS Assistant, ready to answer all your inquiries. But before we continue, please:
+          Do not share passwords, OTP codes, banking info, or card numbers in chat.
+        </span>
       </div>
-      <button class="btn btn-ghost" id="chatClose" type="button" aria-label="Close chat">✕</button>
+      <div class="chat-header-actions">
+        <div class="chat-header-toggles" aria-label="Chat preferences">
+          <button class="btn btn-ghost" id="langToggle" type="button" data-i18n="chat_lang_toggle_text" aria-label="Change language">
+            EN/ES
+          </button>
+          <button class="btn btn-ghost" id="themeToggle" type="button" data-i18n="chat_theme_toggle_text" aria-label="Toggle theme">
+            Dark/Light
+          </button>
+        </div>
+        <button class="btn btn-ghost" id="chatClose" type="button" aria-label="Close chat">✕</button>
+      </div>
     </header>
 
     <div class="chat-body" id="chatBody" role="log" aria-live="polite" aria-relevant="additions"></div>
@@ -113,9 +115,6 @@
       <button class="btn btn-primary" type="submit" data-i18n="chat_send">Send</button>
     </form>
 
-    <p class="chat-disclaimer" data-i18n="chat_disclaimer">
-      Do not share passwords, OTP codes, banking info, or card numbers in chat. Use official OPS channels for sensitive matters.
-    </p>
   </aside>
 
   <!-- App scripts -->
