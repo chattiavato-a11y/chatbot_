@@ -661,6 +661,21 @@ a:focus, button:focus, input:focus, textarea:focus {
   line-height: 1.45;
 }
 
+.transcript-textarea {
+  width: 100%;
+  min-height: 220px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel-alt);
+  color: var(--fg);
+  font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
 .modal-actions {
   padding: 12px 14px;
   border-top: 1px solid var(--line);

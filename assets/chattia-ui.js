@@ -120,9 +120,17 @@
     langToggle: $("#langToggle"),
     themeToggle: $("#themeToggle"),
     chatClear: $("#chatClear"),
+    chatTranscript: $("#chatTranscript"),
 
     // FABs
-    fabChat: $("#fabChat")
+    fabChat: $("#fabChat"),
+
+    // Transcript modal
+    transcriptModal: $("#transcriptModal"),
+    transcriptClose: $("#transcriptClose"),
+    transcriptText: $("#transcriptText"),
+    transcriptCopy: $("#transcriptCopy"),
+    transcriptDownload: $("#transcriptDownload")
   };
 
   if (!UI.sendBtn && UI.chatForm) {
@@ -156,7 +164,8 @@
       fallbackReply:
         "Thanks. To continue, please review the content archive at opsonlinesupport.com/content.md.",
       gatewayError:
-        "There was a problem connecting to the assistant. Please try again or review opsonlinesupport.com/content.md."
+        "There was a problem connecting to the assistant. Please try again or review opsonlinesupport.com/content.md.",
+      transcript_empty: "No conversation yet."
     },
     es: {
       sending: "Enviando…",
@@ -169,7 +178,8 @@
       fallbackReply:
         "Gracias. Para continuar, revisa el archivo de contenido en opsonlinesupport.com/content.md.",
       gatewayError:
-        "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o revisa opsonlinesupport.com/content.md."
+        "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o revisa opsonlinesupport.com/content.md.",
+      transcript_empty: "Aún no hay conversación."
     }
   };
 
@@ -239,6 +249,13 @@
   function clearTranscript() {
     state.transcript = [];
     if (UI.chatBody) UI.chatBody.innerHTML = "";
+    if (UI.chatMessage) UI.chatMessage.value = "";
+    if (UI.sendBtn) UI.sendBtn.disabled = false;
+    isSending = false;
+    state.requestId += 1;
+    if (UI.transcriptText && UI.transcriptModal?.classList.contains("is-open")) {
+      UI.transcriptText.value = buildTranscriptText();
+    }
     try { localStorage.removeItem(LS.TRANSCRIPT); } catch {}
   }
 
@@ -343,6 +360,77 @@
     UI.chatDrawer.classList.remove("is-open");
     setChatExpanded(false);
     if (returnFocus && UI.fabChat) UI.fabChat.focus();
+  }
+
+  /* -------------------- Transcript export -------------------- */
+
+  function buildTranscriptText() {
+    if (!state.transcript.length) return t("transcript_empty");
+    return state.transcript.map((m) => {
+      const stamp = m.ts ? new Date(m.ts).toLocaleString() : new Date().toLocaleString();
+      const role = m.role === "assistant" ? "ASSISTANT" : "USER";
+      return `[${stamp}] ${role}: ${m.content}`;
+    }).join("\n");
+  }
+
+  function openTranscriptModal() {
+    if (!UI.transcriptModal) return;
+    UI.transcriptModal.classList.add("is-open");
+    UI.transcriptModal.setAttribute("aria-hidden", "false");
+
+    if (typeof UI.transcriptModal.showModal === "function") {
+      if (!UI.transcriptModal.open) UI.transcriptModal.showModal();
+    } else {
+      UI.transcriptModal.setAttribute("open", "");
+    }
+
+    if (UI.transcriptText) {
+      UI.transcriptText.value = buildTranscriptText();
+      UI.transcriptText.scrollTop = 0;
+      UI.transcriptText.focus();
+    }
+  }
+
+  function closeTranscriptModal() {
+    if (!UI.transcriptModal) return;
+    UI.transcriptModal.classList.remove("is-open");
+    UI.transcriptModal.setAttribute("aria-hidden", "true");
+
+    if (typeof UI.transcriptModal.close === "function") {
+      if (UI.transcriptModal.open) UI.transcriptModal.close();
+    } else {
+      UI.transcriptModal.removeAttribute("open");
+    }
+  }
+
+  async function copyTranscript() {
+    const text = UI.transcriptText ? UI.transcriptText.value : buildTranscriptText();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch {}
+    }
+    if (UI.transcriptText) {
+      UI.transcriptText.focus();
+      UI.transcriptText.select();
+      document.execCommand("copy");
+      UI.transcriptText.setSelectionRange(0, 0);
+    }
+  }
+
+  function downloadTranscript() {
+    const text = UI.transcriptText ? UI.transcriptText.value : buildTranscriptText();
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `chattia-transcript-${stamp}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   }
 
   /* -------------------- Transcript + message rendering -------------------- */
@@ -462,14 +550,18 @@
 
     isSending = true;
     if (UI.sendBtn) UI.sendBtn.disabled = true;
+    const requestId = state.requestId + 1;
+    state.requestId = requestId;
 
     try {
       const reply = await sendToGateway(raw);
+      if (requestId !== state.requestId) return;
       const finalReply = reply || t("fallbackReply");
       renderMessage("assistant", finalReply);
       pushTranscript("assistant", finalReply);
     } catch (e) {
       console.error(e);
+      if (requestId !== state.requestId) return;
       const errorMessage = e.message === "Missing meta[name=ops-gateway]." ||
         e.message === "Missing meta[name=ops-asset-id]."
         ? t("configError")
@@ -477,6 +569,7 @@
       renderMessage("assistant", errorMessage);
       pushTranscript("assistant", errorMessage);
     } finally {
+      if (requestId !== state.requestId) return;
       isSending = false;
       if (UI.sendBtn) UI.sendBtn.disabled = false;
     }
@@ -592,10 +685,35 @@
       });
     }
 
+    if (UI.chatTranscript) {
+      UI.chatTranscript.addEventListener("click", () => {
+        openTranscriptModal();
+      });
+    }
+
+    if (UI.transcriptClose) {
+      UI.transcriptClose.addEventListener("click", () => {
+        closeTranscriptModal();
+      });
+    }
+
+    if (UI.transcriptCopy) {
+      UI.transcriptCopy.addEventListener("click", () => {
+        copyTranscript();
+      });
+    }
+
+    if (UI.transcriptDownload) {
+      UI.transcriptDownload.addEventListener("click", () => {
+        downloadTranscript();
+      });
+    }
+
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       closeChatDrawer({ returnFocus: false });
       closeConsentModal();
+      closeTranscriptModal();
     });
   }
 
