@@ -71,7 +71,7 @@ function securityHeaders() {
     "X-DNS-Prefetch-Control": "off",
     "X-XSS-Protection": "0",
 
-    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
 
     "Cache-Control": "no-store, max-age=0",
     "Pragma": "no-cache",
