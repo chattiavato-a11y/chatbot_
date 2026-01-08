@@ -103,6 +103,11 @@
     chatMessage: $("#chatMessage"),
     sendBtn: $("#chatForm button[type=submit]"),
 
+    // Chat drawer
+    chatDrawer: $("#chatDrawer"),
+    chatClose: $("#chatClose"),
+    chatForm: $("#chatForm"),
+
     // Consent modal
     consentModal: $("#consentModal"),
     consentAccept: $("#consentAccept"),
@@ -117,6 +122,10 @@
     fabContact: $("#fabContact"),
     fabJoin: $("#fabJoin")
   };
+
+  if (!UI.sendBtn && UI.chatForm) {
+    UI.sendBtn = UI.chatForm.querySelector("button[type='submit']");
+  }
 
   /* -------------------- State -------------------- */
 
@@ -445,6 +454,12 @@
       UI.fabChat.addEventListener("click", () => {
         if (!ensureConsentOrPrompt()) return;
         openChatDrawer({ focus: true });
+      });
+    }
+    if (UI.chatForm) {
+      UI.chatForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        onSend();
       });
     }
 
