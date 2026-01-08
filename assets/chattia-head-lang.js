@@ -50,7 +50,7 @@
 
       chat_title: "Chattia",
       chat_lang_toggle_text: "EN",
-      chat_theme_toggle_text: "Dark/Light",
+      chat_theme_toggle_text: "Dark",
       chat_clear: "Clear",
       chat_transcript: "Transcript",
       chat_label: "Your message",
@@ -76,7 +76,7 @@
 
       chat_title: "Chattia",
       chat_lang_toggle_text: "ES",
-      chat_theme_toggle_text: "Oscuro/Claro",
+      chat_theme_toggle_text: "Oscuro",
       chat_clear: "Borrar",
       chat_transcript: "Transcripción",
       chat_label: "Tu mensaje",
