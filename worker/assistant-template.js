@@ -520,8 +520,8 @@ export default {
         request_id: reqId,
         error_code: "DLP_CARD",
         error: lang === "es"
-          ? "Por seguridad, no compartas datos de tarjeta en el chat. Usa la página de contacto del sitio."
-          : "For security, do not share card details in chat. Please use the site contact page."
+          ? "Por seguridad, no compartas datos de tarjeta en el chat. Revisa opsonlinesupport.com/content.md."
+          : "For security, do not share card details in chat. Please review opsonlinesupport.com/content.md."
       }, reqId);
     }
 

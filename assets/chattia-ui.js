@@ -118,9 +118,7 @@
     themeToggle: $("#themeToggle"),
 
     // FABs
-    fabChat: $("#fabChat"),
-    fabContact: $("#fabContact"),
-    fabJoin: $("#fabJoin")
+    fabChat: $("#fabChat")
   };
 
   if (!UI.sendBtn && UI.chatForm) {
@@ -147,9 +145,9 @@
       configError: "Site configuration error.",
       chat_placeholder: "Type your message…",
       fallbackReply:
-        "Thanks. To continue, please use the Contact or Careers/Join Us section on opsonlinesupport.com.",
+        "Thanks. To continue, please review the content archive at opsonlinesupport.com/content.md.",
       gatewayError:
-        "There was a problem connecting to the assistant. Please try again or use the Contact page."
+        "There was a problem connecting to the assistant. Please try again or review opsonlinesupport.com/content.md."
     },
     es: {
       sending: "Enviando…",
@@ -158,9 +156,9 @@
       configError: "Error de configuración del sitio.",
       chat_placeholder: "Escribe tu mensaje…",
       fallbackReply:
-        "Gracias. Para continuar, usa la página de Contacto o Carreras/Únete en opsonlinesupport.com.",
+        "Gracias. Para continuar, revisa el archivo de contenido en opsonlinesupport.com/content.md.",
       gatewayError:
-        "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o usa la página de Contacto."
+        "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o revisa opsonlinesupport.com/content.md."
     }
   };
 
