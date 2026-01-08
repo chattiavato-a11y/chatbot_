@@ -35,6 +35,10 @@
   };
 
   const prefs = typeof window !== "undefined" ? window.__OPS_PREFS : null;
+  const THEME_LABELS = {
+    en: { light: "Light", dark: "Dark" },
+    es: { light: "Claro", dark: "Oscuro" }
+  };
 
   /* -------------------- DOM helpers -------------------- */
 
@@ -275,6 +279,10 @@
       const isOn = (th === "dark");
       UI.themeToggle.classList.toggle("is-on", isOn);
       UI.themeToggle.setAttribute("aria-pressed", String(isOn));
+      const labelSet = THEME_LABELS[state.lang] || THEME_LABELS.en;
+      const actionLabel = th === "dark" ? labelSet.light : labelSet.dark;
+      UI.themeToggle.textContent = actionLabel;
+      UI.themeToggle.setAttribute("aria-label", actionLabel);
     }
   }
 
@@ -294,6 +302,18 @@
 
     if (UI.chatMessage && !UI.chatMessage.hasAttribute("data-i18n-placeholder")) {
       UI.chatMessage.setAttribute("placeholder", t("chat_placeholder"));
+    }
+
+    if (UI.langToggle) {
+      UI.langToggle.textContent = lg.toUpperCase();
+      UI.langToggle.setAttribute("aria-label", lg.toUpperCase());
+    }
+
+    if (UI.themeToggle) {
+      const labelSet = THEME_LABELS[lg] || THEME_LABELS.en;
+      const actionLabel = state.theme === "dark" ? labelSet.light : labelSet.dark;
+      UI.themeToggle.textContent = actionLabel;
+      UI.themeToggle.setAttribute("aria-label", actionLabel);
     }
   }
 
