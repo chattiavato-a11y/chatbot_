@@ -14,6 +14,7 @@
 export const OPS_SITE = {
   domain: "opsonlinesupport.com",
   brand: "OPS Online Support",
+  base_url: "https://opsonlinesupport.com",
 
   // Public site routes (update if your URLs differ)
   routes: {
@@ -21,7 +22,7 @@ export const OPS_SITE = {
     about: "/pages/about.html",
     contact: "/pages/contact.html",
     policies: "/pages/policies.html",
-    careers: "/pages/policies.html#careers" // update when you have a real careers page/section
+    careers: "/pages/policies.html#careers"
   },
 
   positioning_en:
@@ -53,35 +54,37 @@ export const OPS_SITE = {
     "Si el usuario es un prospecto: pregunta industria, objetivo principal, volumen aproximado (diario/semanal), idioma preferido y plazo. Luego dirígelo a la página de Contacto para continuar.",
 
   careers_flow_en:
-    "If the user is applying: ask what role type they want (CX/ops/IT intake), their location/timezone, languages, and availability. Then direct them to Careers/Join Us instructions on the website.",
+    "If the user is applying: ask what role type they want (CX/ops/IT intake), their location/timezone, languages, and availability. Then direct them to the Careers / Join Us section on the website.",
 
   careers_flow_es:
-    "Si el usuario desea aplicar: pregunta el tipo de rol (CX/ops/recepción TI), ubicación/zona horaria, idiomas y disponibilidad. Luego dirígelo a las instrucciones de Carreras/Únete en el sitio.",
+    "Si el usuario desea aplicar: pregunta el tipo de rol (CX/ops/recepción TI), ubicación/zona horaria, idiomas y disponibilidad. Luego dirígelo a la sección de Carreras / Únete en el sitio.",
 
   // CTAs must reference the public website (no private data invented here)
   contact_cta_en:
-    "To contact us or request a quote, please use the Contact page on opsonlinesupport.com and follow the instructions shown there.",
+    "To contact us or request a quote, use https://opsonlinesupport.com/pages/contact.html and follow the instructions shown there.",
 
   contact_cta_es:
-    "Para contactarnos o solicitar una cotización, usa la página de Contacto en opsonlinesupport.com y sigue las instrucciones que aparecen ahí.",
+    "Para contactarnos o solicitar una cotización, usa https://opsonlinesupport.com/pages/contact.html y sigue las instrucciones que aparecen ahí.",
 
   careers_cta_en:
-    "To apply for a role, please use the Careers / Join Us instructions on opsonlinesupport.com and submit your profile through the official form or steps shown there.",
+    "To apply for a role, use https://opsonlinesupport.com/pages/policies.html#careers and submit your profile through the official form or steps shown there.",
 
   careers_cta_es:
-    "Para postular a un puesto, usa las instrucciones de Carreras / Únete en opsonlinesupport.com y envía tu perfil por el formulario o pasos oficiales del sitio.",
+    "Para postular a un puesto, usa https://opsonlinesupport.com/pages/policies.html#careers y envía tu perfil por el formulario o pasos oficiales del sitio.",
 
   // “Where do I find X?” helpers (no sensitive info)
   where_to_find_en: {
-    services: "Check the About page for a high-level overview of what we do.",
-    policies: "Check the Policies page for privacy/consent and terms.",
-    contact: "Use the Contact page to reach our team or request a quote."
+    services: "Check https://opsonlinesupport.com/pages/about.html for a high-level overview of what we do.",
+    policies: "Check https://opsonlinesupport.com/pages/policies.html for privacy/consent and terms.",
+    contact: "Use https://opsonlinesupport.com/pages/contact.html to reach our team or request a quote.",
+    careers: "Visit https://opsonlinesupport.com/pages/policies.html#careers for Careers / Join Us details."
   },
 
   where_to_find_es: {
-    services: "Revisa la página About / Acerca para ver un resumen de lo que hacemos.",
-    policies: "Revisa la página de Políticas para privacidad/consentimiento y términos.",
-    contact: "Usa la página de Contacto para comunicarte o solicitar una cotización."
+    services: "Revisa https://opsonlinesupport.com/pages/about.html para ver un resumen de lo que hacemos.",
+    policies: "Revisa https://opsonlinesupport.com/pages/policies.html para privacidad/consentimiento y términos.",
+    contact: "Usa https://opsonlinesupport.com/pages/contact.html para comunicarte o solicitar una cotización.",
+    careers: "Visita https://opsonlinesupport.com/pages/policies.html#careers para detalles de Carreras / Únete."
   },
 
   greetings_en: [
@@ -98,18 +101,21 @@ export const OPS_SITE = {
 export const OPS_SITE_RULES_EN = `
 You are the official OPS Online Support website assistant.
 Your ONLY job is CX and lead generation for opsonlinesupport.com.
-Be concise, polite, and action-oriented.
+Be concise, professional, and action-oriented with a helpful, calm tone.
 
 Scope:
 - Explain OPS Online Support services at a high level.
 - Help prospects choose the right path (Contact/Quote).
 - Help candidates choose the right path (Careers/Join Us).
 - Answer basic “where do I find X on the site?” questions.
+- Ask brief clarifying questions when intent is unclear.
 
 Hard rules (security/compliance-aligned: OWASP / NIST / CISA / PCI-ready behavior):
 - Do NOT request, collect, or store sensitive data in chat (payment card numbers, bank info, passwords, OTP codes, government IDs).
+- Do NOT request highly personal data (SSNs, DOBs, home addresses) or account access details.
 - If the user shares sensitive data, tell them to stop and use the official contact channels on the website.
 - Do NOT invent phone numbers, private emails, addresses, prices, SLAs, or internal policies.
+- Do NOT claim legal, compliance, or security certification guarantees; you may say “compliance-aligned.”
 - If you don't know a detail, say you don't have that detail and direct them to the Contact/Careers section on opsonlinesupport.com.
 - Do NOT provide instructions to bypass security, exploit systems, or create malware.
 
@@ -122,18 +128,21 @@ Style:
 export const OPS_SITE_RULES_ES = `
 Eres el asistente oficial del sitio OPS Online Support.
 Tu ÚNICO trabajo es CX y generación de oportunidades para opsonlinesupport.com.
-Sé conciso, amable y orientado a la acción.
+Sé conciso, profesional y orientado a la acción con un tono útil y calmado.
 
 Alcance:
 - Explicar los servicios de OPS Online Support a nivel general.
 - Guiar prospectos a Contacto/Cotización.
 - Guiar candidatos a Carreras/Únete.
 - Responder preguntas básicas de “dónde encuentro X en el sitio”.
+- Hacer preguntas breves de aclaración cuando la intención no sea clara.
 
 Reglas estrictas (alineadas a seguridad/compliance: OWASP / NIST / CISA / conducta PCI-ready):
 - No solicites, recolectes ni almacenes datos sensibles en el chat (tarjetas, bancos, contraseñas, códigos, IDs).
+- No solicites datos altamente personales (SSN, fecha de nacimiento, dirección de casa) ni credenciales.
 - Si el usuario comparte datos sensibles, indícale que se detenga y use los canales oficiales del sitio.
 - No inventes teléfonos, emails privados, direcciones, precios, SLAs ni políticas internas.
+- No garantices certificaciones legales o de seguridad; solo puedes decir “alineado a compliance.”
 - Si no tienes un dato, dilo y dirige a Contacto o Carreras/Únete en opsonlinesupport.com.
 - No des instrucciones para evadir seguridad, explotar sistemas o crear malware.
 

@@ -1,11 +1,11 @@
 /* assets/chattia-ui.js
-   OPS Online Support — Chattia UI Controller (v2)
+   OPS Online Support — Chattia UI Controller (v3)
    - No external libs
    - Handles:
-     - Language toggle (expects assets/chattia-head-lang.js sets <html lang>)
-     - Theme toggle (expects assets/chattia-theme.css + localStorage key)
+     - Language toggle (delegates to assets/chattia-head-lang.js)
+     - Theme toggle (delegates to assets/chattia-preferences.js)
      - Privacy/Consent modal (localStorage consent gate)
-     - Transcript drawer (right-to-left)
+     - Chat drawer (right-to-left)
      - Chat send -> OPS Gateway (/api/ops-online-chat)
      - Minimal client-side sanitization (UI-level) + honeypots
      - Asset ID header (X-Ops-Asset-Id) from meta tag
@@ -24,7 +24,8 @@
   const LS = {
     THEME: "ops_theme",           // "dark" | "light"
     LANG: "ops_lang",             // "en" | "es"
-    CONSENT: "ops_consent_v1",    // "accept" | "deny"
+    CONSENT: "ops_chat_consent",  // "accepted" | "denied"
+    CONSENT_LEGACY: "ops_consent_v1",
     TRANSCRIPT: "ops_transcript"  // JSON array (local only)
   };
 
@@ -33,10 +34,11 @@
     MAX_HISTORY_ITEMS: 12
   };
 
+  const prefs = typeof window !== "undefined" ? window.__OPS_PREFS : null;
+
   /* -------------------- DOM helpers -------------------- */
 
   const $ = (sel) => document.querySelector(sel);
-  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
   function el(tag, attrs = {}, children = []) {
     const n = document.createElement(tag);
@@ -94,20 +96,12 @@
 
   const UI = {
     // Chat
-    messages: $("#messages") || $("#chatBody"),
-    composer: $("#composer") || $("#chatMessage"),
-    sendBtn: $("#sendBtn"),
-    statusPill: $("#statusPill"),
-    langBtn: $("#langBtn"),
-    themeBtn: $("#themeBtn"),
-    transcriptBtn: $("#transcriptBtn"),
-
-    // Drawer
-    drawer: $("#transcriptDrawer"),
-    drawerBody: $("#drawerBody"),
-    drawerClose: $("#drawerClose"),
-    drawerClear: $("#drawerClear"),
-    backdrop: $("#backdrop"),
+    chatDrawer: $("#chatDrawer"),
+    chatClose: $("#chatClose"),
+    chatBody: $("#chatBody"),
+    chatForm: $("#chatForm"),
+    chatMessage: $("#chatMessage"),
+    sendBtn: $("#chatForm button[type=submit]"),
 
     // Chat drawer
     chatDrawer: $("#chatDrawer"),
@@ -118,10 +112,13 @@
     consentModal: $("#consentModal"),
     consentAccept: $("#consentAccept"),
     consentDeny: $("#consentDeny"),
-    consentClose: $("#consentClose"),
+
+    // Toggles
+    langToggle: $("#langToggle"),
+    themeToggle: $("#themeToggle"),
 
     // FABs
-    fabChatbot: $("#fabChatbot") || $("#fabChat"),
+    fabChat: $("#fabChat"),
     fabContact: $("#fabContact"),
     fabJoin: $("#fabJoin")
   };
@@ -133,9 +130,10 @@
   /* -------------------- State -------------------- */
 
   const state = {
-    lang: (document.documentElement.lang === "es") ? "es" : "en",
+    lang: "en",
     theme: "dark",
-    consent: "deny",
+    consent: "denied",
+    configOk: true,
     transcript: [] // { role, content, ts }
   };
 
@@ -143,44 +141,26 @@
 
   const COPY = {
     en: {
-      online: "Online",
-      offline: "Offline",
       sending: "Sending…",
-      blocked: "Blocked",
-      consentTitle: "Privacy & Consent",
-      consentBody:
-        "This chat is for general information about OPS Online Support. Please do not share sensitive personal data (passwords, OTP codes, bank or card details). Messages may be processed to provide the chat experience. If you do not consent, chat will be disabled until you accept.",
-      accept: "Accept",
-      deny: "Deny",
-      close: "Close",
-      transcriptTitle: "Transcript",
-      clear: "Clear",
-      emptyTranscript: "No messages yet.",
-      placeholder: "Type your message…",
-      send: "Send",
-      mustConsent: "To use chat, please accept Privacy & Consent.",
       badInput: "Message blocked. Please remove unsafe content.",
-      configError: "Site configuration error."
+      mustConsent: "To use chat, please accept Privacy & Consent.",
+      configError: "Site configuration error.",
+      chat_placeholder: "Type your message…",
+      fallbackReply:
+        "Thanks. To continue, please use the Contact or Careers/Join Us section on opsonlinesupport.com.",
+      gatewayError:
+        "There was a problem connecting to the assistant. Please try again or use the Contact page."
     },
     es: {
-      online: "En línea",
-      offline: "Fuera de línea",
       sending: "Enviando…",
-      blocked: "Bloqueado",
-      consentTitle: "Privacidad y consentimiento",
-      consentBody:
-        "Este chat es para información general sobre OPS Online Support. No compartas datos sensibles (contraseñas, códigos, banco o tarjetas). Los mensajes pueden procesarse para brindar la experiencia de chat. Si no das consentimiento, el chat quedará deshabilitado hasta que aceptes.",
-      accept: "Aceptar",
-      deny: "Denegar",
-      close: "Cerrar",
-      transcriptTitle: "Transcripción",
-      clear: "Borrar",
-      emptyTranscript: "Aún no hay mensajes.",
-      placeholder: "Escribe tu mensaje…",
-      send: "Enviar",
-      mustConsent: "Para usar el chat, acepta Privacidad y consentimiento.",
       badInput: "Mensaje bloqueado. Elimina contenido inseguro.",
-      configError: "Error de configuración del sitio."
+      mustConsent: "Para usar el chat, acepta Privacidad y consentimiento.",
+      configError: "Error de configuración del sitio.",
+      chat_placeholder: "Escribe tu mensaje…",
+      fallbackReply:
+        "Gracias. Para continuar, usa la página de Contacto o Carreras/Únete en opsonlinesupport.com.",
+      gatewayError:
+        "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o usa la página de Contacto."
     }
   };
 
@@ -196,6 +176,27 @@
   }
   function writeLS(key, value) {
     try { localStorage.setItem(key, String(value)); } catch {}
+  }
+
+  function readConsent() {
+    if (prefs && typeof prefs.getConsent === "function") {
+      return prefs.getConsent() === "accepted" ? "accepted" : "denied";
+    }
+    const legacy = readLS(LS.CONSENT_LEGACY, "");
+    if (legacy === "accept") return "accepted";
+    if (legacy === "deny") return "denied";
+    const c = readLS(LS.CONSENT, "denied");
+    return c === "accepted" ? "accepted" : "denied";
+  }
+
+  function setConsent(val) {
+    const v = (val === "accepted") ? "accepted" : "denied";
+    state.consent = v;
+    if (prefs && typeof prefs.setConsent === "function") {
+      prefs.setConsent(v);
+    } else {
+      writeLS(LS.CONSENT, v);
+    }
   }
 
   function loadTranscript() {
@@ -223,14 +224,17 @@
   function applyTheme(theme) {
     const th = (theme === "light") ? "light" : "dark";
     state.theme = th;
-    document.documentElement.setAttribute("data-theme", th);
-    writeLS(LS.THEME, th);
+    if (prefs && typeof prefs.setTheme === "function") {
+      prefs.setTheme(th);
+    } else {
+      document.documentElement.setAttribute("data-theme", th);
+      writeLS(LS.THEME, th);
+    }
 
-    // Update toggle UI if present
-    const isOn = (th === "dark");
-    if (UI.themeBtn) {
-      UI.themeBtn.classList.toggle("is-on", isOn);
-      UI.themeBtn.setAttribute("aria-pressed", String(isOn));
+    if (UI.themeToggle) {
+      const isOn = (th === "dark");
+      UI.themeToggle.classList.toggle("is-on", isOn);
+      UI.themeToggle.setAttribute("aria-pressed", String(isOn));
     }
   }
 
@@ -239,74 +243,83 @@
   function applyLang(lang) {
     const lg = (lang === "es") ? "es" : "en";
     state.lang = lg;
-    document.documentElement.lang = lg;
-    writeLS(LS.LANG, lg);
+    if (prefs && typeof prefs.setLang === "function") {
+      prefs.setLang(lg);
+    } else if (typeof window.__OPS_setLang === "function") {
+      window.__OPS_setLang(lg);
+    } else {
+      document.documentElement.lang = lg;
+      writeLS(LS.LANG, lg);
+    }
 
-    // placeholder / labels (if elements exist)
-    if (UI.composer) UI.composer.setAttribute("placeholder", t("placeholder"));
-    if (UI.sendBtn) UI.sendBtn.textContent = t("send");
-
-    // modal content
-    const title = $("#consentTitle");
-    const body = $("#consentBody");
-    if (title) title.textContent = t("consentTitle");
-    if (body) body.textContent = t("consentBody");
-    if (UI.consentAccept) UI.consentAccept.textContent = t("accept");
-    if (UI.consentDeny) UI.consentDeny.textContent = t("deny");
-    if (UI.consentClose) UI.consentClose.textContent = t("close");
-
-    const drTitle = $("#drawerTitle");
-    if (drTitle) drTitle.textContent = t("transcriptTitle");
-    if (UI.drawerClear) UI.drawerClear.textContent = t("clear");
-
-    // FAB labels (optional)
-    const fabChatLabel = $("#fabChatLabel");
-    const fabContactLabel = $("#fabContactLabel");
-    const fabJoinLabel = $("#fabJoinLabel");
-    if (fabChatLabel) fabChatLabel.textContent = "Chatbot";
-    if (fabContactLabel) fabContactLabel.textContent = "Contact";
-    if (fabJoinLabel) fabJoinLabel.textContent = "Join Us";
-    // (Keep labels consistent; pages handle EN/ES content)
+    if (UI.chatMessage && !UI.chatMessage.hasAttribute("data-i18n-placeholder")) {
+      UI.chatMessage.setAttribute("placeholder", t("chat_placeholder"));
+    }
   }
 
-  /* -------------------- Consent -------------------- */
-
-  function readConsent() {
-    const c = readLS(LS.CONSENT, "deny");
-    return (c === "accept") ? "accept" : "deny";
-  }
-
-  function setConsent(val) {
-    const v = (val === "accept") ? "accept" : "deny";
-    state.consent = v;
-    writeLS(LS.CONSENT, v);
-  }
+  /* -------------------- Consent modal -------------------- */
 
   function openConsentModal() {
     if (!UI.consentModal) return;
     UI.consentModal.classList.add("is-open");
     UI.consentModal.setAttribute("aria-hidden", "false");
+
+    if (typeof UI.consentModal.showModal === "function") {
+      if (!UI.consentModal.open) UI.consentModal.showModal();
+    } else {
+      UI.consentModal.setAttribute("open", "");
+    }
+
+    if (UI.consentAccept) UI.consentAccept.focus();
   }
 
   function closeConsentModal() {
     if (!UI.consentModal) return;
     UI.consentModal.classList.remove("is-open");
     UI.consentModal.setAttribute("aria-hidden", "true");
+
+    if (typeof UI.consentModal.close === "function") {
+      if (UI.consentModal.open) UI.consentModal.close();
+    } else {
+      UI.consentModal.removeAttribute("open");
+    }
   }
 
   function ensureConsentOrPrompt() {
-    if (state.consent === "accept") return true;
+    if (state.consent === "accepted") return true;
     openConsentModal();
-    status(t("mustConsent"), "warn");
     return false;
   }
 
-  /* -------------------- Status pill -------------------- */
+  function setChatEnabled(enabled) {
+    if (UI.chatMessage) UI.chatMessage.disabled = !enabled;
+    if (UI.sendBtn) UI.sendBtn.disabled = !enabled;
+    if (UI.chatForm) UI.chatForm.setAttribute("aria-disabled", String(!enabled));
+  }
 
-  function status(text, level = "ok") {
-    if (!UI.statusPill) return;
-    UI.statusPill.textContent = String(text || "");
-    UI.statusPill.dataset.level = level;
+  function updateChatEnabled() {
+    setChatEnabled(state.consent === "accepted" && state.configOk);
+  }
+
+  /* -------------------- Drawer controls -------------------- */
+
+  function setChatExpanded(isOpen) {
+    if (UI.fabChat) UI.fabChat.setAttribute("aria-expanded", String(isOpen));
+    if (UI.chatDrawer) UI.chatDrawer.setAttribute("aria-hidden", String(!isOpen));
+  }
+
+  function openChatDrawer({ focus = true } = {}) {
+    if (!UI.chatDrawer) return;
+    UI.chatDrawer.classList.add("is-open");
+    setChatExpanded(true);
+    if (focus && UI.chatMessage) UI.chatMessage.focus();
+  }
+
+  function closeChatDrawer({ returnFocus = true } = {}) {
+    if (!UI.chatDrawer) return;
+    UI.chatDrawer.classList.remove("is-open");
+    setChatExpanded(false);
+    if (returnFocus && UI.fabChat) UI.fabChat.focus();
   }
 
   /* -------------------- Transcript + message rendering -------------------- */
@@ -322,7 +335,7 @@
   }
 
   function renderMessage(role, content) {
-    if (!UI.messages) return;
+    if (!UI.chatBody) return;
 
     const safeRole = (role === "assistant") ? "assistant" : "user";
     const wrap = el("div", { class: `msg ${safeRole}` });
@@ -331,81 +344,21 @@
 
     wrap.appendChild(bubble);
     wrap.appendChild(stamp);
-    UI.messages.appendChild(wrap);
-    UI.messages.scrollTop = UI.messages.scrollHeight;
+    UI.chatBody.appendChild(wrap);
+    UI.chatBody.scrollTop = UI.chatBody.scrollHeight;
   }
 
   function rebuildChatFromTranscript() {
-    if (!UI.messages) return;
-    UI.messages.innerHTML = "";
+    if (!UI.chatBody) return;
+    UI.chatBody.innerHTML = "";
     for (const m of state.transcript.slice(-50)) {
       renderMessage(m.role, m.content);
     }
   }
 
-  function rebuildDrawer() {
-    if (!UI.drawerBody) return;
-
-    const items = state.transcript.slice(-150);
-    if (!items.length) {
-      UI.drawerBody.textContent = t("emptyTranscript");
-      return;
-    }
-
-    UI.drawerBody.innerHTML = "";
-    for (const m of items) {
-      const line = el("div", { class: "bubble", text: `${m.role === "user" ? "End User" : "Chatbot"}: ${m.content}` });
-      line.style.marginBottom = "10px";
-      UI.drawerBody.appendChild(line);
-    }
-  }
-
-  /* -------------------- Drawer controls -------------------- */
-
-  function openDrawer() {
-    if (!UI.drawer || !UI.backdrop) return;
-    UI.drawer.classList.add("is-open");
-    UI.backdrop.classList.add("is-on");
-    UI.drawer.setAttribute("aria-hidden", "false");
-    rebuildDrawer();
-  }
-
-  function closeDrawer() {
-    if (!UI.drawer || !UI.backdrop) return;
-    UI.drawer.classList.remove("is-open");
-    UI.backdrop.classList.remove("is-on");
-    UI.drawer.setAttribute("aria-hidden", "true");
-  }
-
-  /* -------------------- Chat drawer controls -------------------- */
-
-  function openChatDrawer() {
-    if (!UI.chatDrawer) return;
-    UI.chatDrawer.classList.add("is-open");
-    UI.chatDrawer.removeAttribute("hidden");
-    UI.chatDrawer.setAttribute("aria-hidden", "false");
-    if (UI.composer) UI.composer.focus();
-  }
-
-  function closeChatDrawer() {
-    if (!UI.chatDrawer) return;
-    UI.chatDrawer.classList.remove("is-open");
-    UI.chatDrawer.setAttribute("hidden", "hidden");
-    UI.chatDrawer.setAttribute("aria-hidden", "true");
-  }
-
-  function clearTranscript() {
-    state.transcript = [];
-    saveTranscript();
-    rebuildChatFromTranscript();
-    rebuildDrawer();
-  }
-
   /* -------------------- Gateway call -------------------- */
 
   function buildHistoryForGateway() {
-    // Convert local transcript -> gateway history
-    // Keep within LIMITS.MAX_HISTORY_ITEMS
     const last = state.transcript.slice(-LIMITS.MAX_HISTORY_ITEMS);
     return last.map(m => ({
       role: (m.role === "assistant") ? "assistant" : "user",
@@ -452,49 +405,40 @@
 
   let isSending = false;
 
-  async function onSend() {
+  async function onSend(event) {
+    if (event) event.preventDefault();
     if (isSending) return;
-    if (!UI.composer) return;
+    if (!UI.chatMessage) return;
     if (!ensureConsentOrPrompt()) return;
 
-    const raw = normalizeUserText(UI.composer.value || "");
+    const raw = normalizeUserText(UI.chatMessage.value || "");
     if (!raw) return;
 
-    // UI-level suspicious block (server also blocks)
     if (looksSuspicious(raw)) {
-      status(t("badInput"), "warn");
+      renderMessage("assistant", t("badInput"));
       return;
     }
 
-    // Update UI immediately
-    UI.composer.value = "";
+    UI.chatMessage.value = "";
     renderMessage("user", raw);
     pushTranscript("user", raw);
 
     isSending = true;
-    status(t("sending"), "busy");
     if (UI.sendBtn) UI.sendBtn.disabled = true;
 
     try {
       const reply = await sendToGateway(raw);
-
-      // If empty, fallback UI message
-      const finalReply = reply || (state.lang === "es"
-        ? "Gracias. Para continuar, usa la página de Contacto o Carreras/Únete en opsonlinesupport.com."
-        : "Thanks. To continue, please use the Contact or Careers/Join Us section on opsonlinesupport.com.");
-
+      const finalReply = reply || t("fallbackReply");
       renderMessage("assistant", finalReply);
       pushTranscript("assistant", finalReply);
-      status(t("online"), "ok");
     } catch (e) {
       console.error(e);
-      renderMessage("assistant", state.lang === "es"
-        ? "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o usa la página de Contacto."
-        : "There was a problem connecting to the assistant. Please try again or use the Contact page.");
-      pushTranscript("assistant", state.lang === "es"
-        ? "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o usa la página de Contacto."
-        : "There was a problem connecting to the assistant. Please try again or use the Contact page.");
-      status(t("offline"), "warn");
+      const errorMessage = e.message === "Missing meta[name=ops-gateway]." ||
+        e.message === "Missing meta[name=ops-asset-id]."
+        ? t("configError")
+        : t("gatewayError");
+      renderMessage("assistant", errorMessage);
+      pushTranscript("assistant", errorMessage);
     } finally {
       isSending = false;
       if (UI.sendBtn) UI.sendBtn.disabled = false;
@@ -504,14 +448,12 @@
   /* -------------------- Event wiring -------------------- */
 
   function wireEvents() {
-    // Send
-    if (UI.sendBtn) UI.sendBtn.addEventListener("click", onSend);
-    if (UI.composer) {
-      UI.composer.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-          e.preventDefault();
-          onSend();
-        }
+    if (UI.chatForm) UI.chatForm.addEventListener("submit", onSend);
+
+    if (UI.fabChat) {
+      UI.fabChat.addEventListener("click", () => {
+        if (!ensureConsentOrPrompt()) return;
+        openChatDrawer({ focus: true });
       });
     }
     if (UI.chatForm) {
@@ -521,72 +463,42 @@
       });
     }
 
-    // Transcript drawer
-    if (UI.transcriptBtn) UI.transcriptBtn.addEventListener("click", openDrawer);
-    if (UI.drawerClose) UI.drawerClose.addEventListener("click", closeDrawer);
-    if (UI.backdrop) UI.backdrop.addEventListener("click", closeDrawer);
-    if (UI.drawerClear) UI.drawerClear.addEventListener("click", () => {
-      clearTranscript();
-      closeDrawer();
-    });
+    if (UI.chatClose) {
+      UI.chatClose.addEventListener("click", () => closeChatDrawer({ returnFocus: true }));
+    }
 
-    // Consent modal open (nav link)
-    const privacyBtn = $("#privacyBtn");
-    if (privacyBtn) privacyBtn.addEventListener("click", () => openConsentModal());
+    if (UI.consentAccept) {
+      UI.consentAccept.addEventListener("click", () => {
+        setConsent("accepted");
+        updateChatEnabled();
+        closeConsentModal();
+        if (state.configOk) openChatDrawer({ focus: true });
+      });
+    }
 
-    if (UI.consentAccept) UI.consentAccept.addEventListener("click", () => {
-      setConsent("accept");
-      closeConsentModal();
-      status(t("online"), "ok");
-    });
+    if (UI.consentDeny) {
+      UI.consentDeny.addEventListener("click", () => {
+        setConsent("denied");
+        updateChatEnabled();
+        closeConsentModal();
+      });
+    }
 
-    if (UI.consentDeny) UI.consentDeny.addEventListener("click", () => {
-      setConsent("deny");
-      closeConsentModal();
-      status(t("offline"), "warn");
-    });
+    if (UI.themeToggle) {
+      UI.themeToggle.addEventListener("click", () => {
+        applyTheme(state.theme === "dark" ? "light" : "dark");
+      });
+    }
 
-    if (UI.consentClose) UI.consentClose.addEventListener("click", () => closeConsentModal());
+    if (UI.langToggle) {
+      UI.langToggle.addEventListener("click", () => {
+        applyLang(state.lang === "en" ? "es" : "en");
+      });
+    }
 
-    // Theme toggle
-    if (UI.themeBtn) UI.themeBtn.addEventListener("click", () => {
-      applyTheme(state.theme === "dark" ? "light" : "dark");
-    });
-
-    // Language toggle
-    if (UI.langBtn) UI.langBtn.addEventListener("click", () => {
-      applyLang(state.lang === "en" ? "es" : "en");
-      // Re-render drawer title + empty state if needed
-      rebuildDrawer();
-    });
-
-    // FABs
-    if (UI.fabChatbot) UI.fabChatbot.addEventListener("click", () => {
-      if (!ensureConsentOrPrompt()) {
-        openChatDrawer();
-        return;
-      }
-      openChatDrawer();
-    });
-
-    if (UI.chatClose) UI.chatClose.addEventListener("click", closeChatDrawer);
-
-    // Contact + Join must go to nav menu links (pages)
-    if (UI.fabContact) UI.fabContact.addEventListener("click", () => {
-      const a = $("#navContact");
-      if (a && a.getAttribute("href")) window.location.href = a.getAttribute("href");
-    });
-
-    if (UI.fabJoin) UI.fabJoin.addEventListener("click", () => {
-      const a = $("#navJoin");
-      if (a && a.getAttribute("href")) window.location.href = a.getAttribute("href");
-    });
-
-    // ESC closes drawer/modals
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
-      closeDrawer();
-      closeChatDrawer();
+      closeChatDrawer({ returnFocus: false });
       closeConsentModal();
     });
   }
@@ -594,44 +506,38 @@
   /* -------------------- Init -------------------- */
 
   function init() {
-    // Load persisted state
-    state.theme = readLS(LS.THEME, "dark") === "light" ? "light" : "dark";
-    state.lang = readLS(LS.LANG, document.documentElement.lang === "es" ? "es" : "en");
+    state.theme = prefs && typeof prefs.getTheme === "function"
+      ? prefs.getTheme()
+      : readLS(LS.THEME, "dark") === "light" ? "light" : "dark";
+
+    state.lang = prefs && typeof prefs.getLang === "function"
+      ? prefs.getLang()
+      : readLS(LS.LANG, document.documentElement.lang === "es" ? "es" : "en");
+
     state.consent = readConsent();
     state.transcript = loadTranscript();
 
     applyTheme(state.theme);
     applyLang(state.lang);
-
-    // Build UI from transcript
     rebuildChatFromTranscript();
-    rebuildDrawer();
 
-    // Consent gating
-    if (state.consent !== "accept") {
-      // keep chat visible but blocked until accept
-      status(t("offline"), "warn");
-      openConsentModal();
-    } else {
-      status(t("online"), "ok");
-    }
+    setChatExpanded(false);
 
-    closeChatDrawer();
-
-    wireEvents();
-
-    // Basic config check (non-fatal, but shows status)
     try {
       requireConfigOrThrow();
+      state.configOk = true;
     } catch (e) {
       console.error(e);
-      status(t("configError"), "warn");
-      // Also disable send to avoid confusing failures
-      if (UI.sendBtn) UI.sendBtn.disabled = true;
+      state.configOk = false;
     }
+
+    updateChatEnabled();
+
+    if (state.consent !== "accepted") openConsentModal();
+
+    wireEvents();
   }
 
-  // Run when DOM ready
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
   } else {
