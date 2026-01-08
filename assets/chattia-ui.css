@@ -492,10 +492,17 @@ a:focus, button:focus, input:focus, textarea:focus {
 .chat-body {
   padding: 14px;
   overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.chat-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .chat-input {
