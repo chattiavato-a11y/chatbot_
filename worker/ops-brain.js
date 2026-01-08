@@ -26,6 +26,8 @@
      sig     = HMAC_SHA256_HEX(HAND_SHAKE, toSign)
 */
 
+import { OPS_SITE, OPS_SITE_RULES_EN, OPS_SITE_RULES_ES } from "./ops-site-content";
+
 const MODEL_ID = "@cf/meta/llama-3.1-8b-instruct-fp8";
 
 const MAX_CHAT_BYTES = 8_192;
@@ -308,6 +310,24 @@ function sanitizeAssistantOutput(text) {
   return t;
 }
 
+function buildSiteContext(lang) {
+  const routes = OPS_SITE.routes;
+  const services = lang === "es" ? OPS_SITE.services_es : OPS_SITE.services_en;
+  const positioning = lang === "es" ? OPS_SITE.positioning_es : OPS_SITE.positioning_en;
+  const contactCta = lang === "es" ? OPS_SITE.contact_cta_es : OPS_SITE.contact_cta_en;
+  const careersCta = lang === "es" ? OPS_SITE.careers_cta_es : OPS_SITE.careers_cta_en;
+  const whereToFind = lang === "es" ? OPS_SITE.where_to_find_es : OPS_SITE.where_to_find_en;
+
+  return [
+    `Site: ${OPS_SITE.brand} (${OPS_SITE.base_url}).`,
+    `Positioning: ${positioning}`,
+    `Services: ${services.join(" ")}`,
+    `Routes: home ${routes.home}, about ${routes.about}, contact ${routes.contact}, policies ${routes.policies}, careers ${routes.careers}.`,
+    `CTAs: ${contactCta} ${careersCta}`,
+    `Finders: services=${whereToFind.services} policies=${whereToFind.policies} contact=${whereToFind.contact} careers=${whereToFind.careers}`
+  ].join(" ");
+}
+
 /* -------------------- Durable Object (strong nonce guard) -------------------- */
 
 export class OpsNonceGuard {
@@ -495,9 +515,9 @@ export default {
       return json(500, { ok: false, error: "Brain misconfigured (missing AI binding).", error_code: "NO_AI", request_id: reqId }, { "X-Ops-Request-Id": reqId });
     }
 
-    const system = lang === "es"
-      ? "Eres el asistente de OPS/Chattia. Responde en español claro. No pidas ni aceptes datos sensibles (tarjetas, contraseñas, PII). No des instrucciones para hackear. Mantén respuestas breves y útiles."
-      : "You are the OPS/Chattia assistant. Respond in clear English. Do not request or accept sensitive data (cards, passwords, PII). Do not provide hacking instructions. Keep replies brief and helpful.";
+    const rules = lang === "es" ? OPS_SITE_RULES_ES : OPS_SITE_RULES_EN;
+    const siteContext = buildSiteContext(lang);
+    const system = `${rules}\n\n${siteContext}`;
 
     const messages = [{ role: "system", content: system }];
     for (const h of history) messages.push(h);
