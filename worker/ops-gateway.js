@@ -192,6 +192,23 @@ async function sha256HexFromString(s) {
   return bytesToHex(new Uint8Array(digest));
 }
 
+async function sha256HexFromArrayBuffer(ab) {
+  const digest = await crypto.subtle.digest("SHA-256", ab);
+  return bytesToHex(new Uint8Array(digest));
+}
+
+async function hmacSha256Hex(secret, message) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  return bytesToHex(new Uint8Array(sig));
+}
+
 async function ipTag(env, ip) {
   const salt = String(env.IP_TAG_SALT || "");
   const hex = await sha256HexFromString(`${salt}|${ip}`);
@@ -327,11 +344,31 @@ async function proxyJsonToBrain(origin, request, env, ctx, brainPath, rawClientB
     }, reqId);
   }
 
+  const secret = String(env.HAND_SHAKE || "");
+  if (!secret) {
+    return json(origin, 500, {
+      ok: false,
+      error: "Gateway misconfigured (missing HAND_SHAKE).",
+      error_code: "NO_HAND_SHAKE",
+      request_id: reqId
+    }, reqId);
+  }
+
+  const ts = String(Date.now());
+  const nonce = randHex(16);
+  const bodySha = await sha256HexFromArrayBuffer(rawClientBodyAb);
+  const toSign = [ts, nonce, "POST", brainPath, bodySha].join(".");
+  const sig = await hmacSha256Hex(secret, toSign);
+
   const brainReq = new Request("https://brain.local" + brainPath, {
     method: "POST",
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "X-Ops-Request-Id": reqId
+      "X-Ops-Request-Id": reqId,
+      "X-Ops-Ts": ts,
+      "X-Ops-Nonce": nonce,
+      "X-Ops-Body-Sha256": bodySha,
+      "X-Ops-Sig": sig
     },
     body: rawClientBodyAb
   });

@@ -1,0 +1,8 @@
+name = "ops-gateway"
+main = "ops-gateway.js"
+compatibility_date = "2024-10-01"
+
+kv_namespaces = [
+  { binding = "OPS_EVENTS", id = "REPLACE_WITH_OPS_EVENTS_KV_ID" },
+  { binding = "OPS_RL", id = "REPLACE_WITH_OPS_RL_KV_ID" }
+]

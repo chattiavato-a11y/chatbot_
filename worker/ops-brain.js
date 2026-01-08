@@ -195,7 +195,17 @@ async function ipTag(ip) {
 
 async function logEvent(ctx, env, event) {
   try {
-    const safe = { ts: new Date().toISOString(), ...event };
+    const safe = {
+      ts: new Date().toISOString(),
+      type: String(event?.type || ""),
+      ip_tag: event?.ip_tag,
+      path: event?.path,
+      request_id: event?.request_id,
+      lang: event?.lang,
+      history_len: event?.history_len,
+      msg_len: event?.msg_len,
+      reason: event?.reason
+    };
     console.warn("[OPS_EVENT]", JSON.stringify(safe));
 
     const kv = env.OPS_EVENTS;
