@@ -53,14 +53,7 @@
   function getTheme() {
     const saved = safeGet(KEYS.theme);
     if (saved === "light" || saved === "dark") return saved;
-
-    // prefer system if no saved theme
-    const prefersLight = (() => {
-      try { return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches; }
-      catch { return false; }
-    })();
-
-    return prefersLight ? "light" : "dark";
+    return "light";
   }
 
   /* ---------------- Language ---------------- */

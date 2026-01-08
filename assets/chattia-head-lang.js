@@ -57,6 +57,7 @@
       chat_title: "Chattia",
       chat_lang_toggle_text: "EN/ES",
       chat_theme_toggle_text: "Dark/Light",
+      chat_clear: "Clear",
       chat_label: "Your message",
       chat_placeholder: "Type your message…",
       chat_send: "Send"
@@ -76,6 +77,7 @@
       chat_title: "Chattia",
       chat_lang_toggle_text: "EN/ES",
       chat_theme_toggle_text: "Oscuro/Claro",
+      chat_clear: "Borrar",
       chat_label: "Tu mensaje",
       chat_placeholder: "Escribe tu mensaje…",
       chat_send: "Enviar"
