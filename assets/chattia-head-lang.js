@@ -26,13 +26,7 @@
   function getPreferredLang() {
     const saved = safeGetLS(STORAGE_KEY);
     if (SUPPORTED.has(saved)) return saved;
-
-    const navLang =
-      (navigator.languages && navigator.languages[0]) ||
-      navigator.language ||
-      "en";
-
-    return normalizeLang(navLang);
+    return "en";
   }
 
   function setHtmlLang(lang) {
@@ -55,7 +49,7 @@
       consent_note: "If you deny consent, chat will remain disabled until you accept.",
 
       chat_title: "Chattia",
-      chat_lang_toggle_text: "EN/ES",
+      chat_lang_toggle_text: "EN",
       chat_theme_toggle_text: "Dark/Light",
       chat_clear: "Clear",
       chat_transcript: "Transcript",
@@ -81,7 +75,7 @@
       consent_note: "Si niegas el consentimiento, el chat quedará deshabilitado hasta que aceptes.",
 
       chat_title: "Chattia",
-      chat_lang_toggle_text: "EN/ES",
+      chat_lang_toggle_text: "ES",
       chat_theme_toggle_text: "Oscuro/Claro",
       chat_clear: "Borrar",
       chat_transcript: "Transcripción",

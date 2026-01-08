@@ -785,6 +785,7 @@ a:focus, button:focus, input:focus, textarea:focus {
 .hidden { display: none !important; }
 
 .hp {
+  display: none !important;
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;

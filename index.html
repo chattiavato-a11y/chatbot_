@@ -38,6 +38,7 @@
   <!-- OPS Gateway config for assets/chattia-ui.js -->
   <meta name="ops-gateway" content="https://ops-gateway.grabem-holdem-nuts-right.workers.dev" />
   <meta name="ops-asset-id" content="ops-online-support-site" />
+  <meta name="ops-turnstile-sitekey" content="" />
 
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
 
@@ -87,7 +88,7 @@
       <div class="chat-header-actions">
         <div class="chat-header-toggles" aria-label="Chat preferences">
           <button class="btn btn-ghost" id="langToggle" type="button" data-i18n="chat_lang_toggle_text" aria-label="Change language">
-            EN/ES
+            EN
           </button>
           <button class="btn btn-ghost" id="themeToggle" type="button" data-i18n="chat_theme_toggle_text" aria-label="Toggle theme">
             Dark/Light
@@ -107,8 +108,8 @@
 
     <form class="chat-input" id="chatForm">
       <!-- Honeypot fields (hidden by CSS) -->
-      <input class="hp" type="text" name="hp_email" id="hp_email" autocomplete="off" tabindex="-1" aria-hidden="true" />
-      <input class="hp" type="text" name="hp_website" id="hp_website" autocomplete="off" tabindex="-1" aria-hidden="true" />
+      <input class="hp" type="text" name="hp_email" id="hp_email" autocomplete="off" tabindex="-1" aria-hidden="true" hidden />
+      <input class="hp" type="text" name="hp_website" id="hp_website" autocomplete="off" tabindex="-1" aria-hidden="true" hidden />
 
       <!-- Turnstile placeholder (invisible) -->
       <div class="turnstile-slot" id="turnstileSlot" aria-hidden="true"></div>
