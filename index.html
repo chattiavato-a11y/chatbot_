@@ -49,95 +49,7 @@
   <script defer src="/assets/chattia-head-lang.js"></script>
 </head>
 
-<body>
-  <header class="site-header" role="banner">
-    <div class="brand">
-      <a class="brand-link" href="/" aria-label="OPS Online Support Home">
-        <span class="brand-mark" aria-hidden="true">OPS</span>
-        <span class="brand-text">OPS Online Support</span>
-      </a>
-    </div>
-
-    <nav class="site-nav" aria-label="Primary">
-      <a href="/" class="nav-link" data-i18n="nav_home">Home</a>
-      <a href="/pages/about.html" class="nav-link" data-i18n="nav_about">About</a>
-      <a href="/pages/contact.html" class="nav-link" data-i18n="nav_contact">Contact</a>
-      <a href="/pages/policies.html" class="nav-link" data-i18n="nav_policies">Policies</a>
-    </nav>
-
-    <div class="site-actions">
-      <!-- Language toggle (no “accept/deny” here; just a user preference) -->
-      <button class="btn btn-ghost" id="langToggle" type="button" aria-label="Change language">
-        <span aria-hidden="true">EN/ES</span>
-      </button>
-
-      <!-- Theme toggle -->
-      <button class="btn btn-ghost" id="themeToggle" type="button" aria-label="Toggle theme">
-        <span aria-hidden="true">☾</span>
-      </button>
-    </div>
-  </header>
-
-  <main id="main" class="site-main" role="main">
-    <section class="hero">
-      <h1 class="hero-title" data-i18n="hero_title">Reliable CX, Operations, and Support Workflows</h1>
-      <p class="hero-subtitle" data-i18n="hero_subtitle">
-        We help organizations run smoother through customer experience support, back-office operations help, and technical support intake.
-      </p>
-
-      <div class="hero-ctas">
-        <a class="btn btn-primary" href="/pages/contact.html" data-i18n="cta_contact">Contact / Request a Quote</a>
-        <a class="btn btn-secondary" href="/pages/policies.html#careers" data-i18n="cta_careers">Careers / Join Us</a>
-      </div>
-
-      <p class="hero-note" data-i18n="hero_note">
-        For security: do not share passwords, one-time codes, banking info, or card numbers in chat.
-      </p>
-    </section>
-
-    <section class="cards" aria-label="Services">
-      <article class="card">
-        <h2 data-i18n="svc_cx_title">Customer Experience (CX)</h2>
-        <p data-i18n="svc_cx_body">Inbox triage, customer questions, follow-ups, and service workflows.</p>
-      </article>
-
-      <article class="card">
-        <h2 data-i18n="svc_cc_title">Contact Center Support</h2>
-        <p data-i18n="svc_cc_body">Intake, tagging, escalation, and resolution tracking.</p>
-      </article>
-
-      <article class="card">
-        <h2 data-i18n="svc_ops_title">Business Operations</h2>
-        <p data-i18n="svc_ops_body">Back-office coordination, documentation, and process support.</p>
-      </article>
-
-      <article class="card">
-        <h2 data-i18n="svc_it_title">IT Support Intake</h2>
-        <p data-i18n="svc_it_body">Issue capture, basic troubleshooting steps, and routing to the right team.</p>
-      </article>
-    </section>
-  </main>
-
-  <footer class="site-footer" role="contentinfo">
-    <div class="footer-links">
-      <a href="/pages/policies.html" data-i18n="footer_policies">Privacy & Terms</a>
-      <a href="/pages/contact.html" data-i18n="footer_contact">Contact</a>
-      <a href="/pages/about.html" data-i18n="footer_about">About</a>
-    </div>
-    <div class="footer-meta">
-      <span aria-hidden="true">©</span>
-      <span id="year"></span>
-      <span>OPS Online Support</span>
-    </div>
-  </footer>
-
-  <!-- Floating Action Buttons -->
-  <div class="fab-stack" aria-label="Quick actions">
-    <a class="fab" id="fabContact" href="/pages/contact.html" data-i18n="fab_contact" aria-label="Contact Us">Contact</a>
-    <a class="fab" id="fabJoin" href="/pages/policies.html#careers" data-i18n="fab_join" aria-label="Join Us">Join</a>
-    <button class="fab fab-accent" id="fabChat" type="button" data-i18n="fab_chat" aria-label="Open chat"
-            aria-controls="chatDrawer" aria-expanded="false">Chat</button>
-  </div>
+<body class="chatbot-only">
 
   <!-- Privacy & Consent Modal (chat stays disabled until accepted) -->
   <dialog class="modal" id="consentModal" aria-labelledby="consentTitle">
@@ -165,10 +77,26 @@
     <header class="chat-header">
       <div class="chat-title">
         <strong data-i18n="chat_title">OPS Assistant</strong>
-        <span class="chat-subtitle" data-i18n="chat_subtitle">Website help • Contact • Careers</span>
+        <span class="chat-subtitle" data-i18n="chat_subtitle">Guided CX • Lead Gen • Careers</span>
       </div>
-      <button class="btn btn-ghost" id="chatClose" type="button" aria-label="Close chat">✕</button>
+      <div class="chat-actions">
+        <button class="btn btn-ghost" id="langToggle" type="button" data-i18n="chat_lang_toggle_text" aria-label="Change language">
+          EN/ES
+        </button>
+        <button class="btn btn-ghost" id="themeToggle" type="button" data-i18n="chat_theme_toggle_text" aria-label="Toggle theme">
+          Dark/Light
+        </button>
+        <button class="btn btn-ghost" id="chatClose" type="button" aria-label="Close chat">✕</button>
+      </div>
     </header>
+
+    <div class="chat-hero" aria-hidden="true">
+      <img src="/assets/chatbot-hero.svg" alt="" />
+    </div>
+
+    <p class="chat-intro" data-i18n="chat_intro">
+      Tell us your goal, industry, volume, and timeline so we can route you to the right next step.
+    </p>
 
     <div class="chat-body" id="chatBody" role="log" aria-live="polite" aria-relevant="additions"></div>
 

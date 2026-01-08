@@ -506,6 +506,8 @@
   /* -------------------- Init -------------------- */
 
   function init() {
+    const isChatbotOnly = document.body && document.body.classList.contains("chatbot-only");
+
     state.theme = prefs && typeof prefs.getTheme === "function"
       ? prefs.getTheme()
       : readLS(LS.THEME, "dark") === "light" ? "light" : "dark";
@@ -521,7 +523,12 @@
     applyLang(state.lang);
     rebuildChatFromTranscript();
 
-    setChatExpanded(false);
+    if (isChatbotOnly) {
+      if (UI.chatDrawer) UI.chatDrawer.classList.add("is-open");
+      setChatExpanded(true);
+    } else {
+      setChatExpanded(false);
+    }
 
     try {
       requireConfigOrThrow();

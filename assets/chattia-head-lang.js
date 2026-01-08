@@ -66,7 +66,11 @@
       consent_note: "If you deny consent, chat will remain disabled until you accept.",
 
       chat_title: "OPS Assistant",
-      chat_subtitle: "Website help • Contact • Careers",
+      chat_subtitle: "Guided CX • Lead Gen • Careers",
+      chat_intro:
+        "Tell us your goal, industry, volume, and timeline so we can route you to the right next step.",
+      chat_lang_toggle_text: "EN/ES",
+      chat_theme_toggle_text: "Dark/Light",
       chat_label: "Your message",
       chat_placeholder: "Type your message…",
       chat_send: "Send",
@@ -146,7 +150,11 @@
       consent_note: "Si niegas el consentimiento, el chat quedará deshabilitado hasta que aceptes.",
 
       chat_title: "Asistente OPS",
-      chat_subtitle: "Ayuda del sitio • Contacto • Carreras",
+      chat_subtitle: "CX guiado • Leads • Carreras",
+      chat_intro:
+        "Cuéntanos tu objetivo, industria, volumen y plazo para guiarte al siguiente paso correcto.",
+      chat_lang_toggle_text: "EN/ES",
+      chat_theme_toggle_text: "Oscuro/Claro",
       chat_label: "Tu mensaje",
       chat_placeholder: "Escribe tu mensaje…",
       chat_send: "Enviar",
