@@ -102,6 +102,9 @@
     chatForm: $("#chatForm"),
     chatMessage: $("#chatMessage"),
     sendBtn: $("#chatForm button[type=submit]"),
+    hpEmail: $("#hp_email"),
+    hpWebsite: $("#hp_website"),
+    turnstileSlot: $("#turnstileSlot"),
 
     // Chat drawer
     chatDrawer: $("#chatDrawer"),
@@ -408,6 +411,13 @@
     if (isSending) return;
     if (!UI.chatMessage) return;
     if (!ensureConsentOrPrompt()) return;
+
+    const hpEmail = UI.hpEmail ? String(UI.hpEmail.value || "") : "";
+    const hpWebsite = UI.hpWebsite ? String(UI.hpWebsite.value || "") : "";
+    if (hpEmail || hpWebsite) {
+      renderMessage("assistant", t("badInput"));
+      return;
+    }
 
     const raw = normalizeUserText(UI.chatMessage.value || "");
     if (!raw) return;
