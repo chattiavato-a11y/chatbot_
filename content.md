@@ -8,14 +8,14 @@ This file contains the content that previously lived on the website pages. It is
 - Brand: **OPS Online Support**
 - Tagline: **Reliable CX • Ops • Support**
 - Primary navigation: Home, About, Contact, Policies
-- Actions: EN/ES language toggle, Dark/Light theme toggle
+- Actions: EN/ES language toggle, Dark/Light theme toggle (inside the chat header)
 
 ### Main content
 **Reliable CX, Operations, and Support Workflows**
 - We help organizations run smoother through customer experience support, back-office operations help, and technical support intake.
 - CTAs: **Contact / Request a Quote**, **Careers / Join Us**
-- Security note: Do not share passwords, one-time codes, banking info, or card numbers in chat.
-- Chatbot greeting note: Do not share passwords, OTP codes, banking info, or card numbers in chat. Use Contact for sensitive matters.
+- Security note: Do not share passwords, OTP codes, banking info, or card numbers in chat. Use Contact for sensitive matters.
+- Chatbot greeting note: Hi, I'm Chattia your dedicated OPS Assistant, ready to answer all your inquiries. But before we continue, please: Do not share passwords, OTP codes, banking info, or card numbers in chat.
 
 **Customer Experience (CX)**
 - Inbox triage, customer questions, follow-ups, and service workflows.

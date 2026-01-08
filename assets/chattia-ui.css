@@ -291,10 +291,35 @@ a:focus, button:focus, input:focus, textarea:focus {
 }
 
 .chat-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   font-weight: 700;
   margin: 0;
   font-size: 14px;
   color: var(--fg);
+}
+
+.chat-subtitle {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+  max-width: 260px;
+}
+
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.chat-header-toggles {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .chat-meta {
