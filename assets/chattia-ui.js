@@ -94,8 +94,8 @@
 
   const UI = {
     // Chat
-    messages: $("#messages"),
-    composer: $("#composer"),
+    messages: $("#messages") || $("#chatBody"),
+    composer: $("#composer") || $("#chatMessage"),
     sendBtn: $("#sendBtn"),
     statusPill: $("#statusPill"),
     langBtn: $("#langBtn"),
@@ -109,6 +109,11 @@
     drawerClear: $("#drawerClear"),
     backdrop: $("#backdrop"),
 
+    // Chat drawer
+    chatDrawer: $("#chatDrawer"),
+    chatClose: $("#chatClose"),
+    chatForm: $("#chatForm"),
+
     // Consent modal
     consentModal: $("#consentModal"),
     consentAccept: $("#consentAccept"),
@@ -116,10 +121,14 @@
     consentClose: $("#consentClose"),
 
     // FABs
-    fabChatbot: $("#fabChatbot"),
+    fabChatbot: $("#fabChatbot") || $("#fabChat"),
     fabContact: $("#fabContact"),
     fabJoin: $("#fabJoin")
   };
+
+  if (!UI.sendBtn && UI.chatForm) {
+    UI.sendBtn = UI.chatForm.querySelector("button[type='submit']");
+  }
 
   /* -------------------- State -------------------- */
 
@@ -368,6 +377,23 @@
     UI.drawer.setAttribute("aria-hidden", "true");
   }
 
+  /* -------------------- Chat drawer controls -------------------- */
+
+  function openChatDrawer() {
+    if (!UI.chatDrawer) return;
+    UI.chatDrawer.classList.add("is-open");
+    UI.chatDrawer.removeAttribute("hidden");
+    UI.chatDrawer.setAttribute("aria-hidden", "false");
+    if (UI.composer) UI.composer.focus();
+  }
+
+  function closeChatDrawer() {
+    if (!UI.chatDrawer) return;
+    UI.chatDrawer.classList.remove("is-open");
+    UI.chatDrawer.setAttribute("hidden", "hidden");
+    UI.chatDrawer.setAttribute("aria-hidden", "true");
+  }
+
   function clearTranscript() {
     state.transcript = [];
     saveTranscript();
@@ -488,6 +514,12 @@
         }
       });
     }
+    if (UI.chatForm) {
+      UI.chatForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        onSend();
+      });
+    }
 
     // Transcript drawer
     if (UI.transcriptBtn) UI.transcriptBtn.addEventListener("click", openDrawer);
@@ -530,9 +562,14 @@
 
     // FABs
     if (UI.fabChatbot) UI.fabChatbot.addEventListener("click", () => {
-      // focus composer
-      if (UI.composer) UI.composer.focus();
+      if (!ensureConsentOrPrompt()) {
+        openChatDrawer();
+        return;
+      }
+      openChatDrawer();
     });
+
+    if (UI.chatClose) UI.chatClose.addEventListener("click", closeChatDrawer);
 
     // Contact + Join must go to nav menu links (pages)
     if (UI.fabContact) UI.fabContact.addEventListener("click", () => {
@@ -549,6 +586,7 @@
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       closeDrawer();
+      closeChatDrawer();
       closeConsentModal();
     });
   }
@@ -577,6 +615,8 @@
     } else {
       status(t("online"), "ok");
     }
+
+    closeChatDrawer();
 
     wireEvents();
 
