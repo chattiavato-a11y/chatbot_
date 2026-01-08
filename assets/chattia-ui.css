@@ -253,6 +253,13 @@ a:focus, button:focus, input:focus, textarea:focus {
   box-shadow: 0 10px 35px color-mix(in srgb, #000 12%, transparent);
 }
 
+.inline-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
 /* -------------------- Chat -------------------- */
 
 .chat {

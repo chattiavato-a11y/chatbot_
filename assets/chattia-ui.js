@@ -507,6 +507,7 @@
 
   function init() {
     const isChatbotOnly = document.body && document.body.classList.contains("chatbot-only");
+    const autoOpen = document.body && document.body.dataset.chatOpen === "true";
 
     state.theme = prefs && typeof prefs.getTheme === "function"
       ? prefs.getTheme()
@@ -523,7 +524,7 @@
     applyLang(state.lang);
     rebuildChatFromTranscript();
 
-    if (isChatbotOnly) {
+    if (isChatbotOnly || autoOpen) {
       if (UI.chatDrawer) UI.chatDrawer.classList.add("is-open");
       setChatExpanded(true);
     } else {
