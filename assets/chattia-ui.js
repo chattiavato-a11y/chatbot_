@@ -486,6 +486,8 @@
       UI.consentAccept.addEventListener("click", () => {
         setConsent("accepted");
         updateChatEnabled();
+        applyTheme(state.theme);
+        applyLang(state.lang);
         closeConsentModal();
         if (state.configOk) openChatDrawer({ focus: true });
       });

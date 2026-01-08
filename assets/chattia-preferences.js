@@ -45,7 +45,7 @@
     document.documentElement.dataset.theme = t;
     document.documentElement.classList.toggle("theme-light", t === "light");
     document.documentElement.classList.toggle("theme-dark", t !== "light");
-    safeSet(KEYS.theme, t);
+    if (getConsent() === "accepted") safeSet(KEYS.theme, t);
     window.__OPS_THEME = t;
     return t;
   }
@@ -60,7 +60,7 @@
 
   function applyLang(lang) {
     const l = normalizeLang(lang);
-    safeSet(KEYS.lang, l);
+    if (getConsent() === "accepted") safeSet(KEYS.lang, l);
     // delegate to head-lang bootstrap if present
     if (typeof window.__OPS_setLang === "function") window.__OPS_setLang(l);
     else {
@@ -74,7 +74,7 @@
   function getLang() {
     const saved = safeGet(KEYS.lang);
     if (saved === "es" || saved === "en") return saved;
-    return normalizeLang(navigator.language || "en");
+    return "en";
   }
 
   /* ---------------- Consent ---------------- */
