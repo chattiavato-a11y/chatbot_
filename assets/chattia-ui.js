@@ -136,7 +136,10 @@
     theme: "dark",
     consent: "denied",
     configOk: true,
-    transcript: [] // { role, content, ts }
+    transcript: [], // { role, content, ts }
+    sessionBlocked: false,
+    turnstileToken: "",
+    turnstileRequired: false
   };
 
   /* -------------------- Copy (EN/ES) -------------------- */
@@ -145,6 +148,8 @@
     en: {
       sending: "Sending…",
       badInput: "Message blocked. Please remove unsafe content.",
+      turnstileRequired: "Security check required. Please try again.",
+      sessionBlocked: "Session blocked due to failed security checks.",
       mustConsent: "To use chat, please accept Privacy & Consent.",
       configError: "Site configuration error.",
       chat_placeholder: "Type your message…",
@@ -156,6 +161,8 @@
     es: {
       sending: "Enviando…",
       badInput: "Mensaje bloqueado. Elimina contenido inseguro.",
+      turnstileRequired: "Se requiere verificación de seguridad. Inténtalo de nuevo.",
+      sessionBlocked: "Sesión bloqueada por fallas de seguridad.",
       mustConsent: "Para usar el chat, acepta Privacidad y consentimiento.",
       configError: "Error de configuración del sitio.",
       chat_placeholder: "Escribe tu mensaje…",
@@ -169,6 +176,14 @@
   function t(key) {
     const d = COPY[state.lang] || COPY.en;
     return d[key] || COPY.en[key] || "";
+  }
+
+  function blockSession(messageKey) {
+    if (state.sessionBlocked) return;
+    state.sessionBlocked = true;
+    if (UI.chatMessage) UI.chatMessage.disabled = true;
+    if (UI.sendBtn) UI.sendBtn.disabled = true;
+    renderMessage("assistant", t(messageKey || "sessionBlocked"));
   }
 
   /* -------------------- Storage helpers -------------------- */
@@ -306,7 +321,7 @@
   }
 
   function updateChatEnabled() {
-    setChatEnabled(state.consent === "accepted" && state.configOk);
+    setChatEnabled(state.consent === "accepted" && state.configOk && !state.sessionBlocked);
   }
 
   /* -------------------- Drawer controls -------------------- */
@@ -384,7 +399,8 @@
       history: buildHistoryForGateway(),
       // Honeypots: must be empty
       hp_email: "",
-      hp_website: ""
+      hp_website: "",
+      turnstile_token: state.turnstileToken || ""
     };
 
     const res = await fetch(url, {
@@ -417,12 +433,18 @@
     if (event) event.preventDefault();
     if (isSending) return;
     if (!UI.chatMessage) return;
+    if (state.sessionBlocked) return;
     if (!ensureConsentOrPrompt()) return;
 
     const hpEmail = UI.hpEmail ? String(UI.hpEmail.value || "") : "";
     const hpWebsite = UI.hpWebsite ? String(UI.hpWebsite.value || "") : "";
     if (hpEmail || hpWebsite) {
-      renderMessage("assistant", t("badInput"));
+      blockSession("sessionBlocked");
+      return;
+    }
+
+    if (state.turnstileRequired && !state.turnstileToken) {
+      blockSession("turnstileRequired");
       return;
     }
 
@@ -458,6 +480,57 @@
       isSending = false;
       if (UI.sendBtn) UI.sendBtn.disabled = false;
     }
+  }
+
+  function loadTurnstileScript() {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector("script[data-ops-turnstile]")) {
+        resolve();
+        return;
+      }
+      const s = document.createElement("script");
+      s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      s.async = true;
+      s.defer = true;
+      s.dataset.opsTurnstile = "true";
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("Turnstile failed to load."));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function initTurnstile() {
+    const siteKey = getMeta("ops-turnstile-sitekey");
+    if (!siteKey || !UI.turnstileSlot) return;
+
+    state.turnstileRequired = true;
+    try {
+      await loadTurnstileScript();
+    } catch (err) {
+      console.error(err);
+      blockSession("turnstileRequired");
+      return;
+    }
+
+    if (!window.turnstile) {
+      blockSession("turnstileRequired");
+      return;
+    }
+
+    UI.turnstileSlot.classList.add("is-visible");
+    window.turnstile.render(UI.turnstileSlot, {
+      sitekey: siteKey,
+      callback: (token) => {
+        state.turnstileToken = String(token || "");
+      },
+      "expired-callback": () => {
+        state.turnstileToken = "";
+      },
+      "error-callback": () => {
+        state.turnstileToken = "";
+        blockSession("turnstileRequired");
+      }
+    });
   }
 
   /* -------------------- Event wiring -------------------- */
@@ -563,6 +636,8 @@
     updateChatEnabled();
 
     if (state.consent !== "accepted") openConsentModal();
+
+    initTurnstile();
 
     wireEvents();
   }
