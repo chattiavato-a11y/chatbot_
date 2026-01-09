@@ -514,6 +514,11 @@ a:focus, button:focus, input:focus, textarea:focus {
   border-top: 1px solid var(--line);
 }
 
+.chat-input.turnstile-hidden {
+  grid-template-rows: auto;
+  row-gap: 0;
+}
+
 .chat-input .turnstile-slot {
   grid-column: 1 / -1;
   min-height: 0;
@@ -528,6 +533,7 @@ a:focus, button:focus, input:focus, textarea:focus {
 }
 
 .chat-input .turnstile-slot.is-verified {
+  display: none;
   min-height: 0;
   opacity: 0;
   pointer-events: none;

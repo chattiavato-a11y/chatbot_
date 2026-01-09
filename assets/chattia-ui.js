@@ -640,30 +640,34 @@
       return;
     }
 
-    UI.turnstileSlot.classList.add("is-visible");
-    UI.turnstileSlot.classList.remove("is-verified");
-    UI.turnstileSlot.setAttribute("aria-hidden", "false");
+    const showTurnstile = () => {
+      UI.turnstileSlot.classList.add("is-visible");
+      UI.turnstileSlot.classList.remove("is-verified");
+      UI.turnstileSlot.setAttribute("aria-hidden", "false");
+      if (UI.chatForm) UI.chatForm.classList.remove("turnstile-hidden");
+    };
+
+    const hideTurnstile = () => {
+      UI.turnstileSlot.classList.remove("is-visible");
+      UI.turnstileSlot.classList.add("is-verified");
+      UI.turnstileSlot.setAttribute("aria-hidden", "true");
+      if (UI.chatForm) UI.chatForm.classList.add("turnstile-hidden");
+    };
+
+    showTurnstile();
     window.turnstile.render(UI.turnstileSlot, {
       sitekey: siteKey,
       callback: (token) => {
         state.turnstileToken = String(token || "");
-        if (state.turnstileToken) {
-          UI.turnstileSlot.classList.remove("is-visible");
-          UI.turnstileSlot.classList.add("is-verified");
-          UI.turnstileSlot.setAttribute("aria-hidden", "true");
-        }
+        if (state.turnstileToken) hideTurnstile();
       },
       "expired-callback": () => {
         state.turnstileToken = "";
-        UI.turnstileSlot.classList.remove("is-verified");
-        UI.turnstileSlot.classList.add("is-visible");
-        UI.turnstileSlot.setAttribute("aria-hidden", "false");
+        showTurnstile();
       },
       "error-callback": () => {
         state.turnstileToken = "";
-        UI.turnstileSlot.classList.remove("is-verified");
-        UI.turnstileSlot.classList.add("is-visible");
-        UI.turnstileSlot.setAttribute("aria-hidden", "false");
+        showTurnstile();
         blockSession("turnstileRequired");
       }
     });
