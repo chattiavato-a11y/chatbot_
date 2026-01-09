@@ -94,8 +94,8 @@
           <button class="btn btn-ghost" id="themeToggle" type="button" data-i18n="chat_theme_toggle_text" aria-label="Toggle theme">
             Dark
           </button>
-          <button class="btn btn-ghost" id="chatTranscript" type="button" data-i18n="chat_transcript" aria-label="Open transcript">
-            Transcript
+          <button class="btn btn-ghost" id="chatTranscript" type="button" data-i18n="chat_transcript" aria-label="Open copy panel">
+            Copy
           </button>
           <button class="btn btn-ghost" id="chatClear" type="button" data-i18n="chat_clear" aria-label="Clear chat">
             Clear
@@ -127,12 +127,12 @@
   <dialog class="modal" id="transcriptModal" aria-hidden="true" aria-labelledby="transcriptTitle">
     <div class="modal-card">
       <div class="modal-head">
-        <h2 class="modal-title" id="transcriptTitle" data-i18n="transcript_title">Transcript</h2>
-        <button class="btn btn-ghost" id="transcriptClose" type="button" aria-label="Close transcript">✕</button>
+        <h2 class="modal-title" id="transcriptTitle" data-i18n="transcript_title">Copy</h2>
+        <button class="btn btn-ghost" id="transcriptClose" type="button" aria-label="Close copy panel">✕</button>
       </div>
       <div class="modal-body">
-        <p data-i18n="transcript_body">Copy or download your chat transcript.</p>
-        <textarea class="transcript-textarea" id="transcriptText" readonly aria-label="Transcript"></textarea>
+        <p data-i18n="transcript_body">Copy or download your chat history.</p>
+        <textarea class="transcript-textarea" id="transcriptText" readonly aria-label="Chat history"></textarea>
       </div>
       <div class="modal-actions">
         <button class="btn btn-secondary" id="transcriptCopy" type="button" data-i18n="transcript_copy">Copy</button>

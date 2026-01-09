@@ -52,13 +52,13 @@
       chat_lang_toggle_text: "EN",
       chat_theme_toggle_text: "Dark",
       chat_clear: "Clear",
-      chat_transcript: "Transcript",
+      chat_transcript: "Copy",
       chat_label: "Your message",
       chat_placeholder: "Type your message…",
       chat_send: "Send",
 
-      transcript_title: "Transcript",
-      transcript_body: "Copy or download your chat transcript.",
+      transcript_title: "Copy",
+      transcript_body: "Copy or download your chat history.",
       transcript_copy: "Copy",
       transcript_download: "Download"
     },
@@ -78,13 +78,13 @@
       chat_lang_toggle_text: "ES",
       chat_theme_toggle_text: "Oscuro",
       chat_clear: "Borrar",
-      chat_transcript: "Transcripción",
+      chat_transcript: "Copiar",
       chat_label: "Tu mensaje",
       chat_placeholder: "Escribe tu mensaje…",
       chat_send: "Enviar",
 
-      transcript_title: "Transcripción",
-      transcript_body: "Copia o descarga la transcripción del chat.",
+      transcript_title: "Copiar",
+      transcript_body: "Copia o descarga el historial del chat.",
       transcript_copy: "Copiar",
       transcript_download: "Descargar"
     }
