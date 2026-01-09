@@ -120,6 +120,7 @@
     consentModal: $("#consentModal"),
     consentAccept: $("#consentAccept"),
     consentDeny: $("#consentDeny"),
+    consentClose: $("#consentClose"),
 
     // Toggles
     langToggle: $("#langToggle"),
@@ -701,6 +702,14 @@
 
     if (UI.consentDeny) {
       UI.consentDeny.addEventListener("click", () => {
+        setConsent("denied");
+        updateChatEnabled();
+        closeConsentModal();
+      });
+    }
+
+    if (UI.consentClose) {
+      UI.consentClose.addEventListener("click", () => {
         setConsent("denied");
         updateChatEnabled();
         closeConsentModal();

@@ -62,7 +62,10 @@
   <!-- Privacy & Consent Modal (chat stays disabled until accepted) -->
   <dialog class="modal" id="consentModal" aria-labelledby="consentTitle">
     <form method="dialog" class="modal-card">
-      <h2 id="consentTitle" data-i18n="consent_title">Privacy & Consent</h2>
+      <div class="modal-head">
+        <h2 class="modal-title" id="consentTitle" data-i18n="consent_title">Privacy & Consent</h2>
+        <button class="btn btn-ghost" id="consentClose" type="button" aria-label="Close privacy and consent">✕</button>
+      </div>
 
       <p class="modal-text" data-i18n="consent_body">
         Chat interactions may be used to improve the chatbot experience. Please do not enter sensitive personal information.
