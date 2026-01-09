@@ -506,7 +506,7 @@
     }));
   }
 
-  async function sendToGateway(message) {
+  async function sendToGateway(message, honeypots = {}) {
     requireConfigOrThrow();
 
     const url = `${GATEWAY_BASE}/api/ops-online-chat`;
@@ -515,8 +515,8 @@
       message,
       history: buildHistoryForGateway(),
       // Honeypots: must be empty
-      hp_email: "",
-      hp_website: "",
+      hp_email: String(honeypots.email || ""),
+      hp_website: String(honeypots.website || ""),
       turnstile_token: state.turnstileToken || ""
     };
 
@@ -583,7 +583,7 @@
     state.requestId = requestId;
 
     try {
-      const reply = await sendToGateway(raw);
+      const reply = await sendToGateway(raw, { email: hpEmail, website: hpWebsite });
       if (requestId !== state.requestId) return;
       const finalReply = reply || t("fallbackReply");
       renderMessage("assistant", finalReply);
