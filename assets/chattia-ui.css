@@ -527,6 +527,12 @@ a:focus, button:focus, input:focus, textarea:focus {
   pointer-events: auto;
 }
 
+.chat-input .turnstile-slot.is-verified {
+  min-height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .chat-input input {
   width: 100%;
   min-height: 44px;

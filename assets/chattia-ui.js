@@ -641,16 +641,29 @@
     }
 
     UI.turnstileSlot.classList.add("is-visible");
+    UI.turnstileSlot.classList.remove("is-verified");
+    UI.turnstileSlot.setAttribute("aria-hidden", "false");
     window.turnstile.render(UI.turnstileSlot, {
       sitekey: siteKey,
       callback: (token) => {
         state.turnstileToken = String(token || "");
+        if (state.turnstileToken) {
+          UI.turnstileSlot.classList.remove("is-visible");
+          UI.turnstileSlot.classList.add("is-verified");
+          UI.turnstileSlot.setAttribute("aria-hidden", "true");
+        }
       },
       "expired-callback": () => {
         state.turnstileToken = "";
+        UI.turnstileSlot.classList.remove("is-verified");
+        UI.turnstileSlot.classList.add("is-visible");
+        UI.turnstileSlot.setAttribute("aria-hidden", "false");
       },
       "error-callback": () => {
         state.turnstileToken = "";
+        UI.turnstileSlot.classList.remove("is-verified");
+        UI.turnstileSlot.classList.add("is-visible");
+        UI.turnstileSlot.setAttribute("aria-hidden", "false");
         blockSession("turnstileRequired");
       }
     });
