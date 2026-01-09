@@ -114,6 +114,7 @@
     chatDrawer: $("#chatDrawer"),
     chatClose: $("#chatClose"),
     chatForm: $("#chatForm"),
+    chatBackdrop: $("#chatBackdrop"),
 
     // Consent modal
     consentModal: $("#consentModal"),
@@ -368,10 +369,17 @@
     if (UI.chatDrawer) UI.chatDrawer.setAttribute("aria-hidden", String(!isOpen));
   }
 
+  function setChatBackdrop(isOn) {
+    if (!UI.chatBackdrop) return;
+    UI.chatBackdrop.classList.toggle("is-on", isOn);
+    UI.chatBackdrop.setAttribute("aria-hidden", String(!isOn));
+  }
+
   function openChatDrawer({ focus = true } = {}) {
     if (!UI.chatDrawer) return;
     UI.chatDrawer.classList.add("is-open");
     setChatExpanded(true);
+    setChatBackdrop(true);
     if (focus && UI.chatMessage) UI.chatMessage.focus();
   }
 
@@ -379,6 +387,7 @@
     if (!UI.chatDrawer) return;
     UI.chatDrawer.classList.remove("is-open");
     setChatExpanded(false);
+    setChatBackdrop(false);
     if (returnFocus && UI.fabChat) UI.fabChat.focus();
   }
 
@@ -668,6 +677,17 @@
       UI.chatClose.addEventListener("click", () => closeChatDrawer({ returnFocus: true }));
     }
 
+    if (UI.chatBackdrop) {
+      UI.chatBackdrop.addEventListener("click", () => closeChatDrawer({ returnFocus: false }));
+    }
+
+    if (UI.consentModal) {
+      UI.consentModal.addEventListener("click", (event) => {
+        if (event.target !== UI.consentModal) return;
+        closeConsentModal();
+      });
+    }
+
     if (UI.consentAccept) {
       UI.consentAccept.addEventListener("click", () => {
         setConsent("accepted");
@@ -717,6 +737,13 @@
       });
     }
 
+    if (UI.transcriptModal) {
+      UI.transcriptModal.addEventListener("click", (event) => {
+        if (event.target !== UI.transcriptModal) return;
+        closeTranscriptModal();
+      });
+    }
+
     if (UI.transcriptCopy) {
       UI.transcriptCopy.addEventListener("click", () => {
         copyTranscript();
@@ -761,8 +788,10 @@
     if (isChatbotOnly || autoOpen) {
       if (UI.chatDrawer) UI.chatDrawer.classList.add("is-open");
       setChatExpanded(true);
+      setChatBackdrop(true);
     } else {
       setChatExpanded(false);
+      setChatBackdrop(false);
     }
 
     try {
