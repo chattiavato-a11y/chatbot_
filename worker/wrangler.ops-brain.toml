@@ -9,6 +9,9 @@ kv_namespaces = [
 
 durable_objects = { bindings = [{ name = "NONCE_GUARD", class_name = "OpsNonceGuard" }] }
 
+[ai]
+binding = "AI"
+
 [[migrations]]
 tag = "v1"
 new_classes = ["OpsNonceGuard"]
