@@ -109,6 +109,11 @@
     hpEmail: $("#hp_email"),
     hpWebsite: $("#hp_website"),
     turnstileSlot: $("#turnstileSlot"),
+
+    // Chat drawer
+    chatDrawer: $("#chatDrawer"),
+    chatClose: $("#chatClose"),
+    chatForm: $("#chatForm"),
     chatBackdrop: $("#chatBackdrop"),
 
     // Consent modal
