@@ -26,7 +26,7 @@
      sig     = HMAC_SHA256_HEX(HAND_SHAKE, toSign)
 */
 
-import { OPS_SITE, OPS_SITE_RULES_EN, OPS_SITE_RULES_ES } from "./ops-site-content";
+import { OPS_SITE, OPS_SITE_RULES_EN, OPS_SITE_RULES_ES } from "./ops-site-content.js";
 
 const MODEL_ID = "@cf/meta/llama-3.1-8b-instruct-fp8";
 
