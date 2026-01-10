@@ -36,3 +36,20 @@ Use this checklist when deploying the gateway + brain workers. The bindings belo
 
 - Update `ALLOWED_ORIGINS` in `worker/ops-gateway.js` to match production domains.
 
+## 5) Gateway → brain signing details (internal)
+
+**Canonical string format**
+
+`ts.nonce.POST.pathname.bodySha`
+
+**Internal headers (gateway → brain)**
+
+- `X-Ops-Ts`
+- `X-Ops-Nonce`
+- `X-Ops-Body-Sha256`
+- `X-Ops-Sig`
+
+**Code references**
+
+- Signing logic: `worker/ops-gateway.js` (gateway → brain request construction).
+- Verification logic: `worker/ops-brain.js` (signature verification and nonce replay checks).
