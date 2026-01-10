@@ -248,6 +248,7 @@ function timingSafeEqualHex(a, b) {
   return out === 0;
 }
 
+// Clamp NONCE_TTL_SECONDS (default 10 min) for KV TTL minimums before replay checks.
 function clampNonceTtlSec(env) {
   const raw = Number(env.NONCE_TTL_SECONDS || DEFAULT_NONCE_TTL_SEC);
   const ttl = Number.isFinite(raw) ? Math.floor(raw) : DEFAULT_NONCE_TTL_SEC;
@@ -354,6 +355,7 @@ export class OpsNonceGuard {
 
     const body = await request.json().catch(() => null);
     const nonce = String(body?.nonce || "");
+    // Default to 10 minutes; enforce >= 60 seconds for storage hygiene.
     const ttlSec = Math.max(60, Math.floor(Number(body?.ttlSec || DEFAULT_NONCE_TTL_SEC)));
     if (!nonce) return json(400, { ok: false, reason: "missing_nonce" });
 
