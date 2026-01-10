@@ -36,3 +36,18 @@ Use this checklist when deploying the gateway + brain workers. The bindings belo
 
 - Update `ALLOWED_ORIGINS` in `worker/ops-gateway.js` to match production domains.
 
+## 5) Client request requirements (minimum)
+
+The public gateway requires **only** these client-side items:
+- `Origin` header is present and allowed (see `originAllowed(...)` in `worker/ops-gateway.js`).
+- `POST` JSON payload to `/api/ops-online-chat`.
+- `X-Ops-Asset-Id` header matches `OPS_ASSET_IDS`/`ASSET_ID` (see `getAllowedAssetIds(...)` and the `X-Ops-Asset-Id` enforcement block in `worker/ops-gateway.js`).
+
+Example request:
+```bash
+curl -X POST "https://YOUR-GATEWAY.example/api/ops-online-chat" \
+  -H "Origin: https://your-site.example" \
+  -H "Content-Type: application/json" \
+  -H "X-Ops-Asset-Id: YOUR_ASSET_ID_VALUE" \
+  --data '{"lang":"en","message":"Hello","history":[]}'
+```
