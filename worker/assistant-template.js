@@ -339,16 +339,18 @@ async function firewallCheck(env, textToCheck) {
 /* -------------------- Proxy to Brain (Service Binding) -------------------- */
 
 async function proxyJsonToBrain(origin, request, env, ctx, brainPath, rawClientBodyAb, reqId) {
-  if (!env.BRAIN || typeof env.BRAIN.fetch !== "function") {
+  const hasServiceBinding = env.BRAIN && typeof env.BRAIN.fetch === "function";
+  const brainUrlBase = String(env.BRAIN_URL || "").trim().replace(/\/+$/, "");
+  if (!hasServiceBinding && !brainUrlBase) {
     return json(origin, 500, {
       ok: false,
-      error: "Gateway misconfigured (missing BRAIN service binding).",
+      error: "Gateway misconfigured (missing BRAIN service binding or BRAIN_URL).",
       error_code: "NO_BRAIN",
       request_id: reqId
     }, reqId);
   }
 
-  const brainReq = new Request("https://brain.local" + brainPath, {
+  const brainReq = new Request((brainUrlBase || "https://brain.local") + brainPath, {
     method: "POST",
     headers: {
       "Content-Type": "application/json; charset=utf-8",
@@ -359,7 +361,7 @@ async function proxyJsonToBrain(origin, request, env, ctx, brainPath, rawClientB
 
   let brainResp;
   try {
-    brainResp = await env.BRAIN.fetch(brainReq);
+    brainResp = hasServiceBinding ? await env.BRAIN.fetch(brainReq) : await fetch(brainReq);
   } catch (e) {
     console.error("BRAIN fetch failed:", e);
     const tag = await ipTag(env, request.headers.get("CF-Connecting-IP") || "0.0.0.0");
