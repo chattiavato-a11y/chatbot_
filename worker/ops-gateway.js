@@ -338,7 +338,7 @@ async function rateLimitCheck(env, ip) {
 
 async function firewallCheck(env, textToCheck) {
   const fw = env.FIREWALL;
-  if (!fw || typeof fw.run !== "function") return { ok: true, skipped: true };
+  if (!fw || typeof fw.run !== "function") return { ok: false, error: "FIREWALL_REQUIRED" };
 
   try {
     const out = await fw.run("@cf/meta/llama-guard-3-8b", { prompt: String(textToCheck || "") });
@@ -349,7 +349,7 @@ async function firewallCheck(env, textToCheck) {
     return { ok: true };
   } catch (e) {
     console.error("FIREWALL llama-guard failed (ignored):", e);
-    return { ok: true, skipped: true };
+    return { ok: false, error: "FIREWALL_ERROR" };
   }
 }
 
@@ -501,7 +501,7 @@ export default {
     }
 
     // 2) Rate limit early (tight)
-    const rl = await rateLimitCheck(env, clientIp);
+    const rl = await rateLimitCheck(env, tag);
     if (!rl.ok) {
       await logEvent(ctx, env, { type: "RATE_LIMIT", ip_tag: tag, origin_seen: origin, path: pathname, request_id: reqId });
       return json(origin, 429, {
@@ -600,8 +600,10 @@ export default {
     // 8) FIREWALL llama-guard on the user message (required)
     const fw = await firewallCheck(env, message);
     if (!fw.ok) {
-      await logEvent(ctx, env, { type: "FIREWALL_BLOCK", ip_tag: tag, origin_seen: origin, path: pathname, request_id: reqId });
-      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "FIREWALL_BLOCK", lang, request_id: reqId }, reqId);
+      const errorCode = fw.error === "FIREWALL_REQUIRED" ? "FIREWALL_REQUIRED" : "FIREWALL_BLOCK";
+      await logEvent(ctx, env, { type: errorCode, ip_tag: tag, origin_seen: origin, path: pathname, request_id: reqId });
+      const status = fw.error === "FIREWALL_REQUIRED" ? 500 : 400;
+      return json(origin, status, { ok: false, error: "Request blocked.", error_code: errorCode, lang, request_id: reqId }, reqId);
     }
 
     // 9) Forward upstream (Brain does HMAC verify)
