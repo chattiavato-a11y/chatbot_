@@ -557,8 +557,8 @@ export default {
         request_id: reqId,
         error_code: "DLP_CARD",
         error: lang === "es"
-          ? "Por seguridad, no compartas datos de tarjeta en el chat. Revisa opsonlinesupport.com/content.md."
-          : "For security, do not share card details in chat. Please review opsonlinesupport.com/content.md."
+          ? "Por seguridad, no compartas datos de tarjeta de crédito, cuenta bancaria ni información personal/financiera en el chat."
+          : "For security, do not share credit card, bank account, or personal/financial information in chat."
       }, reqId);
     }
 
