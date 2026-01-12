@@ -1,22 +1,26 @@
 /* assets/chattia-preferences.js
-   Chattia / OPS — Preferences (v2)
-   - Manages: language, theme, chat consent
+   Chattia / OPS — Preferences (v3)
+   - Manages: language, theme, chat consent (local only)
    - No cookies, no network calls
    - localStorage only (fails safe if blocked)
+   - Aligns keys with assets/chattia-ui.js:
+     ops_lang, ops_theme, ops_consent
 */
 
 (() => {
+  "use strict";
+
   const KEYS = {
     lang: "ops_lang",
-    theme: "ops_theme",           // "dark" | "light"
-    consent: "ops_chat_consent"   // "accepted" | "denied" | null
+    theme: "ops_theme",      // "dark" | "light"
+    consent: "ops_consent"   // "accepted" | "denied" | null
   };
 
   function safeGet(key) {
     try { return localStorage.getItem(key); } catch { return null; }
   }
   function safeSet(key, val) {
-    try { localStorage.setItem(key, val); } catch {}
+    try { localStorage.setItem(key, String(val)); } catch {}
   }
   function safeDel(key) {
     try { localStorage.removeItem(key); } catch {}
@@ -40,41 +44,49 @@
 
   /* ---------------- Theme ---------------- */
 
-  function applyTheme(theme) {
-    const t = normalizeTheme(theme);
-    document.documentElement.dataset.theme = t;
-    document.documentElement.classList.toggle("theme-light", t === "light");
-    document.documentElement.classList.toggle("theme-dark", t !== "light");
-    if (getConsent() === "accepted") safeSet(KEYS.theme, t);
-    window.__OPS_THEME = t;
-    return t;
-  }
-
   function getTheme() {
     const saved = safeGet(KEYS.theme);
     if (saved === "light" || saved === "dark") return saved;
-    return "light";
+    return "dark";
+  }
+
+  function applyTheme(theme) {
+    const t = normalizeTheme(theme);
+    document.documentElement.dataset.theme = t;
+    safeSet(KEYS.theme, t);
+    window.__OPS_THEME = t;
+    window.dispatchEvent(new CustomEvent("ops:theme", { detail: { theme: t } }));
+    return t;
   }
 
   /* ---------------- Language ---------------- */
 
+  function getLang() {
+    const saved = safeGet(KEYS.lang);
+    if (saved === "es" || saved === "en") return saved;
+
+    const htmlLang = (document.documentElement.getAttribute("lang") || "").toLowerCase();
+    if (htmlLang.startsWith("es")) return "es";
+
+    const nav = (navigator.language || "en").toLowerCase();
+    return nav.startsWith("es") ? "es" : "en";
+  }
+
   function applyLang(lang) {
     const l = normalizeLang(lang);
-    if (getConsent() === "accepted") safeSet(KEYS.lang, l);
-    // delegate to head-lang bootstrap if present
-    if (typeof window.__OPS_setLang === "function") window.__OPS_setLang(l);
-    else {
+    safeSet(KEYS.lang, l);
+
+    // Prefer head-lang bootstrap if present (also applies i18n)
+    if (typeof window.__OPS_setLang === "function") {
+      window.__OPS_setLang(l);
+    } else {
       document.documentElement.setAttribute("lang", l);
       document.documentElement.dataset.lang = l;
       window.__OPS_LANG = l;
     }
-    return l;
-  }
 
-  function getLang() {
-    const saved = safeGet(KEYS.lang);
-    if (saved === "es" || saved === "en") return saved;
-    return "en";
+    window.dispatchEvent(new CustomEvent("ops:lang", { detail: { lang: l } }));
+    return l;
   }
 
   /* ---------------- Consent ---------------- */
@@ -88,10 +100,12 @@
     if (!s) {
       safeDel(KEYS.consent);
       window.__OPS_CHAT_CONSENT = null;
+      window.dispatchEvent(new CustomEvent("ops:consent", { detail: { consent: null } }));
       return null;
     }
     safeSet(KEYS.consent, s);
     window.__OPS_CHAT_CONSENT = s;
+    window.dispatchEvent(new CustomEvent("ops:consent", { detail: { consent: s } }));
     return s;
   }
 
@@ -101,22 +115,18 @@
 
   /* ---------------- Init ---------------- */
 
-  // theme
   applyTheme(getTheme());
-
-  // lang (head-lang already sets; we keep consistent)
   applyLang(getLang());
-
-  // consent
   window.__OPS_CHAT_CONSENT = getConsent();
 
-  /* ---------------- UI hooks (optional) ----------------
+  /* ---------------- Optional data-action hooks ----------------
      Any element with:
-     - data-action="set-lang"  data-value="en|es"
-     - data-action="set-theme" data-value="dark|light"
+     - data-action="set-lang"        data-value="en|es"
+     - data-action="set-theme"       data-value="dark|light"
      - data-action="accept-consent"
      - data-action="deny-consent"
   */
+
   function onClick(e) {
     const el = e.target && e.target.closest ? e.target.closest("[data-action]") : null;
     if (!el) return;
@@ -124,27 +134,10 @@
     const action = el.getAttribute("data-action") || "";
     const value = el.getAttribute("data-value") || "";
 
-    if (action === "set-lang") {
-      applyLang(value);
-      return;
-    }
-
-    if (action === "set-theme") {
-      applyTheme(value);
-      return;
-    }
-
-    if (action === "accept-consent") {
-      setConsent("accepted");
-      window.dispatchEvent(new CustomEvent("ops:consent", { detail: { consent: "accepted" } }));
-      return;
-    }
-
-    if (action === "deny-consent") {
-      setConsent("denied");
-      window.dispatchEvent(new CustomEvent("ops:consent", { detail: { consent: "denied" } }));
-      return;
-    }
+    if (action === "set-lang") { applyLang(value); return; }
+    if (action === "set-theme") { applyTheme(value); return; }
+    if (action === "accept-consent") { setConsent("accepted"); return; }
+    if (action === "deny-consent") { setConsent("denied"); return; }
   }
 
   document.addEventListener("click", onClick, { passive: true });
@@ -161,4 +154,4 @@
     setConsent,
     isChatEnabled
   };
-})(); 
+})();
