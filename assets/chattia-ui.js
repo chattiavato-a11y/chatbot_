@@ -24,25 +24,17 @@
   const LS = {
     THEME: "ops_theme",           // "dark" | "light"
     LANG: "ops_lang",             // "en" | "es"
-    CONSENT: "ops_chat_consent",  // "accepted" | "denied"
-    CONSENT_LEGACY: "ops_consent_v1",
-    TRANSCRIPT: "ops_transcript"  // JSON array (local only)
+    CONSENT: "ops_consent",       // "accepted" | "denied"
+    TRANSCRIPT: "ops_transcript"  // JSON array
   };
 
-  const LIMITS = {
-    MAX_MSG_CHARS: 256,
-    MAX_HISTORY_ITEMS: 12
-  };
+  const MAX_MSG_CHARS = 256;
+  const MAX_HISTORY_ITEMS = 12;
+  const MAX_TRANSCRIPT_ITEMS = 50;
 
-  const prefs = typeof window !== "undefined" ? window.__OPS_PREFS : null;
-  const THEME_LABELS = {
-    en: { light: "Light", dark: "Dark" },
-    es: { light: "Claro", dark: "Oscuro" }
-  };
+  /* -------------------- Helpers -------------------- */
 
-  /* -------------------- DOM helpers -------------------- */
-
-  const $ = (sel) => document.querySelector(sel);
+  const $ = (sel, root = document) => root.querySelector(sel);
 
   function el(tag, attrs = {}, children = []) {
     const n = document.createElement(tag);
@@ -57,13 +49,11 @@
     return n;
   }
 
-  /* -------------------- Safe text helpers (UI-level) -------------------- */
-
-  function normalizeUserText(s) {
+  function clampText(s, max = MAX_MSG_CHARS) {
     let out = String(s || "");
     out = out.replace(/[\u0000-\u001F\u007F]/g, " ");
     out = out.replace(/\s+/g, " ").trim();
-    if (out.length > LIMITS.MAX_MSG_CHARS) out = out.slice(0, LIMITS.MAX_MSG_CHARS);
+    if (out.length > max) out = out.slice(0, max);
     return out;
   }
 
@@ -108,12 +98,6 @@
     sendBtn: $("#chatForm button[type=submit]"),
     hpEmail: $("#hp_email"),
     hpWebsite: $("#hp_website"),
-    turnstileSlot: $("#turnstileSlot"),
-
-    // Chat drawer
-    chatDrawer: $("#chatDrawer"),
-    chatClose: $("#chatClose"),
-    chatForm: $("#chatForm"),
     chatBackdrop: $("#chatBackdrop"),
 
     // Consent modal
@@ -152,9 +136,7 @@
     configOk: true,
     transcript: [], // { role, content, ts }
     requestId: 0,
-    sessionBlocked: false,
-    turnstileToken: "",
-    turnstileRequired: false
+    sessionBlocked: false
   };
 
   /* -------------------- Copy (EN/ES) -------------------- */
@@ -163,85 +145,96 @@
     en: {
       sending: "Sending…",
       badInput: "Message blocked. Please remove unsafe content.",
-      turnstileRequired: "Security check required. Please try again.",
       sessionBlocked: "Session blocked due to failed security checks.",
       mustConsent: "To use chat, please accept Privacy & Consent.",
       configError: "Site configuration error.",
       chat_placeholder: "Type your message…",
-      fallbackReply:
-        "Thanks, if you have any more questions about OPS Online Support, I can assist you.",
-      gatewayError:
-        "There was a problem connecting to the assistant. Please try again or ask another question about OPS Online Support.",
-      transcript_empty: "No conversation yet."
+      openChat: "Open chat",
+      closeChat: "Close chat",
+      transcriptTitle: "Transcript",
+      transcriptEmpty: "No transcript yet.",
+      transcriptCopied: "Copied.",
+      transcriptDownloaded: "Downloaded.",
+      clearConfirm: "Clear chat history?",
+      gatewayError: "Sorry—chat is unavailable right now.",
+      fallbackReply: "Thanks—someone will follow up soon.",
+      accept: "Accept",
+      deny: "Deny",
+      close: "Close"
     },
     es: {
       sending: "Enviando…",
       badInput: "Mensaje bloqueado. Elimina contenido inseguro.",
-      turnstileRequired: "Se requiere verificación de seguridad. Inténtalo de nuevo.",
       sessionBlocked: "Sesión bloqueada por fallas de seguridad.",
-      mustConsent: "Para usar el chat, acepta Privacidad y consentimiento.",
+      mustConsent: "Para usar el chat, acepta Privacidad y Consentimiento.",
       configError: "Error de configuración del sitio.",
       chat_placeholder: "Escribe tu mensaje…",
-      fallbackReply:
-        "Gracias, si tienes más preguntas sobre OPS Online Support, puedo ayudarte.",
-      gatewayError:
-        "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o haz otra pregunta sobre OPS Online Support.",
-      transcript_empty: "Aún no hay conversación."
+      openChat: "Abrir chat",
+      closeChat: "Cerrar chat",
+      transcriptTitle: "Transcripción",
+      transcriptEmpty: "Aún no hay transcripción.",
+      transcriptCopied: "Copiado.",
+      transcriptDownloaded: "Descargado.",
+      clearConfirm: "¿Borrar historial del chat?",
+      gatewayError: "Lo siento—el chat no está disponible ahora.",
+      fallbackReply: "Gracias—alguien te contactará pronto.",
+      accept: "Aceptar",
+      deny: "Rechazar",
+      close: "Cerrar"
     }
   };
 
   function t(key) {
-    const d = COPY[state.lang] || COPY.en;
-    return d[key] || COPY.en[key] || "";
-  }
-
-  function blockSession(messageKey) {
-    if (state.sessionBlocked) return;
-    state.sessionBlocked = true;
-    if (UI.chatMessage) UI.chatMessage.disabled = true;
-    if (UI.sendBtn) UI.sendBtn.disabled = true;
-    renderMessage("assistant", t(messageKey || "sessionBlocked"));
+    const dict = COPY[state.lang] || COPY.en;
+    return dict[key] || COPY.en[key] || key;
   }
 
   /* -------------------- Storage helpers -------------------- */
 
   function readLS(key, fallback = "") {
-    try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
+    try {
+      const v = localStorage.getItem(key);
+      return v == null ? fallback : v;
+    } catch {
+      return fallback;
+    }
   }
+
   function writeLS(key, value) {
-    try { localStorage.setItem(key, String(value)); } catch {}
+    try {
+      localStorage.setItem(key, String(value));
+    } catch {}
+  }
+
+  function removeLS(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
   }
 
   function readConsent() {
-    if (prefs && typeof prefs.getConsent === "function") {
-      return prefs.getConsent() === "accepted" ? "accepted" : "denied";
-    }
-    const legacy = readLS(LS.CONSENT_LEGACY, "");
-    if (legacy === "accept") return "accepted";
-    if (legacy === "deny") return "denied";
-    const c = readLS(LS.CONSENT, "denied");
-    return c === "accepted" ? "accepted" : "denied";
+    const v = readLS(LS.CONSENT, "denied");
+    return v === "accepted" ? "accepted" : "denied";
   }
 
-  function setConsent(val) {
-    const v = (val === "accepted") ? "accepted" : "denied";
-    state.consent = v;
-    if (prefs && typeof prefs.setConsent === "function") {
-      prefs.setConsent(v);
-    } else {
-      writeLS(LS.CONSENT, v);
-    }
+  function setConsent(v) {
+    state.consent = v === "accepted" ? "accepted" : "denied";
+    writeLS(LS.CONSENT, state.consent);
   }
 
   function loadTranscript() {
-    const raw = readLS(LS.TRANSCRIPT, "");
-    if (!raw) return [];
     try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return parsed
-        .filter(x => x && typeof x === "object")
-        .slice(-200); // keep local history bounded
+      const raw = readLS(LS.TRANSCRIPT, "[]");
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return [];
+      return arr
+        .filter(x => x && typeof x === "object" && (x.role === "user" || x.role === "assistant"))
+        .map(x => ({
+          role: x.role,
+          content: clampText(String(x.content || ""), 2048),
+          ts: typeof x.ts === "number" ? x.ts : Date.now()
+        }))
+        .slice(-MAX_TRANSCRIPT_ITEMS);
     } catch {
       return [];
     }
@@ -249,75 +242,13 @@
 
   function saveTranscript() {
     try {
-      writeLS(LS.TRANSCRIPT, JSON.stringify(state.transcript.slice(-200)));
+      writeLS(LS.TRANSCRIPT, JSON.stringify(state.transcript.slice(-MAX_TRANSCRIPT_ITEMS)));
     } catch {}
   }
 
   function clearTranscript() {
     state.transcript = [];
-    if (UI.chatBody) UI.chatBody.innerHTML = "";
-    if (UI.chatMessage) UI.chatMessage.value = "";
-    if (UI.sendBtn) UI.sendBtn.disabled = false;
-    isSending = false;
-    state.requestId += 1;
-    if (UI.transcriptText && UI.transcriptModal?.classList.contains("is-open")) {
-      UI.transcriptText.value = buildTranscriptText();
-    }
-    try { localStorage.removeItem(LS.TRANSCRIPT); } catch {}
-  }
-
-  /* -------------------- Theme -------------------- */
-
-  function applyTheme(theme) {
-    const th = (theme === "light") ? "light" : "dark";
-    state.theme = th;
-    if (prefs && typeof prefs.setTheme === "function") {
-      prefs.setTheme(th);
-    } else {
-      document.documentElement.setAttribute("data-theme", th);
-      writeLS(LS.THEME, th);
-    }
-
-    if (UI.themeToggle) {
-      const isOn = (th === "dark");
-      UI.themeToggle.classList.toggle("is-on", isOn);
-      UI.themeToggle.setAttribute("aria-pressed", String(isOn));
-      const labelSet = THEME_LABELS[state.lang] || THEME_LABELS.en;
-      const actionLabel = th === "dark" ? labelSet.light : labelSet.dark;
-      UI.themeToggle.textContent = actionLabel;
-      UI.themeToggle.setAttribute("aria-label", actionLabel);
-    }
-  }
-
-  /* -------------------- Language -------------------- */
-
-  function applyLang(lang) {
-    const lg = (lang === "es") ? "es" : "en";
-    state.lang = lg;
-    if (prefs && typeof prefs.setLang === "function") {
-      prefs.setLang(lg);
-    } else if (typeof window.__OPS_setLang === "function") {
-      window.__OPS_setLang(lg);
-    } else {
-      document.documentElement.lang = lg;
-      writeLS(LS.LANG, lg);
-    }
-
-    if (UI.chatMessage && !UI.chatMessage.hasAttribute("data-i18n-placeholder")) {
-      UI.chatMessage.setAttribute("placeholder", t("chat_placeholder"));
-    }
-
-    if (UI.langToggle) {
-      UI.langToggle.textContent = lg.toUpperCase();
-      UI.langToggle.setAttribute("aria-label", lg.toUpperCase());
-    }
-
-    if (UI.themeToggle) {
-      const labelSet = THEME_LABELS[lg] || THEME_LABELS.en;
-      const actionLabel = state.theme === "dark" ? labelSet.light : labelSet.dark;
-      UI.themeToggle.textContent = actionLabel;
-      UI.themeToggle.setAttribute("aria-label", actionLabel);
-    }
+    removeLS(LS.TRANSCRIPT);
   }
 
   /* -------------------- Consent modal -------------------- */
@@ -326,26 +257,12 @@
     if (!UI.consentModal) return;
     UI.consentModal.classList.add("is-open");
     UI.consentModal.setAttribute("aria-hidden", "false");
-
-    if (typeof UI.consentModal.showModal === "function") {
-      if (!UI.consentModal.open) UI.consentModal.showModal();
-    } else {
-      UI.consentModal.setAttribute("open", "");
-    }
-
-    if (UI.consentAccept) UI.consentAccept.focus();
   }
 
   function closeConsentModal() {
     if (!UI.consentModal) return;
     UI.consentModal.classList.remove("is-open");
     UI.consentModal.setAttribute("aria-hidden", "true");
-
-    if (typeof UI.consentModal.close === "function") {
-      if (UI.consentModal.open) UI.consentModal.close();
-    } else {
-      UI.consentModal.removeAttribute("open");
-    }
   }
 
   function ensureConsentOrPrompt() {
@@ -354,159 +271,167 @@
     return false;
   }
 
-  function setChatEnabled(enabled) {
-    if (UI.chatMessage) UI.chatMessage.disabled = !enabled;
-    if (UI.sendBtn) UI.sendBtn.disabled = !enabled;
-    if (UI.chatForm) UI.chatForm.setAttribute("aria-disabled", String(!enabled));
+  /* -------------------- Theme + Language -------------------- */
+
+  function applyTheme(theme) {
+    state.theme = theme === "light" ? "light" : "dark";
+    writeLS(LS.THEME, state.theme);
+    document.documentElement.dataset.theme = state.theme;
+    if (UI.themeToggle) {
+      UI.themeToggle.setAttribute("aria-pressed", state.theme === "dark" ? "true" : "false");
+    }
   }
 
-  function updateChatEnabled() {
-    setChatEnabled(state.consent === "accepted" && state.configOk && !state.sessionBlocked);
+  function applyLang(lang) {
+    state.lang = lang === "es" ? "es" : "en";
+    writeLS(LS.LANG, state.lang);
+    document.documentElement.lang = state.lang;
+
+    if (UI.langToggle) {
+      UI.langToggle.setAttribute("aria-pressed", state.lang === "es" ? "true" : "false");
+    }
+
+    if (UI.chatMessage) UI.chatMessage.placeholder = t("chat_placeholder");
+    if (UI.chatTranscript) UI.chatTranscript.title = t("transcriptTitle");
+    if (UI.chatClose) UI.chatClose.title = t("closeChat");
   }
 
-  /* -------------------- Drawer controls -------------------- */
+  /* -------------------- Chat UI rendering -------------------- */
 
-  function setChatExpanded(isOpen) {
-    if (UI.fabChat) UI.fabChat.setAttribute("aria-expanded", String(isOpen));
-    if (UI.chatDrawer) UI.chatDrawer.setAttribute("aria-hidden", String(!isOpen));
-  }
-
-  function setChatBackdrop(isOn) {
+  function setChatBackdrop(on) {
     if (!UI.chatBackdrop) return;
-    UI.chatBackdrop.classList.toggle("is-on", isOn);
-    UI.chatBackdrop.setAttribute("aria-hidden", String(!isOn));
+    UI.chatBackdrop.classList.toggle("is-on", !!on);
+    UI.chatBackdrop.setAttribute("aria-hidden", on ? "false" : "true");
   }
 
-  function openChatDrawer({ focus = true } = {}) {
+  function setChatExpanded(expanded) {
     if (!UI.chatDrawer) return;
-    UI.chatDrawer.classList.add("is-open");
+    UI.chatDrawer.classList.toggle("is-open", !!expanded);
+    UI.chatDrawer.setAttribute("aria-hidden", expanded ? "false" : "true");
+  }
+
+  function openChatDrawer(opts = {}) {
+    if (!UI.chatDrawer) return;
+    if (!state.configOk) return;
     setChatExpanded(true);
     setChatBackdrop(true);
-    if (focus && UI.chatMessage) UI.chatMessage.focus();
+    if (UI.fabChat) UI.fabChat.setAttribute("aria-expanded", "true");
+    if (opts.focus && UI.chatMessage) UI.chatMessage.focus();
   }
 
-  function closeChatDrawer({ returnFocus = true } = {}) {
+  function closeChatDrawer() {
     if (!UI.chatDrawer) return;
-    UI.chatDrawer.classList.remove("is-open");
     setChatExpanded(false);
     setChatBackdrop(false);
-    if (returnFocus && UI.fabChat) UI.fabChat.focus();
-  }
-
-  /* -------------------- Transcript export -------------------- */
-
-  function buildTranscriptText() {
-    if (!state.transcript.length) return t("transcript_empty");
-    return state.transcript.map((m) => {
-      const stamp = m.ts ? new Date(m.ts).toLocaleString() : new Date().toLocaleString();
-      const role = m.role === "assistant" ? "ASSISTANT" : "USER";
-      return `[${stamp}] ${role}: ${m.content}`;
-    }).join("\n");
-  }
-
-  function openTranscriptModal() {
-    if (!UI.transcriptModal) return;
-    UI.transcriptModal.classList.add("is-open");
-    UI.transcriptModal.setAttribute("aria-hidden", "false");
-
-    if (typeof UI.transcriptModal.showModal === "function") {
-      if (!UI.transcriptModal.open) UI.transcriptModal.showModal();
-    } else {
-      UI.transcriptModal.setAttribute("open", "");
-    }
-
-    if (UI.transcriptText) {
-      UI.transcriptText.value = buildTranscriptText();
-      UI.transcriptText.scrollTop = 0;
-      UI.transcriptText.focus();
-    }
-  }
-
-  function closeTranscriptModal() {
-    if (!UI.transcriptModal) return;
-    UI.transcriptModal.classList.remove("is-open");
-    UI.transcriptModal.setAttribute("aria-hidden", "true");
-
-    if (typeof UI.transcriptModal.close === "function") {
-      if (UI.transcriptModal.open) UI.transcriptModal.close();
-    } else {
-      UI.transcriptModal.removeAttribute("open");
-    }
-  }
-
-  async function copyTranscript() {
-    const text = UI.transcriptText ? UI.transcriptText.value : buildTranscriptText();
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      try {
-        await navigator.clipboard.writeText(text);
-        return;
-      } catch {}
-    }
-    if (UI.transcriptText) {
-      UI.transcriptText.focus();
-      UI.transcriptText.select();
-      document.execCommand("copy");
-      UI.transcriptText.setSelectionRange(0, 0);
-    }
-  }
-
-  function downloadTranscript() {
-    const text = UI.transcriptText ? UI.transcriptText.value : buildTranscriptText();
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `chattia-transcript-${stamp}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  /* -------------------- Transcript + message rendering -------------------- */
-
-  function pushTranscript(role, content) {
-    const msg = {
-      role: (role === "assistant") ? "assistant" : "user",
-      content: String(content || ""),
-      ts: new Date().toISOString()
-    };
-    state.transcript.push(msg);
-    saveTranscript();
+    if (UI.fabChat) UI.fabChat.setAttribute("aria-expanded", "false");
   }
 
   function renderMessage(role, content) {
     if (!UI.chatBody) return;
+    const safe = clampText(content, 2048);
 
-    const safeRole = (role === "assistant") ? "assistant" : "user";
-    const wrap = el("div", { class: `msg ${safeRole}` });
-    const bubble = el("div", { class: "bubble", text: String(content || "") });
-    const stamp = el("div", { class: "stamp", text: new Date().toLocaleString() });
+    const row = el("div", { class: `chat-row ${role}` });
+    const bubble = el("div", { class: "chat-bubble", text: safe });
+    row.appendChild(bubble);
 
-    wrap.appendChild(bubble);
-    wrap.appendChild(stamp);
-    UI.chatBody.appendChild(wrap);
+    UI.chatBody.appendChild(row);
     UI.chatBody.scrollTop = UI.chatBody.scrollHeight;
   }
 
   function rebuildChatFromTranscript() {
     if (!UI.chatBody) return;
     UI.chatBody.innerHTML = "";
-    for (const m of state.transcript.slice(-50)) {
-      renderMessage(m.role, m.content);
+    for (const m of state.transcript) renderMessage(m.role, m.content);
+  }
+
+  function pushTranscript(role, content) {
+    state.transcript.push({ role, content: clampText(content, 2048), ts: Date.now() });
+    if (state.transcript.length > MAX_TRANSCRIPT_ITEMS) {
+      state.transcript = state.transcript.slice(-MAX_TRANSCRIPT_ITEMS);
     }
+    saveTranscript();
+  }
+
+  function buildHistoryForGateway() {
+    const out = [];
+    const last = state.transcript.slice(-MAX_HISTORY_ITEMS * 2);
+    for (const m of last) {
+      if (!m || typeof m !== "object") continue;
+      if (out.length >= MAX_HISTORY_ITEMS) break;
+      const role = m.role === "assistant" ? "assistant" : "user";
+      const content = clampText(m.content, MAX_MSG_CHARS);
+      if (!content) continue;
+      if (looksSuspicious(content)) continue;
+      out.push({ role, content });
+    }
+    return out;
+  }
+
+  /* -------------------- Session blocking -------------------- */
+
+  function blockSession(reasonKey = "sessionBlocked") {
+    state.sessionBlocked = true;
+    if (UI.sendBtn) UI.sendBtn.disabled = true;
+    renderMessage("assistant", t(reasonKey));
+    pushTranscript("assistant", t(reasonKey));
+  }
+
+  function updateChatEnabled() {
+    const allowed = state.consent === "accepted" && !state.sessionBlocked;
+    if (UI.chatMessage) UI.chatMessage.disabled = !allowed;
+    if (UI.sendBtn) UI.sendBtn.disabled = !allowed;
+  }
+
+  /* -------------------- Transcript modal -------------------- */
+
+  function openTranscriptModal() {
+    if (!UI.transcriptModal) return;
+    UI.transcriptModal.classList.add("is-open");
+    UI.transcriptModal.setAttribute("aria-hidden", "false");
+
+    const text = state.transcript.length
+      ? state.transcript.map(m => {
+          const when = new Date(m.ts || Date.now()).toISOString();
+          return `[${when}] ${m.role}: ${m.content}`;
+        }).join("\n")
+      : t("transcriptEmpty");
+
+    if (UI.transcriptText) UI.transcriptText.value = text;
+  }
+
+  function closeTranscriptModal() {
+    if (!UI.transcriptModal) return;
+    UI.transcriptModal.classList.remove("is-open");
+    UI.transcriptModal.setAttribute("aria-hidden", "true");
+  }
+
+  async function copyTranscript() {
+    if (!UI.transcriptText) return;
+    try {
+      await navigator.clipboard.writeText(UI.transcriptText.value || "");
+      if (UI.transcriptCopy) UI.transcriptCopy.textContent = t("transcriptCopied");
+      setTimeout(() => { if (UI.transcriptCopy) UI.transcriptCopy.textContent = "Copy"; }, 1200);
+    } catch {}
+  }
+
+  function downloadTranscript() {
+    // Optional; if the button exists, we keep it.
+    if (!UI.transcriptText) return;
+    try {
+      const blob = new Blob([UI.transcriptText.value || ""], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `ops-transcript-${Date.now()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+      if (UI.transcriptDownload) UI.transcriptDownload.textContent = t("transcriptDownloaded");
+      setTimeout(() => { if (UI.transcriptDownload) UI.transcriptDownload.textContent = "Download"; }, 1200);
+    } catch {}
   }
 
   /* -------------------- Gateway call -------------------- */
-
-  function buildHistoryForGateway() {
-    const last = state.transcript.slice(-LIMITS.MAX_HISTORY_ITEMS);
-    return last.map(m => ({
-      role: (m.role === "assistant") ? "assistant" : "user",
-      content: normalizeUserText(m.content)
-    }));
-  }
 
   async function sendToGateway(message, honeypots = {}) {
     requireConfigOrThrow();
@@ -518,8 +443,7 @@
       history: buildHistoryForGateway(),
       // Honeypots: must be empty
       hp_email: String(honeypots.email || ""),
-      hp_website: String(honeypots.website || ""),
-      turnstile_token: state.turnstileToken || ""
+      hp_website: String(honeypots.website || "")
     };
 
     const res = await fetch(url, {
@@ -562,30 +486,28 @@
       return;
     }
 
-    if (state.turnstileRequired && !state.turnstileToken) {
-      blockSession("turnstileRequired");
-      return;
-    }
+    const message = clampText(UI.chatMessage.value || "", MAX_MSG_CHARS);
+    if (!message) return;
 
-    const raw = normalizeUserText(UI.chatMessage.value || "");
-    if (!raw) return;
-
-    if (looksSuspicious(raw)) {
+    if (looksSuspicious(message)) {
       renderMessage("assistant", t("badInput"));
+      pushTranscript("assistant", t("badInput"));
       return;
     }
 
+    state.requestId += 1;
+    const requestId = state.requestId;
+
+    renderMessage("user", message);
+    pushTranscript("user", message);
     UI.chatMessage.value = "";
-    renderMessage("user", raw);
-    pushTranscript("user", raw);
 
     isSending = true;
     if (UI.sendBtn) UI.sendBtn.disabled = true;
-    const requestId = state.requestId + 1;
-    state.requestId = requestId;
 
     try {
-      const reply = await sendToGateway(raw, { email: hpEmail, website: hpWebsite });
+      renderMessage("assistant", t("sending"));
+      const reply = await sendToGateway(message, { email: hpEmail, website: hpWebsite });
       if (requestId !== state.requestId) return;
       const finalReply = reply || t("fallbackReply");
       renderMessage("assistant", finalReply);
@@ -603,106 +525,62 @@
       if (requestId !== state.requestId) return;
       isSending = false;
       if (UI.sendBtn) UI.sendBtn.disabled = false;
+      updateChatEnabled();
     }
   }
 
-  function loadTurnstileScript() {
-    return new Promise((resolve, reject) => {
-      if (document.querySelector("script[data-ops-turnstile]")) {
-        resolve();
-        return;
-      }
-      const s = document.createElement("script");
-      s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-      s.async = true;
-      s.defer = true;
-      s.dataset.opsTurnstile = "true";
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error("Turnstile failed to load."));
-      document.head.appendChild(s);
-    });
-  }
-
-  async function initTurnstile() {
-    const siteKey = getMeta("ops-turnstile-sitekey");
-    if (!siteKey || !UI.turnstileSlot) return;
-
-    state.turnstileRequired = true;
-    try {
-      await loadTurnstileScript();
-    } catch (err) {
-      console.error(err);
-      blockSession("turnstileRequired");
-      return;
-    }
-
-    if (!window.turnstile) {
-      blockSession("turnstileRequired");
-      return;
-    }
-
-    const showTurnstile = () => {
-      UI.turnstileSlot.classList.add("is-visible");
-      UI.turnstileSlot.classList.remove("is-verified");
-      UI.turnstileSlot.setAttribute("aria-hidden", "false");
-      if (UI.chatForm) UI.chatForm.classList.remove("turnstile-hidden");
-    };
-
-    const hideTurnstile = () => {
-      UI.turnstileSlot.classList.remove("is-visible");
-      UI.turnstileSlot.classList.add("is-verified");
-      UI.turnstileSlot.setAttribute("aria-hidden", "true");
-      if (UI.chatForm) UI.chatForm.classList.add("turnstile-hidden");
-    };
-
-    showTurnstile();
-    window.turnstile.render(UI.turnstileSlot, {
-      sitekey: siteKey,
-      callback: (token) => {
-        state.turnstileToken = String(token || "");
-        if (state.turnstileToken) hideTurnstile();
-      },
-      "expired-callback": () => {
-        state.turnstileToken = "";
-        showTurnstile();
-      },
-      "error-callback": () => {
-        state.turnstileToken = "";
-        showTurnstile();
-        blockSession("turnstileRequired");
-      }
-    });
-  }
-
-  /* -------------------- Event wiring -------------------- */
+  /* -------------------- Wire events -------------------- */
 
   function wireEvents() {
-    if (UI.chatForm) UI.chatForm.addEventListener("submit", onSend);
-
     if (UI.fabChat) {
       UI.fabChat.addEventListener("click", () => {
         if (!ensureConsentOrPrompt()) return;
-        openChatDrawer({ focus: true });
-      });
-    }
-    if (UI.chatForm) {
-      UI.chatForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        onSend();
+        const isOpen = UI.chatDrawer && UI.chatDrawer.classList.contains("is-open");
+        if (isOpen) closeChatDrawer();
+        else openChatDrawer({ focus: true });
       });
     }
 
-    if (UI.chatClose) {
-      UI.chatClose.addEventListener("click", () => closeChatDrawer({ returnFocus: true }));
+    if (UI.chatClose) UI.chatClose.addEventListener("click", closeChatDrawer);
+    if (UI.chatBackdrop) UI.chatBackdrop.addEventListener("click", closeChatDrawer);
+
+    if (UI.chatForm) UI.chatForm.addEventListener("submit", onSend);
+
+    if (UI.langToggle) {
+      UI.langToggle.addEventListener("click", () => {
+        applyLang(state.lang === "en" ? "es" : "en");
+      });
     }
 
-    if (UI.chatBackdrop) {
-      UI.chatBackdrop.addEventListener("click", () => closeChatDrawer({ returnFocus: false }));
+    if (UI.themeToggle) {
+      UI.themeToggle.addEventListener("click", () => {
+        applyTheme(state.theme === "dark" ? "light" : "dark");
+      });
     }
 
-    if (UI.consentModal) {
-      UI.consentModal.addEventListener("click", (event) => {
-        if (event.target !== UI.consentModal) return;
+    if (UI.chatClear) {
+      UI.chatClear.addEventListener("click", () => {
+        const ok = confirm(t("clearConfirm"));
+        if (!ok) return;
+        clearTranscript();
+        rebuildChatFromTranscript();
+      });
+    }
+
+    if (UI.chatTranscript) {
+      UI.chatTranscript.addEventListener("click", openTranscriptModal);
+    }
+
+    if (UI.transcriptClose) UI.transcriptClose.addEventListener("click", closeTranscriptModal);
+    if (UI.transcriptCopy) UI.transcriptCopy.addEventListener("click", copyTranscript);
+    if (UI.transcriptDownload) UI.transcriptDownload.addEventListener("click", downloadTranscript);
+
+    if (UI.consentClose) UI.consentClose.addEventListener("click", closeConsentModal);
+
+    if (UI.consentDeny) {
+      UI.consentDeny.addEventListener("click", () => {
+        setConsent("denied");
+        updateChatEnabled();
         closeConsentModal();
       });
     }
@@ -717,93 +595,23 @@
         if (state.configOk) openChatDrawer({ focus: true });
       });
     }
-
-    if (UI.consentDeny) {
-      UI.consentDeny.addEventListener("click", () => {
-        setConsent("denied");
-        updateChatEnabled();
-        closeConsentModal();
-      });
-    }
-
-    if (UI.consentClose) {
-      UI.consentClose.addEventListener("click", () => {
-        setConsent("denied");
-        updateChatEnabled();
-        closeConsentModal();
-      });
-    }
-
-    if (UI.themeToggle) {
-      UI.themeToggle.addEventListener("click", () => {
-        applyTheme(state.theme === "dark" ? "light" : "dark");
-      });
-    }
-
-    if (UI.langToggle) {
-      UI.langToggle.addEventListener("click", () => {
-        applyLang(state.lang === "en" ? "es" : "en");
-      });
-    }
-
-    if (UI.chatClear) {
-      UI.chatClear.addEventListener("click", () => {
-        clearTranscript();
-      });
-    }
-
-    if (UI.chatTranscript) {
-      UI.chatTranscript.addEventListener("click", () => {
-        openTranscriptModal();
-      });
-    }
-
-    if (UI.transcriptClose) {
-      UI.transcriptClose.addEventListener("click", () => {
-        closeTranscriptModal();
-      });
-    }
-
-    if (UI.transcriptModal) {
-      UI.transcriptModal.addEventListener("click", (event) => {
-        if (event.target !== UI.transcriptModal) return;
-        closeTranscriptModal();
-      });
-    }
-
-    if (UI.transcriptCopy) {
-      UI.transcriptCopy.addEventListener("click", () => {
-        copyTranscript();
-      });
-    }
-
-    if (UI.transcriptDownload) {
-      UI.transcriptDownload.addEventListener("click", () => {
-        downloadTranscript();
-      });
-    }
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key !== "Escape") return;
-      closeChatDrawer({ returnFocus: false });
-      closeConsentModal();
-      closeTranscriptModal();
-    });
   }
 
   /* -------------------- Init -------------------- */
 
   function init() {
-    const isChatbotOnly = document.body && document.body.classList.contains("chatbot-only");
-    const autoOpen = document.body && document.body.dataset.chatOpen === "true";
+    // config check (soft)
+    try {
+      requireConfigOrThrow();
+      state.configOk = true;
+    } catch (e) {
+      console.warn(e);
+      state.configOk = false;
+    }
 
-    state.theme = prefs && typeof prefs.getTheme === "function"
-      ? prefs.getTheme()
-      : readLS(LS.THEME, "light") === "light" ? "light" : "dark";
-
-    state.lang = prefs && typeof prefs.getLang === "function"
-      ? prefs.getLang()
-      : readLS(LS.LANG, document.documentElement.lang === "es" ? "es" : "en");
+    // Initial state from LS
+    state.theme = readLS(LS.THEME, "dark") === "light" ? "light" : "dark";
+    state.lang = readLS(LS.LANG, document.documentElement.lang === "es" ? "es" : "en") === "es" ? "es" : "en";
 
     state.consent = readConsent();
     state.transcript = loadTranscript();
@@ -811,6 +619,9 @@
     applyTheme(state.theme);
     applyLang(state.lang);
     rebuildChatFromTranscript();
+
+    const isChatbotOnly = document.body && document.body.classList.contains("chatbot-only");
+    const autoOpen = (new URLSearchParams(location.search)).get("chat") === "1";
 
     if (isChatbotOnly || autoOpen) {
       if (UI.chatDrawer) UI.chatDrawer.classList.add("is-open");
@@ -821,19 +632,9 @@
       setChatBackdrop(false);
     }
 
-    try {
-      requireConfigOrThrow();
-      state.configOk = true;
-    } catch (e) {
-      console.error(e);
-      state.configOk = false;
-    }
-
     updateChatEnabled();
 
     if (state.consent !== "accepted") openConsentModal();
-
-    initTurnstile();
 
     wireEvents();
   }
