@@ -1,144 +1,149 @@
 /* assets/chattia-head-lang.js
-   Chattia / OPS — Head Language + i18n bootstrap (v2)
-   - Detect & persist language (en/es)
-   - Sets <html lang=""> early
-   - Exposes minimal window.__OPS_LANG + window.__OPS_I18N
-   - No network calls, no cookies (localStorage only)
+   Chattia / OPS — Head Language Bootstrap (v3)
+   - Runs early (defer in <head>)
+   - Reads ops_lang from localStorage
+   - Applies <html lang> + dataset.lang
+   - Translates DOM nodes with [data-i18n="key"]
+   - Exposes: window.__OPS_setLang(lang)
+
+   Keys used by index.html in this project:
+   topbar_sub, theme_label, lang_label,
+   hero_title, hero_desc,
+   card1_title, card1_desc,
+   card2_title, card2_desc,
+   card3_title, card3_desc,
+   consent_title, consent_body, consent_deny, consent_accept, consent_note,
+   chat_title, chat_note,
+   transcript_title, transcript_body, transcript_copy, transcript_download
 */
 
 (() => {
-  const STORAGE_KEY = "ops_lang";
-  const SUPPORTED = new Set(["en", "es"]);
+  "use strict";
 
-  function safeGetLS(key) {
-    try { return localStorage.getItem(key); } catch { return null; }
-  }
-  function safeSetLS(key, val) {
-    try { localStorage.setItem(key, val); } catch {}
-  }
+  const LS_LANG_KEY = "ops_lang"; // "en" | "es"
 
-  function normalizeLang(v) {
-    const s = String(v || "").toLowerCase().trim();
-    if (s.startsWith("es")) return "es";
-    return "en";
-  }
-
-  function getPreferredLang() {
-    const saved = safeGetLS(STORAGE_KEY);
-    if (SUPPORTED.has(saved)) return saved;
-    return "en";
-  }
-
-  function setHtmlLang(lang) {
-    const l = SUPPORTED.has(lang) ? lang : "en";
-    document.documentElement.setAttribute("lang", l);
-    document.documentElement.dataset.lang = l;
-  }
-
-  // Minimal i18n strings used by the chat-only UI
   const I18N = {
     en: {
-      fab_chat: "Chattia",
+      topbar_sub: "Secure Chat",
+      theme_label: "Theme",
+      lang_label: "EN/ES",
+
+      hero_title: "Chattia",
+      hero_desc: "Ask about OPS services, solutions, and how we can support your operations.",
+
+      card1_title: "Fast answers",
+      card1_desc: "Get clear information about OPS offerings and next steps.",
+
+      card2_title: "Secure by design",
+      card2_desc: "No uploads, no sensitive info, and anti-abuse protections.",
+
+      card3_title: "Lead-ready",
+      card3_desc: "When you’re ready, we’ll route you to contact or sales.",
 
       consent_title: "Privacy & Consent",
       consent_body:
-        "Chat interactions may be used to improve the chatbot experience. Please do not enter sensitive personal information. " +
+        "Chat interactions may be used to improve and train the chatbot experience. Please do not enter sensitive personal information. " +
         "OPS Online Support does not intentionally collect payment card data, banking info, passwords, or one-time codes.",
       consent_deny: "Deny",
       consent_accept: "Accept",
       consent_note: "If you deny consent, chat will remain disabled until you accept.",
 
       chat_title: "Chattia",
-      chat_lang_toggle_text: "EN",
-      chat_theme_toggle_text: "Dark",
-      chat_clear: "Clear",
-      chat_transcript: "Copy",
-      chat_label: "Your message",
-      chat_placeholder: "Type your message…",
-      chat_send: "Send",
+      chat_note: "Please avoid sharing personal or sensitive information.",
 
-      transcript_title: "Copy",
+      transcript_title: "Transcript",
       transcript_body: "Copy or download your chat history.",
       transcript_copy: "Copy",
       transcript_download: "Download"
     },
 
     es: {
-      fab_chat: "Chattia",
+      topbar_sub: "Chat Seguro",
+      theme_label: "Tema",
+      lang_label: "EN/ES",
 
-      consent_title: "Privacidad y consentimiento",
+      hero_title: "Chattia",
+      hero_desc: "Pregunta sobre servicios de OPS, soluciones y cómo podemos apoyar tus operaciones.",
+
+      card1_title: "Respuestas rápidas",
+      card1_desc: "Información clara sobre ofertas de OPS y próximos pasos.",
+
+      card2_title: "Seguro por diseño",
+      card2_desc: "Sin cargas de archivos, sin datos sensibles y con protecciones anti-abuso.",
+
+      card3_title: "Listo para leads",
+      card3_desc: "Cuando estés listo, te guiamos a contacto o ventas.",
+
+      consent_title: "Privacidad y Consentimiento",
       consent_body:
-        "Las interacciones del chat pueden usarse para mejorar la experiencia del chatbot. No ingreses información personal sensible. " +
-        "OPS Online Support no recolecta intencionalmente datos de tarjeta, bancarios, contraseñas ni códigos de un solo uso.",
-      consent_deny: "Denegar",
+        "Las interacciones del chat pueden usarse para mejorar y entrenar la experiencia del chatbot. No ingreses información personal sensible. " +
+        "OPS Online Support no recopila intencionalmente datos de tarjetas, información bancaria, contraseñas ni códigos de un solo uso.",
+      consent_deny: "Rechazar",
       consent_accept: "Aceptar",
-      consent_note: "Si niegas el consentimiento, el chat quedará deshabilitado hasta que aceptes.",
+      consent_note: "Si rechazas el consentimiento, el chat permanecerá deshabilitado hasta que aceptes.",
 
       chat_title: "Chattia",
-      chat_lang_toggle_text: "ES",
-      chat_theme_toggle_text: "Oscuro",
-      chat_clear: "Borrar",
-      chat_transcript: "Copiar",
-      chat_label: "Tu mensaje",
-      chat_placeholder: "Escribe tu mensaje…",
-      chat_send: "Enviar",
+      chat_note: "Evita compartir información personal o sensible.",
 
-      transcript_title: "Copiar",
-      transcript_body: "Copia o descarga el historial del chat.",
+      transcript_title: "Transcripción",
+      transcript_body: "Copia o descarga tu historial del chat.",
       transcript_copy: "Copiar",
       transcript_download: "Descargar"
     }
   };
 
-  function applyI18n(lang) {
-    const dict = I18N[lang] || I18N.en;
-
-    // text nodes via data-i18n
-    const nodes = document.querySelectorAll("[data-i18n]");
-    for (const el of nodes) {
-      const key = el.getAttribute("data-i18n");
-      if (!key) continue;
-      const val = dict[key];
-      if (typeof val === "string") el.textContent = val;
-    }
-
-    // placeholders via data-i18n-placeholder
-    const pnodes = document.querySelectorAll("[data-i18n-placeholder]");
-    for (const el of pnodes) {
-      const key = el.getAttribute("data-i18n-placeholder");
-      if (!key) continue;
-      const val = dict[key];
-      if (typeof val === "string") el.setAttribute("placeholder", val);
-    }
+  function safeGetLang() {
+    try {
+      const v = localStorage.getItem(LS_LANG_KEY);
+      if (v === "es" || v === "en") return v;
+    } catch {}
+    const htmlLang = (document.documentElement.getAttribute("lang") || "").toLowerCase();
+    if (htmlLang.startsWith("es")) return "es";
+    const nav = (navigator.language || "en").toLowerCase();
+    return nav.startsWith("es") ? "es" : "en";
   }
 
-  function setLang(lang) {
-    const l = SUPPORTED.has(lang) ? lang : "en";
-    safeSetLS(STORAGE_KEY, l);
-    setHtmlLang(l);
-    // If DOM is ready, apply translations now
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", () => applyI18n(l), { once: true });
-    } else {
-      applyI18n(l);
+  function applyTranslations(lang) {
+    const l = (lang === "es") ? "es" : "en";
+    const dict = I18N[l] || I18N.en;
+
+    // Apply to all [data-i18n]
+    const nodes = document.querySelectorAll("[data-i18n]");
+    for (const node of nodes) {
+      const key = node.getAttribute("data-i18n");
+      if (!key) continue;
+      const val = dict[key];
+      if (typeof val !== "string") continue;
+
+      // If it's an input with placeholder intent:
+      const tag = (node.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea") {
+        // Only set placeholder if attribute exists or if node is clearly an input
+        if (node.hasAttribute("placeholder")) node.setAttribute("placeholder", val);
+        else node.value = val;
+      } else {
+        node.textContent = val;
+      }
     }
-    // expose for other modules
+
+    // Update <html>
+    document.documentElement.setAttribute("lang", l);
+    document.documentElement.dataset.lang = l;
+
+    // Expose for other scripts
     window.__OPS_LANG = l;
   }
 
-  // Initial
-  const initial = getPreferredLang();
-  setHtmlLang(initial);
-  window.__OPS_LANG = initial;
-  window.__OPS_I18N = I18N;
-
-  // Apply when ready
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => applyI18n(initial), { once: true });
-  } else {
-    applyI18n(initial);
+  function setLang(lang) {
+    const l = (String(lang || "").toLowerCase().startsWith("es")) ? "es" : "en";
+    try { localStorage.setItem(LS_LANG_KEY, l); } catch {}
+    applyTranslations(l);
+    return l;
   }
 
-  // Public API
+  // Public API (used by chattia-preferences.js)
   window.__OPS_setLang = setLang;
+
+  // Init early
+  applyTranslations(safeGetLang());
 })();
