@@ -151,6 +151,7 @@
     consent: "denied",
     configOk: true,
     transcript: [], // { role, content, ts }
+    requestId: 0,
     sessionBlocked: false,
     turnstileToken: "",
     turnstileRequired: false
@@ -168,9 +169,9 @@
       configError: "Site configuration error.",
       chat_placeholder: "Type your message…",
       fallbackReply:
-        "Thanks. To continue, please use Contact Us from the navigation menu on opsonlinesupport.com.",
+        "Thanks, if you have any more questions about OPS Online Support, I can assist you.",
       gatewayError:
-        "There was a problem connecting to the assistant. Please try again or use Contact Us from the navigation menu on opsonlinesupport.com.",
+        "There was a problem connecting to the assistant. Please try again or ask another question about OPS Online Support.",
       transcript_empty: "No conversation yet."
     },
     es: {
@@ -182,9 +183,9 @@
       configError: "Error de configuración del sitio.",
       chat_placeholder: "Escribe tu mensaje…",
       fallbackReply:
-        "Gracias. Para continuar, usa Contact Us en el menú de navegación de opsonlinesupport.com.",
+        "Gracias, si tienes más preguntas sobre OPS Online Support, puedo ayudarte.",
       gatewayError:
-        "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o usa Contact Us en el menú de navegación de opsonlinesupport.com.",
+        "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o haz otra pregunta sobre OPS Online Support.",
       transcript_empty: "Aún no hay conversación."
     }
   };

@@ -594,8 +594,8 @@ export default {
         request_id: reqId,
         error_code: "DLP_CARD",
         error: lang === "es"
-          ? "Por seguridad, no compartas datos personales como tarjeta de credito, datos financeros, o cualquier dato que comunique Información Identificable Personal (PII) en el chat."
-          : "For security, do not share personal data such as card details, financial information, or any information that can identify you in chat."
+          ? "Por seguridad, no compartas datos de tarjeta de crédito, cuenta bancaria ni información personal/financiera en el chat."
+          : "For security, do not share credit card, bank account, or personal/financial information in chat."
       }, reqId);
     }
 

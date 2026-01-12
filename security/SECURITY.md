@@ -17,4 +17,4 @@
 
 ## Reporting
 - For security incidents or suspected vulnerabilities, file an issue with minimal reproduction steps and no sensitive data.
-- For Privacy Concerns refer / direct users to Contact Us located on the Navigation Menu.
+- For privacy requests (deletion, data access), direct users to chattia.io and include timestamps.
