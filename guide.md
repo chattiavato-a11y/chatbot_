@@ -1,6 +1,13 @@
-# Archived Website Content
+# OPS Online Support Guide
 
-This file contains the content that previously lived on the website pages. It is retained here as a reference.
+This guide is the reference source for Chattia (chattia.io). It summarizes OPS Online Support services and provides clear, professional pathways for visitors on opsonlinesupport.com.
+
+## Web governance & compliance (reference)
+- Security headers are enforced (CSP, HSTS, X-Frame-Options, Referrer-Policy, and related controls) via `_headers` and edge configurations.
+- Privacy & consent: Chat interactions may be used to improve the chatbot experience; sensitive data is not accepted in chat.
+- Data minimization: Do not submit payment card data, banking info, passwords, or one-time codes (OTP).
+- SEO governance: The sitemap is scoped to chattia.io, and robots policies are defined in `robots.txt`.
+- Accessibility: Keep language toggles, theme toggles, and chat controls accessible (ARIA labels, focus management).
 
 ## Home (index.html)
 
@@ -12,10 +19,10 @@ This file contains the content that previously lived on the website pages. It is
 
 ### Main content
 **Reliable CX, Operations, and Support Workflows**
-- We help organizations run smoother through customer experience support, back-office operations help, and technical support intake.
+- We help organizations run smoother through customer experience support, back-office operations, and technical support intake.
 - CTAs: **Contact / Request a Quote**, **Careers / Join Us**
-- Security note: Do not share passwords, OTP codes, banking info, or card numbers in chat. Use Contact for sensitive matters.
-- Chatbot greeting note: Hi, I'm Chattia your dedicated OPS Assistant, ready to answer all your inquiries. But before we continue, please: Do not share passwords, OTP codes, banking info, or card numbers in chat.
+- Safety note: Do not share passwords, OTP codes, banking info, or card numbers in chat. Use Contact for sensitive matters.
+- Chat greeting: Hi, I’m Chattia, your OPS Assistant. I can guide you to the right OPS Online Support path. Please do not share passwords, OTP codes, banking info, or card numbers in chat.
 
 **Customer Experience (CX)**
 - Inbox triage, customer questions, follow-ups, and service workflows.
@@ -45,11 +52,11 @@ This file contains the content that previously lived on the website pages. It is
 - We help organizations run smoother with reliable customer experience support, business operations assistance, and technical support intake.
 
 ### What we do
-- OPS Online Support provides structured CX and operations support that helps teams reduce backlog, respond faster, and keep work organized.
+- OPS Online Support delivers structured CX and operations support to reduce backlog, improve response times, and keep work organized.
 - We focus on clear intake, triage, follow-ups, and handoffs so issues move to resolution.
 
 ### How we work
-- We start by understanding your workflow and the outcome you want, then align staffing and process to your volume and timeline.
+- We begin by understanding your workflow and desired outcomes, then align staffing and process to your volume and timeline.
 - For security, we avoid collecting sensitive information in chat and guide users to official site channels for anything private.
 
 ### Who this is for
@@ -116,7 +123,7 @@ This file contains the content that previously lived on the website pages. It is
 - Privacy & consent, terms, fair use, and security guidance for using this site and chat.
 
 ### Privacy & Consent
-- This website may provide a chat feature to help you navigate services, contact options, and careers paths. Chat interactions may be used to improve the chatbot experience.
+- This website provides assistance with Chattia as a Concierge Ninja servicing our Clients and Future Clients. Chat interactions may be used to improve the chatbot experience.
 - Please do not enter sensitive personal information in chat or forms, including payment card numbers, banking details, passwords, or one-time codes (OTP). If sensitive topics are necessary, use the official channels shown on the site.
 - If you deny consent, the chat feature will remain disabled until you accept. You can still use the website content and contact pages.
 - CTA: **Manage chat consent**

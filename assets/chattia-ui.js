@@ -168,9 +168,9 @@
       configError: "Site configuration error.",
       chat_placeholder: "Type your message…",
       fallbackReply:
-        "Thanks. To continue, please review the content archive at opsonlinesupport.com/content.md.",
+        "Thanks. To continue, please use Contact Us from the navigation menu on opsonlinesupport.com.",
       gatewayError:
-        "There was a problem connecting to the assistant. Please try again or review opsonlinesupport.com/content.md.",
+        "There was a problem connecting to the assistant. Please try again or use Contact Us from the navigation menu on opsonlinesupport.com.",
       transcript_empty: "No conversation yet."
     },
     es: {
@@ -182,9 +182,9 @@
       configError: "Error de configuración del sitio.",
       chat_placeholder: "Escribe tu mensaje…",
       fallbackReply:
-        "Gracias. Para continuar, revisa el archivo de contenido en opsonlinesupport.com/content.md.",
+        "Gracias. Para continuar, usa Contact Us en el menú de navegación de opsonlinesupport.com.",
       gatewayError:
-        "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o revisa opsonlinesupport.com/content.md.",
+        "Hubo un problema al conectar con el asistente. Inténtalo de nuevo o usa Contact Us en el menú de navegación de opsonlinesupport.com.",
       transcript_empty: "Aún no hay conversación."
     }
   };
