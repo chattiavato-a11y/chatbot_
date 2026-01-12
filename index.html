@@ -1,11 +1,9 @@
 <!-- index.html
-     OPS Online Support — Chat Only
+     OPS Online Support — Chat Only (No Turnstile)
 
-     Notes:
-     - No inline JS. Uses /assets/*.js
-     - Chat uses gateway endpoint (set in assets/chattia-ui.js config)
-     - Privacy/Consent modal required before enabling chat
-     - “Compliance-aligned” UX: no sensitive data, no card data, no passwords/OTPs
+     Required meta (used by assets/chattia-ui.js):
+     - ops-gateway
+     - ops-asset-id
 -->
 
 <!doctype html>
@@ -20,7 +18,7 @@
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta http-equiv="X-Frame-Options" content="DENY" />
 
-  <!-- CSP: keep strict; update connect-src to your gateway -->
+  <!-- CSP: strict; allow only gateway for API calls -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'none';
     base-uri 'none';
@@ -36,17 +34,15 @@
     upgrade-insecure-requests;
   " />
 
-  <!-- OPS Gateway config for assets/chattia-ui.js -->
+  <!-- OPS Gateway config -->
   <meta name="ops-gateway" content="https://ops-gateway.grabem-holdem-nuts-right.workers.dev" />
   <meta name="ops-asset-id" content="ops-online-support-site" />
 
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
 
-  <!-- Theme + UI -->
   <link rel="stylesheet" href="/assets/chattia-theme.css" />
   <link rel="stylesheet" href="/assets/chattia-ui.css" />
 
-  <!-- Language head helper (sets html[lang] early, no inline JS) -->
   <script defer src="/assets/chattia-head-lang.js"></script>
 </head>
 
@@ -62,6 +58,7 @@
         </div>
       </div>
 
+      <!-- ONLY place we keep lang/theme toggles (unique IDs) -->
       <div class="top-actions">
         <button class="btn btn-ghost" id="themeToggle" type="button" aria-pressed="false" aria-label="Toggle theme">
           <span class="icon" aria-hidden="true">☾</span>
@@ -114,7 +111,7 @@
         </div>
 
         <p class="modal-text" data-i18n="consent_body">
-          Chat interactions may be used to improve the chatbot... experience. Please do not enter sensitive personal information.
+          Chat interactions may be used to improve and train the chatbot experience. Please do not enter sensitive personal information.
           OPS Online Support does not intentionally collect payment card data, banking info, passwords, or one-time codes.
         </p>
 
@@ -138,21 +135,9 @@
         </div>
 
         <div class="chat-header-actions">
-          <div class="chat-header-toggles" aria-label="Chat preferences">
-            <button class="btn btn-ghost" id="langToggle" type="button" aria-pressed="false" data-i18n="chat_lang_toggle_text" aria-label="Change language">
-              EN
-            </button>
-            <button class="btn btn-ghost" id="themeToggle" type="button" aria-pressed="false" aria-label="Change theme">
-              ☾
-            </button>
-            <button class="btn btn-ghost" id="chatTranscript" type="button" aria-label="Open transcript">
-              ⎘
-            </button>
-            <button class="btn btn-ghost" id="chatClear" type="button" aria-label="Clear chat">
-              ⟲
-            </button>
-          </div>
-
+          <!-- No duplicate theme/lang IDs here -->
+          <button class="btn btn-ghost" id="chatTranscript" type="button" aria-label="Open transcript">⎘</button>
+          <button class="btn btn-ghost" id="chatClear" type="button" aria-label="Clear chat">⟲</button>
           <button class="btn btn-ghost" id="chatClose" type="button" aria-label="Close chat">✕</button>
         </div>
       </header>
@@ -202,4 +187,3 @@
   </div>
 </body>
 </html>
-
