@@ -88,13 +88,13 @@ export const OPS_SITE = {
   },
 
   greetings_en: [
-    "Welcome to OPS Online Support. Do not share passwords, OTP codes, banking info, or card numbers in chat. Use Contact for sensitive matters. How can I help you today?",
-    "Hi — do not share passwords, OTP codes, banking info, or card numbers in chat. Use Contact for sensitive matters. Tell me if you’re looking for business support services or applying for a role."
+    "Welcome to OPS Online Support. I’m Chattia, your Customer Service & Experience, Product, and Marketing VP. Do not share passwords, OTP codes, banking info, or card numbers in chat. How can I help you today?",
+    "Hi — I’m Chattia, your Customer Service & Experience, Product, and Marketing VP. Do not share passwords, OTP codes, banking info, or card numbers in chat. Are you looking for business support services or career opportunities?"
   ],
 
   greetings_es: [
-    "Bienvenido a OPS Online Support. No compartas contraseñas, códigos OTP, información bancaria ni números de tarjeta en el chat. Usa Contacto para asuntos sensibles. ¿Cómo puedo ayudarte hoy?",
-    "Hola — no compartas contraseñas, códigos OTP, información bancaria ni números de tarjeta en el chat. Usa Contacto para asuntos sensibles. Dime si buscas servicios para tu negocio o quieres postular a un puesto."
+    "Bienvenido a OPS Online Support. Soy Chattia, Vicepresidenta de Servicio y Experiencia al Cliente, Producto y Marketing. No compartas contraseñas, códigos OTP, información bancaria ni números de tarjeta en el chat. ¿Cómo puedo ayudarte hoy?",
+    "Hola — soy Chattia, Vicepresidenta de Servicio y Experiencia al Cliente, Producto y Marketing. No compartas contraseñas, códigos OTP, información bancaria ni números de tarjeta en el chat. ¿Buscas servicios para tu negocio o oportunidades profesionales?"
   ]
 };
 
