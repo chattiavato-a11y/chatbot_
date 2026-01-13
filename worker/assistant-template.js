@@ -1,6 +1,10 @@
 /* worker/assistant-template.js
-   OPS GATEWAY (Template) — PUBLIC EDGE — NO TURNSTILE
-   UI (opsonlinesupport.com / chattia.io / GH Pages) -> Gateway -> Brain (Service Binding)
+   OPS Gateway Template (v3.2.2) — PUBLIC EDGE (Turnstile removed)
+
+   Purpose:
+   - Same “public edge” pattern as ops-gateway.js
+   - Strict CORS + asset allowlist + sanitize + llama-guard + proxy to Brain
+   - NO Turnstile (no TURNSTILE_SECRET, no token checks)
 
    REQUIRED bindings:
    - Service binding:  BRAIN      (points to your Brain worker)
@@ -10,7 +14,6 @@
    OPTIONAL:
    - KV namespace:     OPS_RL     (rate limiting)
    - KV namespace:     OPS_EVENTS (audit events)
-   - Secret/var:       IP_TAG_SALT (salt for ip_tag hashing)
 */
 
 const ALLOWED_ORIGINS = new Set([
@@ -22,6 +25,9 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 const MAX_CHAT_BYTES = 8_192;
+const MAX_AUDIO_BYTES = 1 * 1024 * 1024;
+const MAX_REPORT_BYTES = 8_192;
+
 const MAX_MSG_CHARS = 256;
 const MAX_HISTORY_ITEMS = 12;
 
@@ -90,13 +96,14 @@ function corsHeaders(origin, requestedHeadersRaw = "") {
 
 /* -------------------- Responses -------------------- */
 
-function json(origin, status, obj, extra = {}) {
+function json(origin, status, obj, reqId, extra = {}) {
   return new Response(JSON.stringify(obj), {
     status,
     headers: {
       ...securityHeaders(),
       ...corsHeaders(origin),
       "Content-Type": "application/json; charset=utf-8",
+      "X-Ops-Request-Id": reqId,
       ...extra
     }
   });
@@ -206,9 +213,9 @@ async function sha256HexFromString(s) {
   return bytesToHex(new Uint8Array(digest));
 }
 
-async function ipTagOf(env, ip) {
-  const salt = String(env.IP_TAG_SALT || "");
-  const hex = await sha256HexFromString(`${salt}|${ip}`);
+async function ipTagOf(ip) {
+  // 16 hex chars is enough to correlate events without storing raw IP
+  const hex = await sha256HexFromString(ip);
   return hex.slice(0, 16);
 }
 
@@ -366,7 +373,7 @@ async function proxyJsonToBrain(origin, env, ctx, brainPath, rawClientBodyAb, re
       error: "Gateway misconfigured (missing BRAIN service binding).",
       error_code: "NO_BRAIN_BINDING",
       request_id: reqId
-    });
+    }, reqId);
   }
 
   const signHeaders = await signForBrain(env, "POST", brainPath, rawClientBodyAb);
@@ -376,7 +383,7 @@ async function proxyJsonToBrain(origin, env, ctx, brainPath, rawClientBodyAb, re
       error: "Gateway misconfigured (missing HAND_SHAKE secret).",
       error_code: "NO_HAND_SHAKE",
       request_id: reqId
-    });
+    }, reqId);
   }
 
   const brainReq = new Request("https://brain.local" + brainPath, {
@@ -395,7 +402,7 @@ async function proxyJsonToBrain(origin, env, ctx, brainPath, rawClientBodyAb, re
   } catch (e) {
     console.error("BRAIN fetch failed:", e);
     await logEvent(ctx, env, { type: "BRAIN_UNREACHABLE", ip_tag, path: brainPath, request_id: reqId });
-    return json(origin, 502, { ok: false, error: "Upstream error.", error_code: "UPSTREAM_ERROR", request_id: reqId });
+    return json(origin, 502, { ok: false, error: "Upstream error.", error_code: "UPSTREAM_ERROR", request_id: reqId }, reqId);
   }
 
   const ab = await brainResp.arrayBuffer();
@@ -417,7 +424,7 @@ export default {
     const pathname = url.pathname || "/";
     const origin = request.headers.get("Origin") || "";
     const clientIp = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
-    const ip_tag = await ipTagOf(env, clientIp);
+    const ip_tag = await ipTagOf(clientIp);
     const reqId = `req_${Date.now()}_${randHex(6)}`;
 
     const isChatPath = pathname === "/api/ops-online-chat";
@@ -427,19 +434,19 @@ export default {
     if (request.method === "GET" && isRoot) {
       return json(origin, 200, {
         ok: true,
-        service: "ops-gateway-template",
+        service: "assistant-template",
         allowed_origins: Array.from(ALLOWED_ORIGINS),
         has_rate_limit_kv: !!(env.OPS_RL && typeof env.OPS_RL.get === "function"),
         has_firewall: !!(env.FIREWALL && typeof env.FIREWALL.run === "function"),
         request_id: reqId
-      });
+      }, reqId);
     }
 
     // Preflight (strict)
     if (request.method === "OPTIONS") {
       if (!originAllowed(origin)) {
         await logEvent(ctx, env, { type: "ORIGIN_BLOCK", ip_tag, origin_seen: origin, path: pathname, request_id: reqId });
-        return json(origin, 403, { ok: false, error: "Origin not allowed.", error_code: "ORIGIN_BLOCK", origin_seen: origin, path: pathname, request_id: reqId });
+        return json(origin, 403, { ok: false, error: "Origin not allowed.", error_code: "ORIGIN_BLOCK", origin_seen: origin, path: pathname, request_id: reqId }, reqId);
       }
 
       const acrm = (request.headers.get("Access-Control-Request-Method") || "").toUpperCase();
@@ -447,12 +454,12 @@ export default {
       const requested = (acrhRaw || "").toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
 
       const allowedHeaders = ["content-type", "x-ops-asset-id"];
-      if (acrm && acrm !== "POST") return json(origin, 403, { ok: false, error: "Preflight rejected.", error_code: "PREFLIGHT_REJECT", request_id: reqId });
+      if (acrm && acrm !== "POST") return json(origin, 403, { ok: false, error: "Preflight rejected.", error_code: "PREFLIGHT_REJECT", request_id: reqId }, reqId);
 
       const disallowed = requested.filter(h => !allowedHeaders.includes(h));
       if (disallowed.length) {
         await logEvent(ctx, env, { type: "PREFLIGHT_REJECT", ip_tag, origin_seen: origin, path: pathname, request_id: reqId, disallowed });
-        return json(origin, 403, { ok: false, error: "Preflight rejected.", error_code: "PREFLIGHT_REJECT", request_id: reqId });
+        return json(origin, 403, { ok: false, error: "Preflight rejected.", error_code: "PREFLIGHT_REJECT", request_id: reqId }, reqId);
       }
 
       return new Response(null, {
@@ -469,14 +476,14 @@ export default {
         error_code: "WRONG_PATH",
         hint: "Use /api/ops-online-chat.",
         request_id: reqId
-      });
+      }, reqId);
     }
 
     if (!isChatPath) {
-      return json(origin, 404, { ok: false, error: "Not found.", error_code: "NOT_FOUND", request_id: reqId });
+      return json(origin, 404, { ok: false, error: "Not found.", error_code: "NOT_FOUND", request_id: reqId }, reqId);
     }
     if (request.method !== "POST") {
-      return json(origin, 405, { ok: false, error: "POST only.", error_code: "METHOD_NOT_ALLOWED", request_id: reqId });
+      return json(origin, 405, { ok: false, error: "POST only.", error_code: "METHOD_NOT_ALLOWED", request_id: reqId }, reqId);
     }
 
     // 1) Enforce origin
@@ -489,7 +496,7 @@ export default {
         origin_seen: origin,
         path: pathname,
         request_id: reqId
-      });
+      }, reqId);
     }
 
     // 2) Rate limit early (tight) — keyed by ip_tag (privacy)
@@ -501,7 +508,7 @@ export default {
         error: "Too many requests. Please wait and try again.",
         error_code: "RATE_LIMIT",
         request_id: reqId
-      }, {
+      }, reqId, {
         "Retry-After": String(Math.max(1, Number(rl.retryAfter || 10)))
       });
     }
@@ -514,7 +521,7 @@ export default {
         error: "Gateway config error (missing OPS_ASSET_IDS/ASSET_ID).",
         error_code: "NO_ASSET_ALLOWLIST",
         request_id: reqId
-      });
+      }, reqId);
     }
 
     const clientAssetId = request.headers.get("X-Ops-Asset-Id") || "";
@@ -526,7 +533,7 @@ export default {
         error_code: "MISSING_ASSET_ID",
         hint: "Send the X-Ops-Asset-Id header from the website/app.",
         request_id: reqId
-      });
+      }, reqId);
     }
 
     if (!allowedAssets.some(v => v === clientAssetId)) {
@@ -537,18 +544,18 @@ export default {
         error_code: "INVALID_ASSET_ID",
         hint: "X-Ops-Asset-Id must match the gateway allowlist.",
         request_id: reqId
-      });
+      }, reqId);
     }
 
     // 4) JSON-only
     const ct = (request.headers.get("content-type") || "").toLowerCase();
     if (!ct.includes("application/json")) {
-      return json(origin, 415, { ok: false, error: "JSON only.", error_code: "UNSUPPORTED_MEDIA_TYPE", request_id: reqId });
+      return json(origin, 415, { ok: false, error: "JSON only.", error_code: "UNSUPPORTED_MEDIA_TYPE", request_id: reqId }, reqId);
     }
 
     const raw = await readBodyArrayBufferLimited(request, MAX_CHAT_BYTES);
     if (!raw) {
-      return json(origin, 413, { ok: false, error: "Request too large or empty.", error_code: "PAYLOAD_TOO_LARGE", request_id: reqId });
+      return json(origin, 413, { ok: false, error: "Request too large or empty.", error_code: "PAYLOAD_TOO_LARGE", request_id: reqId }, reqId);
     }
 
     const bodyText = new TextDecoder().decode(raw);
@@ -556,13 +563,13 @@ export default {
     // 5) Block uploads & obvious injection
     if (hasDataUriBase64(bodyText) || looksSuspicious(bodyText)) {
       await logEvent(ctx, env, { type: "SANITIZE_BLOCK", ip_tag, origin_seen: origin, path: pathname, request_id: reqId, reason: "body" });
-      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "SANITIZE_BLOCK", request_id: reqId });
+      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "SANITIZE_BLOCK", request_id: reqId }, reqId);
     }
 
     // 6) Parse + enforce schema
     const payload = safeJsonParse(bodyText);
     if (!payload || typeof payload !== "object") {
-      return json(origin, 400, { ok: false, error: "Invalid JSON.", error_code: "BAD_JSON", request_id: reqId });
+      return json(origin, 400, { ok: false, error: "Invalid JSON.", error_code: "BAD_JSON", request_id: reqId }, reqId);
     }
 
     // Honeypots
@@ -570,7 +577,7 @@ export default {
     const hpWebsite = String(payload.hp_website || "").trim();
     if (hpEmail || hpWebsite) {
       await logEvent(ctx, env, { type: "HONEYPOT_TRIP", ip_tag, origin_seen: origin, path: pathname, request_id: reqId });
-      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "HONEYPOT", request_id: reqId });
+      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "HONEYPOT", request_id: reqId }, reqId);
     }
 
     const lang = (payload.lang === "es") ? "es" : "en";
@@ -578,10 +585,10 @@ export default {
     const history = sanitizeHistory(payload.history);
 
     if (!message) {
-      return json(origin, 400, { ok: false, error: "No message provided.", error_code: "NO_MESSAGE", lang, request_id: reqId });
+      return json(origin, 400, { ok: false, error: "No message provided.", error_code: "NO_MESSAGE", lang, request_id: reqId }, reqId);
     }
     if (looksSuspicious(message)) {
-      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "SANITIZE_BLOCK", lang, request_id: reqId });
+      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "SANITIZE_BLOCK", lang, request_id: reqId }, reqId);
     }
 
     // 7) PCI-ish DLP: never accept card numbers
@@ -595,17 +602,17 @@ export default {
         error: lang === "es"
           ? "Por seguridad, no compartas datos de tarjeta en el chat. Usa la página de contacto del sitio."
           : "For security, do not share card details in chat. Please use the site contact page."
-      });
+      }, reqId);
     }
 
-    // 8) FIREWALL llama-guard on the user message (required)
+    // 8) FIREWALL llama-guard on the user message
     const fw = await firewallCheck(env, message);
     if (!fw.ok) {
       await logEvent(ctx, env, { type: "FIREWALL_BLOCK", ip_tag, origin_seen: origin, path: pathname, request_id: reqId });
-      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "FIREWALL_BLOCK", lang, request_id: reqId });
+      return json(origin, 400, { ok: false, error: "Request blocked.", error_code: "FIREWALL_BLOCK", lang, request_id: reqId }, reqId);
     }
 
-    // 9) Forward upstream (NO TURNSTILE)
+    // 9) Forward upstream (Turnstile removed)
     const cleanPayload = { lang, message, history, v: 3 };
     const rawUpstream = new TextEncoder().encode(JSON.stringify(cleanPayload)).buffer;
 
