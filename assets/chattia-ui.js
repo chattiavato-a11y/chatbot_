@@ -1,647 +1,521 @@
 /* assets/chattia-ui.js
-   OPS Online Support — Chattia UI Controller (v3)
-   - No external libs
-   - Handles:
-     - Language toggle (delegates to assets/chattia-head-lang.js)
-     - Theme toggle (delegates to assets/chattia-preferences.js)
-     - Privacy/Consent modal (localStorage consent gate)
-     - Chat drawer (right-to-left)
-     - Chat send -> OPS Gateway (/api/ops-online-chat)
-     - Minimal client-side sanitization (UI-level) + honeypots
-     - Asset ID header (X-Ops-Asset-Id) from meta tag
-
-   REQUIRED in index.html:
-   - <meta name="ops-gateway" content="https://ops-gateway.grabem-holdem-nuts-right.workers.dev">
-   - <meta name="ops-asset-id" content="YOUR_ASSET_ID_VALUE">
-   - Basic elements with IDs used below (see selectors)
+   OPS Online Support — Chattia UI (v3, NO TURNSTILE)
+   - Gateway POST JSON → /api/ops-online-chat
+   - Consent gating (localStorage ops_consent)
+   - Theme + Language toggles (localStorage ops_theme / ops_lang)
+   - Transcript modal (copy/download)
+   - Honeypots supported (hp_email / hp_website)
 */
 
 (() => {
   "use strict";
 
-  /* -------------------- Config keys -------------------- */
+  /* -------------------- Constants / Keys -------------------- */
 
   const LS = {
-    THEME: "ops_theme",           // "dark" | "light"
-    LANG: "ops_lang",             // "en" | "es"
-    CONSENT: "ops_consent",       // "accepted" | "denied"
-    TRANSCRIPT: "ops_transcript"  // JSON array
+    CONSENT: "ops_consent", // "accepted" | "denied" | null
+    THEME: "ops_theme",     // "dark" | "light"
+    LANG: "ops_lang"        // "en" | "es"
   };
 
-  const MAX_MSG_CHARS = 256;
-  const MAX_HISTORY_ITEMS = 12;
-  const MAX_TRANSCRIPT_ITEMS = 50;
+  const LIMITS = {
+    MAX_MSG_CHARS: 256,
+    MAX_HISTORY: 12
+  };
 
-  /* -------------------- Helpers -------------------- */
+  /* -------------------- DOM helpers -------------------- */
 
-  const $ = (sel, root = document) => root.querySelector(sel);
-
-  function el(tag, attrs = {}, children = []) {
-    const n = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs)) {
-      if (k === "class") n.className = v;
-      else if (k === "text") n.textContent = String(v);
-      else if (k.startsWith("aria-")) n.setAttribute(k, String(v));
-      else if (k === "html") n.innerHTML = String(v);
-      else n.setAttribute(k, String(v));
-    }
-    for (const c of children) n.appendChild(c);
-    return n;
-  }
-
-  function clampText(s, max = MAX_MSG_CHARS) {
-    let out = String(s || "");
-    out = out.replace(/[\u0000-\u001F\u007F]/g, " ");
-    out = out.replace(/\s+/g, " ").trim();
-    if (out.length > max) out = out.slice(0, max);
-    return out;
-  }
-
-  function looksSuspicious(s) {
-    const t = String(s || "").toLowerCase();
-    const bad = [
-      "<script", "</script", "javascript:",
-      "<img", "onerror", "onload",
-      "<iframe", "<object", "<embed",
-      "<svg", "<link", "<meta", "<style",
-      "document.cookie",
-      "onmouseover", "onmouseenter",
-      "<form", "<input", "<textarea"
-    ];
-    return bad.some(p => t.includes(p));
-  }
-
-  /* -------------------- Meta config -------------------- */
-
-  function getMeta(name) {
-    const m = document.querySelector(`meta[name="${name}"]`);
-    return m ? (m.getAttribute("content") || "") : "";
-  }
-
-  const GATEWAY_BASE = (getMeta("ops-gateway") || "").replace(/\/+$/, "");
-  const ASSET_ID = (getMeta("ops-asset-id") || "").trim();
-
-  function requireConfigOrThrow() {
-    if (!GATEWAY_BASE) throw new Error("Missing meta[name=ops-gateway].");
-    if (!ASSET_ID) throw new Error("Missing meta[name=ops-asset-id].");
-  }
-
-  /* -------------------- UI selectors (IDs expected) -------------------- */
+  const $ = (id) => document.getElementById(id);
 
   const UI = {
+    // Shell
+    fabChat: $("fabChat"),
+    drawer: $("chatDrawer"),
+    backdrop: $("chatBackdrop"),
+    close: $("chatClose"),
+
     // Chat
-    chatDrawer: $("#chatDrawer"),
-    chatClose: $("#chatClose"),
-    chatBody: $("#chatBody"),
-    chatForm: $("#chatForm"),
-    chatMessage: $("#chatMessage"),
-    sendBtn: $("#chatForm button[type=submit]"),
-    hpEmail: $("#hp_email"),
-    hpWebsite: $("#hp_website"),
-    chatBackdrop: $("#chatBackdrop"),
+    body: $("chatBody"),
+    form: $("chatForm"),
+    input: $("chatMessage"),
+    hpEmail: $("hp_email"),
+    hpWebsite: $("hp_website"),
+    chatClear: $("chatClear"),
+    chatTranscript: $("chatTranscript"),
 
     // Consent modal
-    consentModal: $("#consentModal"),
-    consentAccept: $("#consentAccept"),
-    consentDeny: $("#consentDeny"),
-    consentClose: $("#consentClose"),
+    consentModal: $("consentModal"),
+    consentAccept: $("consentAccept"),
+    consentDeny: $("consentDeny"),
+    consentClose: $("consentClose"),
 
-    // Toggles
-    langToggle: $("#langToggle"),
-    themeToggle: $("#themeToggle"),
-    chatClear: $("#chatClear"),
-    chatTranscript: $("#chatTranscript"),
-
-    // FABs
-    fabChat: $("#fabChat"),
+    // Preferences
+    langToggle: $("langToggle"),
+    themeToggle: $("themeToggle"),
 
     // Transcript modal
-    transcriptModal: $("#transcriptModal"),
-    transcriptClose: $("#transcriptClose"),
-    transcriptText: $("#transcriptText"),
-    transcriptCopy: $("#transcriptCopy"),
-    transcriptDownload: $("#transcriptDownload")
+    transcriptModal: $("transcriptModal"),
+    transcriptText: $("transcriptText"),
+    transcriptClose: $("transcriptClose"),
+    transcriptCopy: $("transcriptCopy"),
+    transcriptDownload: $("transcriptDownload")
   };
 
-  if (!UI.sendBtn && UI.chatForm) {
-    UI.sendBtn = UI.chatForm.querySelector("button[type='submit']");
+  function safeGet(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+  function safeSet(key, val) {
+    try { localStorage.setItem(key, String(val)); } catch {}
+  }
+  function safeDel(key) {
+    try { localStorage.removeItem(key); } catch {}
   }
 
-  /* -------------------- State -------------------- */
-
-  const state = {
-    lang: "en",
-    theme: "dark",
-    consent: "denied",
-    configOk: true,
-    transcript: [], // { role, content, ts }
-    requestId: 0,
-    sessionBlocked: false
-  };
-
-  /* -------------------- Copy (EN/ES) -------------------- */
-
-  const COPY = {
-    en: {
-      sending: "Sending…",
-      badInput: "Message blocked. Please remove unsafe content.",
-      sessionBlocked: "Session blocked due to failed security checks.",
-      mustConsent: "To use chat, please accept Privacy & Consent.",
-      configError: "Site configuration error.",
-      chat_placeholder: "Type your message…",
-      openChat: "Open chat",
-      closeChat: "Close chat",
-      transcriptTitle: "Transcript",
-      transcriptEmpty: "No transcript yet.",
-      transcriptCopied: "Copied.",
-      transcriptDownloaded: "Downloaded.",
-      clearConfirm: "Clear chat history?",
-      gatewayError: "Sorry—chat is unavailable right now.",
-      fallbackReply: "Thanks—someone will follow up soon.",
-      accept: "Accept",
-      deny: "Deny",
-      close: "Close"
-    },
-    es: {
-      sending: "Enviando…",
-      badInput: "Mensaje bloqueado. Elimina contenido inseguro.",
-      sessionBlocked: "Sesión bloqueada por fallas de seguridad.",
-      mustConsent: "Para usar el chat, acepta Privacidad y Consentimiento.",
-      configError: "Error de configuración del sitio.",
-      chat_placeholder: "Escribe tu mensaje…",
-      openChat: "Abrir chat",
-      closeChat: "Cerrar chat",
-      transcriptTitle: "Transcripción",
-      transcriptEmpty: "Aún no hay transcripción.",
-      transcriptCopied: "Copiado.",
-      transcriptDownloaded: "Descargado.",
-      clearConfirm: "¿Borrar historial del chat?",
-      gatewayError: "Lo siento—el chat no está disponible ahora.",
-      fallbackReply: "Gracias—alguien te contactará pronto.",
-      accept: "Aceptar",
-      deny: "Rechazar",
-      close: "Cerrar"
-    }
-  };
-
-  function t(key) {
-    const dict = COPY[state.lang] || COPY.en;
-    return dict[key] || COPY.en[key] || key;
+  function getMeta(name) {
+    const el = document.querySelector(`meta[name="${name}"]`);
+    return el ? String(el.getAttribute("content") || "").trim() : "";
   }
 
-  /* -------------------- Storage helpers -------------------- */
+  /* -------------------- Modal helpers (dialog-safe) -------------------- */
 
-  function readLS(key, fallback = "") {
+  function openModal(el) {
+    if (!el) return;
+    el.classList.add("is-open");
     try {
-      const v = localStorage.getItem(key);
-      return v == null ? fallback : v;
+      if (typeof el.showModal === "function" && !el.open) el.showModal();
     } catch {
-      return fallback;
+      // ignore (some browsers block showModal if not a <dialog>)
     }
+    el.setAttribute("aria-hidden", "false");
   }
 
-  function writeLS(key, value) {
+  function closeModal(el) {
+    if (!el) return;
+    el.classList.remove("is-open");
     try {
-      localStorage.setItem(key, String(value));
+      if (typeof el.close === "function" && el.open) el.close();
     } catch {}
+    el.setAttribute("aria-hidden", "true");
   }
 
-  function removeLS(key) {
-    try {
-      localStorage.removeItem(key);
-    } catch {}
+  /* -------------------- Drawer helpers -------------------- */
+
+  function openDrawer() {
+    if (!UI.drawer || !UI.backdrop) return;
+    UI.drawer.classList.add("is-open");
+    UI.drawer.setAttribute("aria-hidden", "false");
+    UI.backdrop.classList.add("is-on");
+    UI.backdrop.setAttribute("aria-hidden", "false");
+    if (UI.fabChat) UI.fabChat.setAttribute("aria-expanded", "true");
+    setTimeout(() => { try { UI.input && UI.input.focus(); } catch {} }, 0);
   }
 
-  function readConsent() {
-    const v = readLS(LS.CONSENT, "denied");
-    return v === "accepted" ? "accepted" : "denied";
+  function closeDrawer() {
+    if (!UI.drawer || !UI.backdrop) return;
+    UI.drawer.classList.remove("is-open");
+    UI.drawer.setAttribute("aria-hidden", "true");
+    UI.backdrop.classList.remove("is-on");
+    UI.backdrop.setAttribute("aria-hidden", "true");
+    if (UI.fabChat) UI.fabChat.setAttribute("aria-expanded", "false");
+  }
+
+  /* -------------------- Consent -------------------- */
+
+  function getConsent() {
+    const v = (safeGet(LS.CONSENT) || "").toLowerCase().trim();
+    if (v === "accepted") return "accepted";
+    if (v === "denied") return "denied";
+    return null;
   }
 
   function setConsent(v) {
-    state.consent = v === "accepted" ? "accepted" : "denied";
-    writeLS(LS.CONSENT, state.consent);
-  }
-
-  function loadTranscript() {
-    try {
-      const raw = readLS(LS.TRANSCRIPT, "[]");
-      const arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) return [];
-      return arr
-        .filter(x => x && typeof x === "object" && (x.role === "user" || x.role === "assistant"))
-        .map(x => ({
-          role: x.role,
-          content: clampText(String(x.content || ""), 2048),
-          ts: typeof x.ts === "number" ? x.ts : Date.now()
-        }))
-        .slice(-MAX_TRANSCRIPT_ITEMS);
-    } catch {
-      return [];
+    const s = (String(v || "")).toLowerCase().trim();
+    if (s === "accepted" || s === "denied") {
+      safeSet(LS.CONSENT, s);
+      window.__OPS_CHAT_CONSENT = s;
+      window.dispatchEvent(new CustomEvent("ops:consent", { detail: { consent: s } }));
+      return s;
     }
+    safeDel(LS.CONSENT);
+    window.__OPS_CHAT_CONSENT = null;
+    window.dispatchEvent(new CustomEvent("ops:consent", { detail: { consent: null } }));
+    return null;
   }
 
-  function saveTranscript() {
-    try {
-      writeLS(LS.TRANSCRIPT, JSON.stringify(state.transcript.slice(-MAX_TRANSCRIPT_ITEMS)));
-    } catch {}
-  }
-
-  function clearTranscript() {
-    state.transcript = [];
-    removeLS(LS.TRANSCRIPT);
-  }
-
-  /* -------------------- Consent modal -------------------- */
-
-  function openConsentModal() {
-    if (!UI.consentModal) return;
-    UI.consentModal.classList.add("is-open");
-    UI.consentModal.setAttribute("aria-hidden", "false");
-  }
-
-  function closeConsentModal() {
-    if (!UI.consentModal) return;
-    UI.consentModal.classList.remove("is-open");
-    UI.consentModal.setAttribute("aria-hidden", "true");
-  }
-
-  function ensureConsentOrPrompt() {
-    if (state.consent === "accepted") return true;
-    openConsentModal();
-    return false;
+  function requireConsentThenOpenChat() {
+    const c = getConsent();
+    if (c === "accepted") {
+      openDrawer();
+      return;
+    }
+    openModal(UI.consentModal);
   }
 
   /* -------------------- Theme + Language -------------------- */
 
+  function normalizeTheme(v) {
+    const s = String(v || "").toLowerCase().trim();
+    return s === "light" ? "light" : "dark";
+  }
+
+  function getTheme() {
+    const saved = safeGet(LS.THEME);
+    if (saved === "light" || saved === "dark") return saved;
+    return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+  }
+
   function applyTheme(theme) {
-    state.theme = theme === "light" ? "light" : "dark";
-    writeLS(LS.THEME, state.theme);
-    document.documentElement.dataset.theme = state.theme;
-    if (UI.themeToggle) {
-      UI.themeToggle.setAttribute("aria-pressed", state.theme === "dark" ? "true" : "false");
-    }
+    const t = normalizeTheme(theme);
+    document.documentElement.dataset.theme = t;
+    safeSet(LS.THEME, t);
+    if (UI.themeToggle) UI.themeToggle.setAttribute("aria-pressed", t === "light" ? "true" : "false");
+    window.dispatchEvent(new CustomEvent("ops:theme", { detail: { theme: t } }));
+    return t;
+  }
+
+  function normalizeLang(v) {
+    const s = String(v || "").toLowerCase().trim();
+    return s.startsWith("es") ? "es" : "en";
+  }
+
+  function getLang() {
+    const saved = safeGet(LS.LANG);
+    if (saved === "en" || saved === "es") return saved;
+    const htmlLang = (document.documentElement.getAttribute("lang") || "").toLowerCase();
+    if (htmlLang.startsWith("es")) return "es";
+    const nav = (navigator.language || "en").toLowerCase();
+    return nav.startsWith("es") ? "es" : "en";
   }
 
   function applyLang(lang) {
-    state.lang = lang === "es" ? "es" : "en";
-    writeLS(LS.LANG, state.lang);
-    document.documentElement.lang = state.lang;
+    const l = normalizeLang(lang);
+    safeSet(LS.LANG, l);
 
-    if (UI.langToggle) {
-      UI.langToggle.setAttribute("aria-pressed", state.lang === "es" ? "true" : "false");
+    // Prefer head bootstrap translator if present
+    if (typeof window.__OPS_setLang === "function") {
+      window.__OPS_setLang(l);
+    } else {
+      document.documentElement.setAttribute("lang", l);
+      document.documentElement.dataset.lang = l;
+      window.__OPS_LANG = l;
     }
 
-    if (UI.chatMessage) UI.chatMessage.placeholder = t("chat_placeholder");
-    if (UI.chatTranscript) UI.chatTranscript.title = t("transcriptTitle");
-    if (UI.chatClose) UI.chatClose.title = t("closeChat");
+    if (UI.langToggle) UI.langToggle.setAttribute("aria-pressed", l === "es" ? "true" : "false");
+    window.dispatchEvent(new CustomEvent("ops:lang", { detail: { lang: l } }));
+    return l;
   }
 
-  /* -------------------- Chat UI rendering -------------------- */
-
-  function setChatBackdrop(on) {
-    if (!UI.chatBackdrop) return;
-    UI.chatBackdrop.classList.toggle("is-on", !!on);
-    UI.chatBackdrop.setAttribute("aria-hidden", on ? "false" : "true");
+  function toggleTheme() {
+    const cur = getTheme();
+    return applyTheme(cur === "dark" ? "light" : "dark");
   }
 
-  function setChatExpanded(expanded) {
-    if (!UI.chatDrawer) return;
-    UI.chatDrawer.classList.toggle("is-open", !!expanded);
-    UI.chatDrawer.setAttribute("aria-hidden", expanded ? "false" : "true");
+  function toggleLang() {
+    const cur = getLang();
+    return applyLang(cur === "en" ? "es" : "en");
   }
 
-  function openChatDrawer(opts = {}) {
-    if (!UI.chatDrawer) return;
-    if (!state.configOk) return;
-    setChatExpanded(true);
-    setChatBackdrop(true);
-    if (UI.fabChat) UI.fabChat.setAttribute("aria-expanded", "true");
-    if (opts.focus && UI.chatMessage) UI.chatMessage.focus();
-  }
+  /* -------------------- Chat rendering -------------------- */
 
-  function closeChatDrawer() {
-    if (!UI.chatDrawer) return;
-    setChatExpanded(false);
-    setChatBackdrop(false);
-    if (UI.fabChat) UI.fabChat.setAttribute("aria-expanded", "false");
-  }
+  const state = {
+    history: [], // { role: "user"|"assistant", content: "..." }
+    sending: false
+  };
 
-  function renderMessage(role, content) {
-    if (!UI.chatBody) return;
-    const safe = clampText(content, 2048);
-
-    const row = el("div", { class: `chat-row ${role}` });
-    const bubble = el("div", { class: "chat-bubble", text: safe });
-    row.appendChild(bubble);
-
-    UI.chatBody.appendChild(row);
-    UI.chatBody.scrollTop = UI.chatBody.scrollHeight;
-  }
-
-  function rebuildChatFromTranscript() {
-    if (!UI.chatBody) return;
-    UI.chatBody.innerHTML = "";
-    for (const m of state.transcript) renderMessage(m.role, m.content);
-  }
-
-  function pushTranscript(role, content) {
-    state.transcript.push({ role, content: clampText(content, 2048), ts: Date.now() });
-    if (state.transcript.length > MAX_TRANSCRIPT_ITEMS) {
-      state.transcript = state.transcript.slice(-MAX_TRANSCRIPT_ITEMS);
-    }
-    saveTranscript();
-  }
-
-  function buildHistoryForGateway() {
-    const out = [];
-    const last = state.transcript.slice(-MAX_HISTORY_ITEMS * 2);
-    for (const m of last) {
-      if (!m || typeof m !== "object") continue;
-      if (out.length >= MAX_HISTORY_ITEMS) break;
-      const role = m.role === "assistant" ? "assistant" : "user";
-      const content = clampText(m.content, MAX_MSG_CHARS);
-      if (!content) continue;
-      if (looksSuspicious(content)) continue;
-      out.push({ role, content });
-    }
+  function normalizeUserText(s) {
+    let out = String(s || "");
+    out = out.replace(/[\u0000-\u001F\u007F]/g, " ");
+    out = out.replace(/\s+/g, " ").trim();
+    if (out.length > LIMITS.MAX_MSG_CHARS) out = out.slice(0, LIMITS.MAX_MSG_CHARS);
     return out;
   }
 
-  /* -------------------- Session blocking -------------------- */
-
-  function blockSession(reasonKey = "sessionBlocked") {
-    state.sessionBlocked = true;
-    if (UI.sendBtn) UI.sendBtn.disabled = true;
-    renderMessage("assistant", t(reasonKey));
-    pushTranscript("assistant", t(reasonKey));
+  function pushHistory(role, content) {
+    const item = { role: role === "assistant" ? "assistant" : "user", content: String(content || "") };
+    state.history.push(item);
+    if (state.history.length > LIMITS.MAX_HISTORY) {
+      state.history = state.history.slice(-LIMITS.MAX_HISTORY);
+    }
   }
 
-  function updateChatEnabled() {
-    const allowed = state.consent === "accepted" && !state.sessionBlocked;
-    if (UI.chatMessage) UI.chatMessage.disabled = !allowed;
-    if (UI.sendBtn) UI.sendBtn.disabled = !allowed;
+  function el(tag, attrs = {}, text = "") {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null) continue;
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, String(v));
+    }
+    if (text) n.textContent = text;
+    return n;
   }
 
-  /* -------------------- Transcript modal -------------------- */
-
-  function openTranscriptModal() {
-    if (!UI.transcriptModal) return;
-    UI.transcriptModal.classList.add("is-open");
-    UI.transcriptModal.setAttribute("aria-hidden", "false");
-
-    const text = state.transcript.length
-      ? state.transcript.map(m => {
-          const when = new Date(m.ts || Date.now()).toISOString();
-          return `[${when}] ${m.role}: ${m.content}`;
-        }).join("\n")
-      : t("transcriptEmpty");
-
-    if (UI.transcriptText) UI.transcriptText.value = text;
+  function appendMessage(role, text) {
+    if (!UI.body) return;
+    const wrap = el("div", { class: `msg ${role}` });
+    const bubble = el("div", { class: "bubble" });
+    bubble.textContent = String(text || "");
+    wrap.appendChild(bubble);
+    UI.body.appendChild(wrap);
+    try { UI.body.scrollTop = UI.body.scrollHeight; } catch {}
   }
 
-  function closeTranscriptModal() {
-    if (!UI.transcriptModal) return;
-    UI.transcriptModal.classList.remove("is-open");
-    UI.transcriptModal.setAttribute("aria-hidden", "true");
+  function systemNote(text) {
+    appendMessage("assistant", text);
+  }
+
+  function clearChat() {
+    state.history = [];
+    if (UI.body) UI.body.innerHTML = "";
+  }
+
+  /* -------------------- Transcript -------------------- */
+
+  function buildTranscriptText() {
+    const lines = [];
+    for (const item of state.history) {
+      const who = item.role === "assistant" ? "Assistant" : "User";
+      lines.push(`${who}: ${item.content}`);
+      lines.push("");
+    }
+    return lines.join("\n").trim() + "\n";
+  }
+
+  function openTranscript() {
+    if (!UI.transcriptModal || !UI.transcriptText) return;
+    UI.transcriptText.value = buildTranscriptText();
+    openModal(UI.transcriptModal);
+    setTimeout(() => {
+      try { UI.transcriptText.focus(); UI.transcriptText.select(); } catch {}
+    }, 0);
   }
 
   async function copyTranscript() {
     if (!UI.transcriptText) return;
+    const txt = UI.transcriptText.value || "";
     try {
-      await navigator.clipboard.writeText(UI.transcriptText.value || "");
-      if (UI.transcriptCopy) UI.transcriptCopy.textContent = t("transcriptCopied");
-      setTimeout(() => { if (UI.transcriptCopy) UI.transcriptCopy.textContent = "Copy"; }, 1200);
-    } catch {}
+      await navigator.clipboard.writeText(txt);
+    } catch {
+      // fallback: select + execCommand
+      try {
+        UI.transcriptText.focus();
+        UI.transcriptText.select();
+        document.execCommand("copy");
+      } catch {}
+    }
   }
 
   function downloadTranscript() {
-    // Optional; if the button exists, we keep it.
-    if (!UI.transcriptText) return;
-    try {
-      const blob = new Blob([UI.transcriptText.value || ""], { type: "text/plain;charset=utf-8" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `ops-transcript-${Date.now()}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(a.href);
-      if (UI.transcriptDownload) UI.transcriptDownload.textContent = t("transcriptDownloaded");
-      setTimeout(() => { if (UI.transcriptDownload) UI.transcriptDownload.textContent = "Download"; }, 1200);
-    } catch {}
+    const txt = buildTranscriptText();
+    const blob = new Blob([txt], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `chattia-transcript-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
-  /* -------------------- Gateway call -------------------- */
+  /* -------------------- Network (Gateway) -------------------- */
 
-  async function sendToGateway(message, honeypots = {}) {
-    requireConfigOrThrow();
+  function getGatewayBase() {
+    const fromMeta = getMeta("ops-gateway");
+    return fromMeta || `${location.origin}`;
+  }
 
-    const url = `${GATEWAY_BASE}/api/ops-online-chat`;
+  function getAssetId() {
+    const fromMeta = getMeta("ops-asset-id");
+    return fromMeta || "ops-online-support-site";
+  }
+
+  async function postChat(message) {
+    const base = getGatewayBase().replace(/\/+$/, "");
+    const url = `${base}/api/ops-online-chat`;
+
     const payload = {
-      lang: state.lang,
+      lang: getLang(),
       message,
-      history: buildHistoryForGateway(),
-      // Honeypots: must be empty
-      hp_email: String(honeypots.email || ""),
-      hp_website: String(honeypots.website || "")
+      history: state.history,
+      // honeypots (must remain empty)
+      hp_email: UI.hpEmail ? String(UI.hpEmail.value || "") : "",
+      hp_website: UI.hpWebsite ? String(UI.hpWebsite.value || "") : ""
     };
 
     const res = await fetch(url, {
       method: "POST",
       headers: {
-        "content-type": "application/json",
-        "X-Ops-Asset-Id": ASSET_ID
+        "Content-Type": "application/json",
+        "X-Ops-Asset-Id": getAssetId()
       },
       body: JSON.stringify(payload)
     });
 
-    const text = await res.text();
-    let data = null;
-    try { data = JSON.parse(text); } catch {}
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
 
-    if (!res.ok) {
-      const msg = (data && (data.error || data.message)) ? String(data.error || data.message) : `HTTP ${res.status}`;
-      throw new Error(msg);
+    // Gateway/brain usually returns JSON
+    if (ct.includes("application/json")) {
+      const data = await res.json().catch(() => null);
+      return { ok: res.ok, status: res.status, data };
     }
 
-    const reply = (data && typeof data.reply === "string") ? data.reply : "";
-    return reply || "";
+    // Fallback: text
+    const text = await res.text().catch(() => "");
+    return { ok: res.ok, status: res.status, data: { text } };
   }
 
-  /* -------------------- Main chat flow -------------------- */
+  function extractAssistantText(respData) {
+    if (!respData) return "";
+    // Common patterns
+    if (typeof respData.reply === "string") return respData.reply;
+    if (typeof respData.message === "string") return respData.message;
+    if (typeof respData.text === "string") return respData.text;
 
-  let isSending = false;
+    // Cloudflare AI style payload: { result: { response: "..." } } or { response: "..." }
+    if (typeof respData.response === "string") return respData.response;
+    if (respData.result && typeof respData.result.response === "string") return respData.result.response;
 
-  async function onSend(event) {
-    if (event) event.preventDefault();
-    if (isSending) return;
-    if (!UI.chatMessage) return;
-    if (state.sessionBlocked) return;
-    if (!ensureConsentOrPrompt()) return;
+    // If the brain returns OpenAI-like: { choices: [{ message: { content } }] }
+    const c0 = respData.choices && respData.choices[0];
+    const content = c0 && c0.message && c0.message.content;
+    if (typeof content === "string") return content;
 
-    const hpEmail = UI.hpEmail ? String(UI.hpEmail.value || "") : "";
-    const hpWebsite = UI.hpWebsite ? String(UI.hpWebsite.value || "") : "";
-    if (hpEmail || hpWebsite) {
-      blockSession("sessionBlocked");
+    return "";
+  }
+
+  function friendlyError(status, data) {
+    const code = data && (data.error_code || data.code);
+    const msg = data && (data.error || data.message);
+
+    if (status === 401) return msg || "Unauthorized client (asset ID check failed).";
+    if (status === 403) return msg || "Blocked (origin not allowed).";
+    if (status === 413) return msg || "Message too large.";
+    if (status === 415) return msg || "JSON only.";
+    if (status === 429) return msg || "Too many requests. Please wait and try again.";
+    if (status >= 500) return msg || "Service error. Please try again.";
+    return msg || (code ? `Request failed: ${code}` : "Request failed.");
+  }
+
+  /* -------------------- Events -------------------- */
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    if (state.sending) return;
+
+    // Consent gate
+    if (getConsent() !== "accepted") {
+      openModal(UI.consentModal);
       return;
     }
 
-    const message = clampText(UI.chatMessage.value || "", MAX_MSG_CHARS);
+    const raw = UI.input ? UI.input.value : "";
+    const message = normalizeUserText(raw);
     if (!message) return;
 
-    if (looksSuspicious(message)) {
-      renderMessage("assistant", t("badInput"));
-      pushTranscript("assistant", t("badInput"));
-      return;
-    }
+    // Honeypots must be empty; if not, do nothing (bot)
+    if ((UI.hpEmail && UI.hpEmail.value) || (UI.hpWebsite && UI.hpWebsite.value)) return;
 
-    state.requestId += 1;
-    const requestId = state.requestId;
+    // UI
+    if (UI.input) UI.input.value = "";
+    appendMessage("user", message);
+    pushHistory("user", message);
 
-    renderMessage("user", message);
-    pushTranscript("user", message);
-    UI.chatMessage.value = "";
-
-    isSending = true;
-    if (UI.sendBtn) UI.sendBtn.disabled = true;
+    state.sending = true;
 
     try {
-      renderMessage("assistant", t("sending"));
-      const reply = await sendToGateway(message, { email: hpEmail, website: hpWebsite });
-      if (requestId !== state.requestId) return;
-      const finalReply = reply || t("fallbackReply");
-      renderMessage("assistant", finalReply);
-      pushTranscript("assistant", finalReply);
-    } catch (e) {
-      console.error(e);
-      if (requestId !== state.requestId) return;
-      const errorMessage = e.message === "Missing meta[name=ops-gateway]." ||
-        e.message === "Missing meta[name=ops-asset-id]."
-        ? t("configError")
-        : t("gatewayError");
-      renderMessage("assistant", errorMessage);
-      pushTranscript("assistant", errorMessage);
+      const { ok, status, data } = await postChat(message);
+
+      if (!ok) {
+        const errText = friendlyError(status, data);
+        systemNote(errText);
+        pushHistory("assistant", errText);
+        return;
+      }
+
+      const reply = extractAssistantText(data) || (getLang() === "es"
+        ? "Listo. ¿En qué más puedo ayudarte?"
+        : "Done. How else can I help?");
+
+      appendMessage("assistant", reply);
+      pushHistory("assistant", reply);
+    } catch (err) {
+      const msg = (getLang() === "es")
+        ? "Error de red. Inténtalo de nuevo."
+        : "Network error. Please try again.";
+      systemNote(msg);
+      pushHistory("assistant", msg);
+      console.error(err);
     } finally {
-      if (requestId !== state.requestId) return;
-      isSending = false;
-      if (UI.sendBtn) UI.sendBtn.disabled = false;
-      updateChatEnabled();
+      state.sending = false;
     }
   }
 
-  /* -------------------- Wire events -------------------- */
-
   function wireEvents() {
-    if (UI.fabChat) {
-      UI.fabChat.addEventListener("click", () => {
-        if (!ensureConsentOrPrompt()) return;
-        const isOpen = UI.chatDrawer && UI.chatDrawer.classList.contains("is-open");
-        if (isOpen) closeChatDrawer();
-        else openChatDrawer({ focus: true });
-      });
-    }
+    if (UI.fabChat) UI.fabChat.addEventListener("click", requireConsentThenOpenChat);
+    if (UI.close) UI.close.addEventListener("click", closeDrawer);
+    if (UI.backdrop) UI.backdrop.addEventListener("click", closeDrawer);
 
-    if (UI.chatClose) UI.chatClose.addEventListener("click", closeChatDrawer);
-    if (UI.chatBackdrop) UI.chatBackdrop.addEventListener("click", closeChatDrawer);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeModal(UI.consentModal);
+        closeModal(UI.transcriptModal);
+        closeDrawer();
+      }
+    });
 
-    if (UI.chatForm) UI.chatForm.addEventListener("submit", onSend);
+    if (UI.form) UI.form.addEventListener("submit", onSubmit);
 
-    if (UI.langToggle) {
-      UI.langToggle.addEventListener("click", () => {
-        applyLang(state.lang === "en" ? "es" : "en");
-      });
-    }
+    if (UI.chatClear) UI.chatClear.addEventListener("click", () => {
+      clearChat();
+      systemNote(getLang() === "es" ? "Chat limpiado." : "Chat cleared.");
+    });
 
-    if (UI.themeToggle) {
-      UI.themeToggle.addEventListener("click", () => {
-        applyTheme(state.theme === "dark" ? "light" : "dark");
-      });
-    }
+    if (UI.chatTranscript) UI.chatTranscript.addEventListener("click", openTranscript);
 
-    if (UI.chatClear) {
-      UI.chatClear.addEventListener("click", () => {
-        const ok = confirm(t("clearConfirm"));
-        if (!ok) return;
-        clearTranscript();
-        rebuildChatFromTranscript();
-      });
-    }
-
-    if (UI.chatTranscript) {
-      UI.chatTranscript.addEventListener("click", openTranscriptModal);
-    }
-
-    if (UI.transcriptClose) UI.transcriptClose.addEventListener("click", closeTranscriptModal);
+    if (UI.transcriptClose) UI.transcriptClose.addEventListener("click", () => closeModal(UI.transcriptModal));
     if (UI.transcriptCopy) UI.transcriptCopy.addEventListener("click", copyTranscript);
     if (UI.transcriptDownload) UI.transcriptDownload.addEventListener("click", downloadTranscript);
 
-    if (UI.consentClose) UI.consentClose.addEventListener("click", closeConsentModal);
+    if (UI.consentClose) UI.consentClose.addEventListener("click", () => closeModal(UI.consentModal));
 
-    if (UI.consentDeny) {
-      UI.consentDeny.addEventListener("click", () => {
-        setConsent("denied");
-        updateChatEnabled();
-        closeConsentModal();
-      });
-    }
+    if (UI.consentAccept) UI.consentAccept.addEventListener("click", (e) => {
+      e.preventDefault();
+      setConsent("accepted");
+      closeModal(UI.consentModal);
+      openDrawer();
+    });
 
-    if (UI.consentAccept) {
-      UI.consentAccept.addEventListener("click", () => {
-        setConsent("accepted");
-        updateChatEnabled();
-        applyTheme(state.theme);
-        applyLang(state.lang);
-        closeConsentModal();
-        if (state.configOk) openChatDrawer({ focus: true });
-      });
-    }
+    if (UI.consentDeny) UI.consentDeny.addEventListener("click", (e) => {
+      e.preventDefault();
+      setConsent("denied");
+      closeModal(UI.consentModal);
+      // keep chat closed; user can accept later
+    });
+
+    if (UI.langToggle) UI.langToggle.addEventListener("click", () => toggleLang());
+    if (UI.themeToggle) UI.themeToggle.addEventListener("click", () => toggleTheme());
   }
 
   /* -------------------- Init -------------------- */
 
   function init() {
-    // config check (soft)
-    try {
-      requireConfigOrThrow();
-      state.configOk = true;
-    } catch (e) {
-      console.warn(e);
-      state.configOk = false;
-    }
+    // Apply stored prefs (even if chattia-preferences.js also does it — harmless)
+    applyTheme(getTheme());
+    applyLang(getLang());
 
-    // Initial state from LS
-    state.theme = readLS(LS.THEME, "dark") === "light" ? "light" : "dark";
-    state.lang = readLS(LS.LANG, document.documentElement.lang === "es" ? "es" : "en") === "es" ? "es" : "en";
-
-    state.consent = readConsent();
-    state.transcript = loadTranscript();
-
-    applyTheme(state.theme);
-    applyLang(state.lang);
-    rebuildChatFromTranscript();
-
-    const isChatbotOnly = document.body && document.body.classList.contains("chatbot-only");
-    const autoOpen = (new URLSearchParams(location.search)).get("chat") === "1";
-
-    if (isChatbotOnly || autoOpen) {
-      if (UI.chatDrawer) UI.chatDrawer.classList.add("is-open");
-      setChatExpanded(true);
-      setChatBackdrop(true);
-    } else {
-      setChatExpanded(false);
-      setChatBackdrop(false);
-    }
-
-    updateChatEnabled();
-
-    if (state.consent !== "accepted") openConsentModal();
+    // If consent was accepted earlier, allow direct open
+    const c = getConsent();
+    window.__OPS_CHAT_CONSENT = c;
 
     wireEvents();
+
+    // Optional: greet only once per page load
+    systemNote(getLang() === "es"
+      ? "Hola — soy Chattia. Pregúntame sobre OPS Online Support."
+      : "Hi — I’m Chattia. Ask me about OPS Online Support.");
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  // Run
+  init();
 })();
