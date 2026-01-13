@@ -1,7 +1,7 @@
 /* assets/chattia-theme.css
-   Chattia / OPS — Theme Tokens (v2)
+   Chattia / OPS — Theme Tokens (v3) — NO TURNSTILE
    - Light/Dark via [data-theme="light|dark"]
-   - Subtle animated watermark background (optional)
+   - Tokens consumed by assets/chattia-ui.css
    - No external deps
 */
 
@@ -13,6 +13,7 @@
   --card: #f8fafc;
   --border: #e5e7eb;
   --panel: #f8fafc;
+  --panel-alt: #f1f5f9;
   --line: #e5e7eb;
   --chip: #eef2ff;
   --input: #ffffff;
@@ -23,8 +24,14 @@
   /* brand accents */
   --accent: #2563eb;
   --accent2: #22c55e;
+  --accent-contrast: #ffffff;
   --danger: #ef4444;
   --warn: #f59e0b;
+  --focus: #2563eb;
+
+  /* toggles */
+  --toggle-track: #e5e7eb;
+  --toggle-knob: #ffffff;
 
   /* shadow */
   --shadow: 0 10px 30px rgba(0,0,0,.08);
@@ -36,10 +43,14 @@
   /* typography */
   --font: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
 
-  /* background animation controls */
+  /* watermark controls + colors (used by .app::after in chattia-ui.css) */
   --wm-opacity: 0.09;         /* watermark strength */
   --wm-blur: 70px;            /* softness */
   --wm-speed: 45s;            /* cycle duration */
+  --wm-1: #2563eb;
+  --wm-2: #22c55e;
+  --wm-3: #f59e0b;
+  --wm-4: #7c3aed;
 }
 
 :root[data-theme="dark"]{
@@ -49,8 +60,9 @@
   --card: rgba(255,255,255,.06);
   --border: rgba(255,255,255,.14);
   --panel: #0f172a;
+  --panel-alt: rgba(2,6,23,.55);
   --line: rgba(148,163,184,.18);
-  --chip: rgba(30,41,59,.8);
+  --chip: rgba(30,41,59,.80);
   --input: rgba(15,23,42,.85);
   --bubble: rgba(30,41,59,.65);
   --bubble-user: rgba(96,165,250,.18);
@@ -59,12 +71,21 @@
 
   --accent: #60a5fa;
   --accent2: #34d399;
+  --accent-contrast: #0b1020;
+  --focus: #93c5fd;
+
+  --toggle-track: rgba(148,163,184,.25);
+  --toggle-knob: #e5e7eb;
 
   --wm-opacity: 0.12;
   --wm-blur: 90px;
+  --wm-1: #60a5fa;
+  --wm-2: #34d399;
+  --wm-3: #fbbf24;
+  --wm-4: #a78bfa;
 }
 
-/* optional: subtle animated watermark background */
+/* optional: subtle animated watermark background (legacy v2) */
 body::before{
   content:"";
   position: fixed;
