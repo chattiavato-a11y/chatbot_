@@ -1,15 +1,29 @@
+# worker/wrangler.ops-gateway.toml
+
 name = "ops-gateway"
 main = "ops-gateway.js"
-compatibility_date = "2024-10-01"
+compatibility_date = "2026-01-05"
+workers_dev = true
 
-kv_namespaces = [
-  { binding = "OPS_EVENTS", id = "REPLACE_WITH_OPS_EVENTS_KV_ID" },
-  { binding = "OPS_RL", id = "REPLACE_WITH_OPS_RL_KV_ID" }
-]
+# Public edge worker:
+# - Requires service binding to ops-brain
+# - Requires Workers AI binding for FIREWALL (llama-guard)
+# - Optional KV bindings (commented)
 
+[ai]
+binding = "FIREWALL"
+
+# Service binding: ops-gateway -> ops-brain
 [[services]]
 binding = "BRAIN"
 service = "ops-brain"
 
-[ai]
-binding = "FIREWALL"
+# OPTIONAL KV (only if/when you want them)
+# [[kv_namespaces]]
+# binding = "OPS_RL"
+# id = "YOUR_KV_ID_FOR_RATE_LIMIT"
+
+# [[kv_namespaces]]
+# binding = "OPS_EVENTS"
+# id = "YOUR_KV_ID_FOR_EVENTS"
+
