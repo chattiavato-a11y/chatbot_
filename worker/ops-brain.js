@@ -1,30 +1,41 @@
 /* worker/ops-brain.js
    OPS BRAIN (v3.2) — PRIVATE CORE (Service Binding target)
-   - Accepts ONLY Gateway-signed requests (HMAC + ts + nonce + body hash)
-   - Runs AI (Workers AI) for replies
-   - Pulls site content via service binding (optional): SITE_CONTENT
+
+   Gateway -> Brain (Service Binding)
 
    REQUIRED bindings:
-   - Workers AI:       AI           (model inference)
-   - Secret:           HAND_SHAKE   (must match Gateway)
+   - Workers AI:       AI         (model inference)
+   - Secret:           HAND_SHAKE (same as Gateway)
 
    OPTIONAL:
-   - Service binding:  SITE_CONTENT (content source worker)
-   - KV namespace:     OPS_NONCES   (best-effort replay protection)
    - KV namespace:     OPS_EVENTS   (minimal audit events)
+   - KV namespace:     OPS_NONCES   (best-effort nonce cache)
+   - Durable Object:   NONCE_GUARD  (strong nonce replay protection)
+     durable_objects.bindings: [{ name: "NONCE_GUARD", class_name: "OpsNonceGuard" }]
+
+   REQUIRED headers from Gateway:
+   - X-Ops-Request-Id
+   - X-Ops-Ts
+   - X-Ops-Nonce
+   - X-Ops-Body-Sha256
+   - X-Ops-Sig
+
+   Signature scheme:
+     bodySha = SHA256_HEX(rawBodyBytes)
+     toSign  = `${ts}.${nonce}.${method}.${path}.${bodySha}`
+     sig     = HMAC_SHA256_HEX(HAND_SHAKE, toSign)
 */
+
+import { OPS_SITE, OPS_SITE_RULES_EN, OPS_SITE_RULES_ES } from "./ops-site-content.js";
 
 const MODEL_ID = "@cf/meta/llama-3.1-8b-instruct-fp8";
 
 const MAX_CHAT_BYTES = 8_192;
-
 const MAX_MSG_CHARS = 256;
 const MAX_HISTORY_ITEMS = 12;
 
-const TS_SKEW_MS = 5 * 60_000; // 5 minutes
-const NONCE_TTL_DEFAULT_SEC = 10 * 60; // 10 minutes
-
-/* ------------ “Compliance-aligned” security headers (OWASP-friendly) ------------ */
+const TS_SKEW_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_NONCE_TTL_SEC = 10 * 60; // 10 minutes (for gateway->brain replay)
 
 const API_CSP = [
   "default-src 'none'",
@@ -45,22 +56,20 @@ const PERMISSIONS_POLICY = [
 function securityHeaders() {
   return {
     "Content-Security-Policy": API_CSP,
+    "Permissions-Policy": PERMISSIONS_POLICY,
+    "Cross-Origin-Resource-Policy": "same-origin",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
-    "Permissions-Policy": PERMISSIONS_POLICY,
-    "Cross-Origin-Resource-Policy": "same-origin",
     "X-Permitted-Cross-Domain-Policies": "none",
     "X-DNS-Prefetch-Control": "off",
     "X-XSS-Protection": "0",
-    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
     "Cache-Control": "no-store, max-age=0",
     "Pragma": "no-cache",
     "X-Robots-Tag": "noindex, nofollow"
   };
 }
-
-/* -------------------- Responses -------------------- */
 
 function json(status, obj, extra = {}) {
   return new Response(JSON.stringify(obj), {
@@ -97,14 +106,8 @@ function looksSuspicious(s) {
   return badPatterns.some(p => t.includes(p));
 }
 
-async function readBodyArrayBufferLimited(request, limitBytes) {
-  const len = Number(request.headers.get("content-length") || "0");
-  if (len && len > limitBytes) return null;
-
-  const ab = await request.arrayBuffer();
-  if (!ab || ab.byteLength === 0) return null;
-  if (ab.byteLength > limitBytes) return null;
-  return ab;
+function hasDataUriBase64(s) {
+  return /data:\s*[^;]+;\s*base64\s*,/i.test(String(s || ""));
 }
 
 function safeJsonParse(text) {
@@ -129,7 +132,15 @@ function sanitizeHistory(historyIn) {
   return out;
 }
 
-/* -------------------- PCI-ish DLP: block payment cards (never collect) -------------------- */
+async function readBodyArrayBufferLimited(request, limitBytes) {
+  const len = Number(request.headers.get("content-length") || "0");
+  if (len && len > limitBytes) return null;
+
+  const ab = await request.arrayBuffer();
+  if (!ab || ab.byteLength === 0) return null;
+  if (ab.byteLength > limitBytes) return null;
+  return ab;
+}
 
 function digitsOnly(s) {
   return String(s || "").replace(/\D/g, "");
@@ -161,24 +172,7 @@ function containsLikelyCardNumber(text) {
   return false;
 }
 
-/* -------------------- Privacy: IP tagging (hash) -------------------- */
-
-function bytesToHex(bytes) {
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function sha256HexFromString(s) {
-  const ab = new TextEncoder().encode(String(s || "")).buffer;
-  const digest = await crypto.subtle.digest("SHA-256", ab);
-  return bytesToHex(new Uint8Array(digest));
-}
-
-async function ipTag(ip) {
-  const hex = await sha256HexFromString(ip);
-  return hex.slice(0, 16);
-}
-
-/* -------------------- Minimal audit logging (no raw messages, no raw IP) -------------------- */
+/* -------------------- Minimal audit (no raw messages) -------------------- */
 
 function randHex(byteLen = 16) {
   const b = new Uint8Array(byteLen);
@@ -186,40 +180,43 @@ function randHex(byteLen = 16) {
   return Array.from(b).map(x => x.toString(16).padStart(2, "0")).join("");
 }
 
+function bytesToHex(bytes) {
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Hex(text) {
+  const data = new TextEncoder().encode(String(text || ""));
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return bytesToHex(new Uint8Array(digest));
+}
+
+async function ipTag(ip) {
+  const h = await sha256Hex(ip || "");
+  return h.slice(0, 16);
+}
+
 async function logEvent(ctx, env, event) {
-  const safe = { ts: new Date().toISOString(), ...event };
-  console.warn("[OPS_EVENT]", JSON.stringify(safe));
-
-  const kv = env.OPS_EVENTS;
-  if (kv && typeof kv.put === "function") {
-    const key = `ops_evt:${Date.now()}:${randHex(8)}`;
-    ctx.waitUntil(
-      kv.put(key, JSON.stringify(safe), { expirationTtl: 60 * 60 * 24 * 7 }).catch(() => {})
-    );
-  }
-}
-
-/* -------------------- Replay protection (best-effort) -------------------- */
-
-function clampNonceTtlSec(env) {
-  const raw = Number(env.NONCE_TTL_SEC || "");
-  if (!Number.isFinite(raw) || raw <= 0) return NONCE_TTL_DEFAULT_SEC;
-  return Math.max(60, Math.min(60 * 60, Math.floor(raw))); // 1m..1h
-}
-
-async function nonceReplayCheck(env, nonce, ttlSec) {
-  const kv = env.OPS_NONCES;
-  if (!kv || typeof kv.get !== "function" || typeof kv.put !== "function") return { ok: true, skipped: true };
-
   try {
-    const key = `nonce:${nonce}`;
-    const hit = await kv.get(key);
-    if (hit) return { ok: false };
-    await kv.put(key, "1", { expirationTtl: ttlSec });
-    return { ok: true };
+    const safe = {
+      ts: new Date().toISOString(),
+      type: String(event?.type || ""),
+      ip_tag: event?.ip_tag,
+      path: event?.path,
+      request_id: event?.request_id,
+      lang: event?.lang,
+      history_len: event?.history_len,
+      msg_len: event?.msg_len,
+      reason: event?.reason
+    };
+    console.warn("[OPS_EVENT]", JSON.stringify(safe));
+
+    const kv = env.OPS_EVENTS;
+    if (kv && typeof kv.put === "function") {
+      const key = `ops_evt:${Date.now()}:${randHex(8)}`;
+      ctx.waitUntil(kv.put(key, JSON.stringify(safe), { expirationTtl: 60 * 60 * 24 * 7 }));
+    }
   } catch (e) {
-    console.error("nonceReplayCheck KV error (ignored):", e);
-    return { ok: true, skipped: true };
+    console.error("logEvent failed:", e);
   }
 }
 
@@ -251,42 +248,164 @@ function timingSafeEqualHex(a, b) {
   return out === 0;
 }
 
-/* -------------------- Site content (optional) -------------------- */
+// Clamp NONCE_TTL_SECONDS (default 10 min) for KV TTL minimums before replay checks.
+function clampNonceTtlSec(env) {
+  const raw = Number(env.NONCE_TTL_SECONDS || DEFAULT_NONCE_TTL_SEC);
+  const ttl = Number.isFinite(raw) ? Math.floor(raw) : DEFAULT_NONCE_TTL_SEC;
+  return Math.max(60, ttl); // Cloudflare KV TTL must be >= 60
+}
 
-async function getSiteContext(env, lang) {
-  const svc = env.SITE_CONTENT;
-  if (!svc || typeof svc.fetch !== "function") return "";
+/* -------------------- Nonce replay protection -------------------- */
+
+async function nonceReplayCheck(env, nonce, ttlSec) {
+  if (!nonce) return { ok: false, reason: "missing_nonce" };
+
+  // Strong path: Durable Object
+  if (env.NONCE_GUARD && typeof env.NONCE_GUARD.idFromName === "function") {
+    const id = env.NONCE_GUARD.idFromName("ops_nonce_guard");
+    const stub = env.NONCE_GUARD.get(id);
+    const r = await stub.fetch("https://nonce.local/check", {
+      method: "POST",
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ nonce, ttlSec })
+    });
+    const out = await r.json().catch(() => null);
+    return out && out.ok ? { ok: true } : { ok: false, reason: out?.reason || "replay" };
+  }
+
+  // Best-effort path: KV (eventual consistency)
+  const kv = env.OPS_NONCES;
+  if (kv && typeof kv.get === "function" && typeof kv.put === "function") {
+    const key = `nonce:${nonce}`;
+    const existing = await kv.get(key);
+    if (existing) return { ok: false, reason: "replay" };
+    await kv.put(key, "1", { expirationTtl: ttlSec });
+    return { ok: true };
+  }
+
+  // Fail-open if no storage
+  return { ok: true, skipped: true };
+}
+
+/* -------------------- Optional firewall (defense-in-depth) -------------------- */
+
+async function firewallCheck(env, textToCheck) {
+  const fw = env.FIREWALL;
+  if (!fw || typeof fw.run !== "function") return { ok: true, skipped: true };
 
   try {
-    const r = await svc.fetch("https://site-content.local/api/content?lang=" + encodeURIComponent(lang || "en"));
-    if (!r.ok) return "";
-    const data = await r.json().catch(() => null);
-    const text = String(data?.text || "").trim();
-    return text;
-  } catch {
-    return "";
+    const out = await fw.run("@cf/meta/llama-guard-3-8b", { prompt: String(textToCheck || "") });
+    const resp = String(out?.response || out?.result || "").trim().toLowerCase();
+    if (!resp) return { ok: true, skipped: true };
+    if (resp.includes("unsafe")) return { ok: false };
+    if (resp === "safe") return { ok: true };
+    return { ok: true };
+  } catch (e) {
+    console.error("FIREWALL llama-guard failed (ignored):", e);
+    return { ok: true, skipped: true };
   }
 }
 
-/* -------------------- Main Worker -------------------- */
+/* -------------------- Output sanitizer -------------------- */
+
+function sanitizeAssistantOutput(text) {
+  let t = String(text || "");
+  // kill control chars
+  t = t.replace(/[\u0000-\u001F\u007F]/g, " ");
+  // block any HTML-ish tags (keep plain text)
+  t = t.replace(/</g, "‹").replace(/>/g, "›");
+  // collapse whitespace
+  t = t.replace(/\s+/g, " ").trim();
+  // hard cap
+  if (t.length > 1600) t = t.slice(0, 1600);
+  return t;
+}
+
+function buildSiteContext(lang) {
+  const routes = OPS_SITE.routes;
+  const services = lang === "es" ? OPS_SITE.services_es : OPS_SITE.services_en;
+  const positioning = lang === "es" ? OPS_SITE.positioning_es : OPS_SITE.positioning_en;
+  const contactCta = lang === "es" ? OPS_SITE.contact_cta_es : OPS_SITE.contact_cta_en;
+  const careersCta = lang === "es" ? OPS_SITE.careers_cta_es : OPS_SITE.contact_cta_en;
+  const whereToFind = lang === "es" ? OPS_SITE.where_to_find_es : OPS_SITE.where_to_find_en;
+
+  return [
+    `Site: ${OPS_SITE.brand} (${OPS_SITE.base_url}).`,
+    `Positioning: ${positioning}`,
+    `Services: ${services.join(" ")}`,
+    `Routes: home ${routes.home}, about ${routes.about}, contact ${routes.contact}, policies ${routes.policies}, careers ${routes.careers}.`,
+    `CTAs: ${contactCta} ${careersCta}`,
+    `Finders: services=${whereToFind.services} policies=${whereToFind.policies} contact=${whereToFind.contact} careers=${whereToFind.careers}`
+  ].join(" ");
+}
+
+/* -------------------- Durable Object (strong nonce guard) -------------------- */
+
+export class OpsNonceGuard {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    if (url.pathname !== "/check" || request.method !== "POST") {
+      return new Response("Not found", { status: 404 });
+    }
+
+    const body = await request.json().catch(() => null);
+    const nonce = String(body?.nonce || "");
+    // Default to 10 minutes; enforce >= 60 seconds for storage hygiene.
+    const ttlSec = Math.max(60, Math.floor(Number(body?.ttlSec || DEFAULT_NONCE_TTL_SEC)));
+    if (!nonce) return json(400, { ok: false, reason: "missing_nonce" });
+
+    const now = Date.now();
+    const rec = await this.state.storage.get(nonce);
+
+    if (rec && typeof rec === "object" && Number(rec.exp) > now) {
+      return json(409, { ok: false, reason: "replay" });
+    }
+
+    await this.state.storage.put(nonce, { exp: now + ttlSec * 1000 });
+
+    // Lightweight opportunistic cleanup (rare)
+    if ((now % 997) === 0) {
+      try {
+        const list = await this.state.storage.list({ limit: 64 });
+        for (const [k, v] of list.entries()) {
+          if (v && typeof v === "object" && Number(v.exp) <= now) {
+            await this.state.storage.delete(k);
+          }
+        }
+      } catch {}
+    }
+
+    return json(200, { ok: true });
+  }
+}
+
+/* -------------------- Main Brain Worker -------------------- */
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const pathname = url.pathname || "/";
-    const clientIp = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
     const reqId = request.headers.get("X-Ops-Request-Id") || `req_${Date.now()}_${randHex(6)}`;
+    const clientIp = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
 
-    // health
-    if (request.method === "GET" && (pathname === "/" || pathname === "/ping" || pathname === "/health")) {
+    // Health
+    if (request.method === "GET" && (pathname === "/" || pathname === "/health" || pathname === "/ping")) {
       return json(200, {
         ok: true,
         service: "ops-brain",
+        has_ai: !!(env.AI && typeof env.AI.run === "function"),
+        has_nonce_guard_do: !!(env.NONCE_GUARD && typeof env.NONCE_GUARD.idFromName === "function"),
+        has_nonce_kv: !!(env.OPS_NONCES && typeof env.OPS_NONCES.get === "function"),
         request_id: reqId
       }, { "X-Ops-Request-Id": reqId });
     }
 
-    // Only the chat endpoint
+    // Only API
     if (pathname !== "/api/ops-online-chat") {
       return json(404, { ok: false, error: "Not found.", error_code: "NOT_FOUND", request_id: reqId }, { "X-Ops-Request-Id": reqId });
     }
@@ -306,32 +425,19 @@ export default {
       return json(413, { ok: false, error: "Request too large or empty.", error_code: "TOO_LARGE", request_id: reqId }, { "X-Ops-Request-Id": reqId });
     }
 
-    // Verify body hash header
-    const bodyShaHdr = String(request.headers.get("X-Ops-Body-Sha256") || "");
-    if (!bodyShaHdr || bodyShaHdr.length < 16) {
-      const tag = await ipTag(clientIp);
-      await logEvent(ctx, env, { type: "AUTH_MISSING_BODY_SHA", ip_tag: tag, request_id: reqId });
-      return json(401, { ok: false, error: "Unauthorized.", error_code: "NO_BODY_SHA", request_id: reqId }, { "X-Ops-Request-Id": reqId });
-    }
-
-    const bodySha = await sha256HexFromArrayBuffer(raw);
-    if (!timingSafeEqualHex(bodySha, bodyShaHdr)) {
-      const tag = await ipTag(clientIp);
-      await logEvent(ctx, env, { type: "AUTH_BODY_SHA_MISMATCH", ip_tag: tag, request_id: reqId });
-      return json(401, { ok: false, error: "Unauthorized.", error_code: "BAD_BODY_SHA", request_id: reqId }, { "X-Ops-Request-Id": reqId });
-    }
-
-    // Verify HMAC signature headers
+    // Verify required headers
     const ts = String(request.headers.get("X-Ops-Ts") || "");
     const nonce = String(request.headers.get("X-Ops-Nonce") || "");
+    const bodyShaHdr = String(request.headers.get("X-Ops-Body-Sha256") || "");
     const sigHdr = String(request.headers.get("X-Ops-Sig") || "");
 
-    if (!ts || !nonce || !sigHdr) {
+    if (!ts || !nonce || !bodyShaHdr || !sigHdr) {
       const tag = await ipTag(clientIp);
-      await logEvent(ctx, env, { type: "AUTH_MISSING_SIG_HEADERS", ip_tag: tag, request_id: reqId });
-      return json(401, { ok: false, error: "Unauthorized.", error_code: "NO_SIG_HEADERS", request_id: reqId }, { "X-Ops-Request-Id": reqId });
+      await logEvent(ctx, env, { type: "AUTH_MISSING_HEADERS", ip_tag: tag, path: pathname, request_id: reqId });
+      return json(401, { ok: false, error: "Unauthorized.", error_code: "AUTH_HEADERS", request_id: reqId }, { "X-Ops-Request-Id": reqId });
     }
 
+    // Timestamp skew check
     const tsNum = Number(ts);
     if (!Number.isFinite(tsNum) || Math.abs(Date.now() - tsNum) > TS_SKEW_MS) {
       const tag = await ipTag(clientIp);
@@ -339,6 +445,15 @@ export default {
       return json(401, { ok: false, error: "Unauthorized.", error_code: "TS_SKEW", request_id: reqId }, { "X-Ops-Request-Id": reqId });
     }
 
+    // Body SHA check
+    const bodySha = await sha256HexFromArrayBuffer(raw);
+    if (!timingSafeEqualHex(bodySha, bodyShaHdr)) {
+      const tag = await ipTag(clientIp);
+      await logEvent(ctx, env, { type: "AUTH_BODY_SHA_MISMATCH", ip_tag: tag, request_id: reqId });
+      return json(401, { ok: false, error: "Unauthorized.", error_code: "BODY_SHA", request_id: reqId }, { "X-Ops-Request-Id": reqId });
+    }
+
+    // HMAC signature verify
     const secret = String(env.HAND_SHAKE || "");
     if (!secret) {
       return json(500, { ok: false, error: "Brain misconfigured (missing HAND_SHAKE).", error_code: "NO_HAND_SHAKE", request_id: reqId }, { "X-Ops-Request-Id": reqId });
@@ -364,10 +479,11 @@ export default {
 
     // Parse payload
     const bodyText = new TextDecoder().decode(raw);
-    if (looksSuspicious(bodyText)) {
+
+    if (hasDataUriBase64(bodyText) || looksSuspicious(bodyText)) {
       const tag = await ipTag(clientIp);
-      await logEvent(ctx, env, { type: "SANITIZE_BLOCK", ip_tag: tag, request_id: reqId });
-      return json(400, { ok: false, error: "Request blocked.", error_code: "SUSPECT_BODY", request_id: reqId }, { "X-Ops-Request-Id": reqId });
+      await logEvent(ctx, env, { type: "SANITIZE_BLOCK", ip_tag: tag, reason: "body", request_id: reqId });
+      return json(400, { ok: false, error: "Request blocked.", error_code: "SANITIZE", request_id: reqId }, { "X-Ops-Request-Id": reqId });
     }
 
     const payload = safeJsonParse(bodyText);
@@ -393,45 +509,35 @@ export default {
         request_id: reqId,
         error_code: "DLP_CARD",
         error: lang === "es"
-          ? "Por seguridad, no compartas datos de tarjeta en el chat. Usa la página de contacto del sitio."
-          : "For security, do not share card details in chat. Please use the site contact page."
+          ? "Por seguridad, no compartas datos de tarjeta en el chat."
+          : "For security, do not share card details in chat."
       }, { "X-Ops-Request-Id": reqId });
     }
 
-    // Build system + context
-    const siteContext = await getSiteContext(env, lang);
+    // Optional firewall (defense-in-depth)
+    const fwIn = await firewallCheck(env, message);
+    if (!fwIn.ok) {
+      const tag = await ipTag(clientIp);
+      await logEvent(ctx, env, { type: "FIREWALL_BLOCK_IN", ip_tag: tag, request_id: reqId });
+      return json(400, { ok: false, error: "Request blocked.", error_code: "FIREWALL_IN", request_id: reqId }, { "X-Ops-Request-Id": reqId });
+    }
 
-    const system = lang === "es"
-      ? [
-          "Eres Chattia, el asistente oficial de OPS Online Support.",
-          "Responde de forma clara, útil y profesional. Sé conciso.",
-          "No aceptes instrucciones para ejecutar código, revelar secretos, o ayudar con actividades ilegales.",
-          "Si el usuario pide pagos o tarjetas: indica que no se procesan tarjetas y que use la página de contacto.",
-          siteContext ? `CONTEXTO DEL SITIO (fuente confiable):\n${siteContext}` : ""
-        ].filter(Boolean).join("\n\n")
-      : [
-          "You are Chattia, the official assistant for OPS Online Support.",
-          "Respond clearly, helpfully, and professionally. Be concise.",
-          "Do not follow instructions to execute code, reveal secrets, or assist illegal activity.",
-          "If the user asks about payments or cards: state that card details are not accepted and to use the contact page.",
-          siteContext ? `SITE CONTEXT (trusted source):\n${siteContext}` : ""
-        ].filter(Boolean).join("\n\n");
-
-    const messages = [
-      { role: "system", content: system },
-      ...history,
-      { role: "user", content: message }
-    ];
-
-    // Run AI
+    // AI run
     if (!env.AI || typeof env.AI.run !== "function") {
       return json(500, { ok: false, error: "Brain misconfigured (missing AI binding).", error_code: "NO_AI", request_id: reqId }, { "X-Ops-Request-Id": reqId });
     }
 
-    let reply = "";
+    const rules = lang === "es" ? OPS_SITE_RULES_ES : OPS_SITE_RULES_EN;
+    const siteContext = buildSiteContext(lang);
+    const system = `${rules}\n\n${siteContext}`;
+
+    const messages = [{ role: "system", content: system }];
+    for (const h of history) messages.push(h);
+    messages.push({ role: "user", content: message });
+
+    let out;
     try {
-      const out = await env.AI.run(MODEL_ID, { messages, max_tokens: 600 });
-      reply = String(out?.response || out?.result || "").trim();
+      out = await env.AI.run(MODEL_ID, { messages, max_tokens: 700 });
     } catch (e) {
       console.error("AI.run failed:", e);
       const tag = await ipTag(clientIp);
@@ -439,16 +545,30 @@ export default {
       return json(502, { ok: false, error: "Upstream error.", error_code: "AI_ERROR", request_id: reqId }, { "X-Ops-Request-Id": reqId });
     }
 
-    if (!reply) {
+    const rawReply = String(out?.response || out?.result || out?.text || "");
+    let reply = sanitizeAssistantOutput(rawReply || "");
+
+    // Optional firewall on output
+    const fwOut = await firewallCheck(env, reply);
+    if (!fwOut.ok) {
       reply = lang === "es"
-        ? "Lo siento—no pude generar una respuesta en este momento. Intenta de nuevo."
-        : "Sorry—I couldn’t generate a response right now. Please try again.";
+        ? "Lo siento, no puedo ayudar con eso."
+        : "Sorry, I can’t help with that.";
+      const tag = await ipTag(clientIp);
+      await logEvent(ctx, env, { type: "FIREWALL_BLOCK_OUT", ip_tag: tag, request_id: reqId });
     }
 
-    return json(200, {
-      ok: true,
+    // Minimal audit (no raw message)
+    const tag = await ipTag(clientIp);
+    await logEvent(ctx, env, {
+      type: "CHAT_OK",
+      ip_tag: tag,
+      lang,
       request_id: reqId,
-      reply
-    }, { "X-Ops-Request-Id": reqId });
+      history_len: history.length,
+      msg_len: message.length
+    });
+
+    return json(200, { ok: true, lang, request_id: reqId, reply }, { "X-Ops-Request-Id": reqId });
   }
 };
