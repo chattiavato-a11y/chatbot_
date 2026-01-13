@@ -1,9 +1,7 @@
 <!-- index.html
-     OPS Online Support — Chat Only (No Turnstile)
-
-     Required meta (used by assets/chattia-ui.js):
-     - ops-gateway
-     - ops-asset-id
+     Chattia (OPS Online Support) — Chat Only (NO TURNSTILE)
+     - Calls OPS Gateway: /api/ops-online-chat
+     - Requires X-Ops-Asset-Id header (set by assets/chattia-ui.js from meta ops-asset-id)
 -->
 
 <!doctype html>
@@ -13,12 +11,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Chattia • Chat</title>
 
-  <!-- Basic hardening (best delivered via headers, but meta helps on static hosting) -->
+  <!-- Basic hardening (best via headers; meta helps on static hosting) -->
   <meta name="referrer" content="no-referrer" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta http-equiv="X-Frame-Options" content="DENY" />
 
-  <!-- CSP: strict; allow only gateway for API calls -->
+  <!-- CSP: NO Turnstile, connect only to the gateway -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'none';
     base-uri 'none';
@@ -36,6 +34,7 @@
 
   <!-- OPS Gateway config -->
   <meta name="ops-gateway" content="https://ops-gateway.grabem-holdem-nuts-right.workers.dev" />
+  <!-- MUST match OPS_ASSET_IDS allowlist in the gateway env -->
   <meta name="ops-asset-id" content="ops-online-support-site" />
 
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
@@ -43,6 +42,7 @@
   <link rel="stylesheet" href="/assets/chattia-theme.css" />
   <link rel="stylesheet" href="/assets/chattia-ui.css" />
 
+  <!-- Language bootstrap (applies data-i18n strings + sets <html lang>) -->
   <script defer src="/assets/chattia-head-lang.js"></script>
 </head>
 
@@ -53,12 +53,12 @@
       <div class="brand">
         <span class="brand-dot" aria-hidden="true"></span>
         <div class="brand-text">
-          <strong>OPS Online Support</strong>
-          <span class="sub" data-i18n="topbar_sub">Secure Chat</span>
+          <strong class="brand-title">OPS Online Support</strong>
+          <span class="sub brand-subtitle" data-i18n="topbar_sub">Secure Chat</span>
         </div>
       </div>
 
-      <!-- ONLY place we keep lang/theme toggles (unique IDs) -->
+      <!-- Unique IDs (only here, not duplicated) -->
       <div class="top-actions">
         <button class="btn btn-ghost" id="themeToggle" type="button" aria-pressed="false" aria-label="Toggle theme">
           <span class="icon" aria-hidden="true">☾</span>
@@ -85,10 +85,12 @@
             <h3 data-i18n="card1_title">Fast answers</h3>
             <p data-i18n="card1_desc">Get clear information about OPS offerings and next steps.</p>
           </article>
+
           <article class="card">
             <h3 data-i18n="card2_title">Secure by design</h3>
             <p data-i18n="card2_desc">No uploads, no sensitive info, and anti-abuse protections.</p>
           </article>
+
           <article class="card">
             <h3 data-i18n="card3_title">Lead-ready</h3>
             <p data-i18n="card3_desc">When you’re ready, we’ll route you to contact or sales.</p>
@@ -97,7 +99,7 @@
       </section>
     </main>
 
-    <!-- Floating action button -->
+    <!-- Floating chat button -->
     <button class="fab" id="fabChat" type="button" aria-label="Open chat" aria-expanded="false">
       <span class="fab-icon" aria-hidden="true">💬</span>
     </button>
@@ -110,24 +112,29 @@
           <button class="btn btn-ghost" id="consentClose" type="button" aria-label="Close privacy and consent">✕</button>
         </div>
 
-        <p class="modal-text" data-i18n="consent_body">
-          Chat interactions may be used to improve and train the chatbot experience. Please do not enter sensitive personal information.
-          OPS Online Support does not intentionally collect payment card data, banking info, passwords, or one-time codes.
-        </p>
+        <div class="modal-body">
+          <p class="modal-text" data-i18n="consent_body">
+            Chat interactions may be used to improve and train the chatbot experience. Please do not enter sensitive personal information.
+            OPS Online Support does not intentionally collect payment card data, banking info, passwords, or one-time codes.
+          </p>
+        </div>
 
         <div class="modal-actions">
           <button class="btn btn-secondary" id="consentDeny" value="deny" type="submit" data-i18n="consent_deny">Deny</button>
           <button class="btn btn-primary" id="consentAccept" value="accept" type="submit" data-i18n="consent_accept">Accept</button>
         </div>
 
-        <p class="modal-footnote" data-i18n="consent_note">
-          If you deny consent, chat will remain disabled until you accept.
-        </p>
+        <div class="modal-body">
+          <p class="modal-footnote" data-i18n="consent_note">
+            If you deny consent, chat will remain disabled until you accept.
+          </p>
+        </div>
       </form>
     </dialog>
 
-    <!-- Chat Panel -->
+    <!-- Chat Drawer -->
     <div class="backdrop" id="chatBackdrop" aria-hidden="true"></div>
+
     <aside class="chat-drawer" id="chatDrawer" aria-label="Chattia" aria-hidden="true">
       <header class="chat-header">
         <div class="chat-title">
@@ -135,7 +142,6 @@
         </div>
 
         <div class="chat-header-actions">
-          <!-- No duplicate theme/lang IDs here -->
           <button class="btn btn-ghost" id="chatTranscript" type="button" aria-label="Open transcript">⎘</button>
           <button class="btn btn-ghost" id="chatClear" type="button" aria-label="Clear chat">⟲</button>
           <button class="btn btn-ghost" id="chatClose" type="button" aria-label="Close chat">✕</button>
@@ -146,12 +152,20 @@
 
       <footer class="chat-footer">
         <form class="chat-form" id="chatForm" autocomplete="off">
-          <!-- Honeypots -->
+          <!-- Honeypots (must remain empty) -->
           <input class="hp" type="text" name="hp_email" id="hp_email" autocomplete="off" tabindex="-1" aria-hidden="true" hidden />
           <input class="hp" type="text" name="hp_website" id="hp_website" autocomplete="off" tabindex="-1" aria-hidden="true" hidden />
 
-          <input class="chat-input" id="chatMessage" name="message" type="text" inputmode="text" maxlength="256"
-                 placeholder="Type your message…" aria-label="Your message" />
+          <input
+            class="chat-input"
+            id="chatMessage"
+            name="message"
+            type="text"
+            inputmode="text"
+            maxlength="256"
+            placeholder="Type your message…"
+            aria-label="Your message"
+          />
           <button class="btn btn-primary" type="submit" aria-label="Send message">Send</button>
         </form>
 
