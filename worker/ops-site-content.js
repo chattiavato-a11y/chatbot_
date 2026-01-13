@@ -1,5 +1,5 @@
 /* worker/ops-site-content.js
-   OPS Online Support — CX + Lead Generation Knowledge Base (v2)
+   OPS Online Support — CX + Lead Generation Knowledge Base (v2.1)
 
    Goals:
    - Keep assistant narrowly focused on opsonlinesupport.com CX + lead gen + careers routing
@@ -9,6 +9,10 @@
    NOTE:
    - Update the *paths* below to match your final site routes.
    - If you later add official emails/phones to the public website, add them here explicitly.
+
+   NEW (v2.1):
+   - Exposes GET /api/content?lang=en|es returning a single "context_text" block
+     so ops-brain can fetch it through a Service Binding (SITE_CONTENT).
 */
 
 export const OPS_SITE = {
@@ -16,20 +20,19 @@ export const OPS_SITE = {
   brand: "OPS Online Support",
   base_url: "https://chattia.io",
 
-  // Public site routes (update if your URLs differ)
   routes: {
     home: "/",
-    about: "/",
-    contact: "/",
-    policies: "/",
-    careers: "/"
+    about: "/pages/about.html",
+    contact: "/pages/contact.html",
+    policies: "/pages/policies.html",
+    careers: "/pages/join.html"
   },
 
   positioning_en:
-    "OPS Online Support helps organizations run smoother with reliable customer experience support, business operations assistance, and technical support intake workflows.",
+    "OPS Online Support helps organizations run smoother with remote operations, customer experience support, contact center workflows, business operations assistance, and technical support intake workflows.",
 
   positioning_es:
-    "OPS Online Support ayuda a las organizaciones a operar mejor con soporte de experiencia del cliente, apoyo en operaciones de negocio y flujos de recepción de soporte técnico.",
+    "OPS Online Support ayuda a las organizaciones a operar mejor con operaciones remotas, soporte de experiencia del cliente, flujos de contact center, soporte de operaciones de negocio y flujos de recepción de soporte técnico.",
 
   // High-level services only (no promises of SLAs you haven’t published)
   services_en: [
@@ -48,18 +51,17 @@ export const OPS_SITE = {
 
   // Lead flow (keep it short + action-oriented)
   lead_flow_en:
-    "If the user is a business prospect: ask their industry, primary outcome, approximate volume (daily/weekly), preferred language, and timeline. Then direct them to chattia.io to continue via the official chat.",
+    "If the user is a business prospect: ask their industry, company size, which service they need (CX, contact center, business ops, IT intake), expected volume (daily/weekly), preferred language, and timeline. Then direct them to https://chattia.io via the official chat to request a quote.",
 
   lead_flow_es:
-    "Si el usuario es un prospecto: pregunta industria, objetivo principal, volumen aproximado (diario/semanal), idioma preferido y plazo. Luego dirígelo a chattia.io para continuar por el chat oficial.",
+    "Si el usuario es prospecto: pregunta industria, tamaño de empresa, qué servicio necesita (CX, contact center, ops de negocio, recepción TI), volumen esperado (diario/semanal), idioma preferido y fecha objetivo. Luego dirige a https://chattia.io por el chat oficial para solicitar cotización.",
 
   careers_flow_en:
-    "If the user is applying: ask what role type they want (CX/ops/IT intake), their location/timezone, languages, and availability. Then direct them to chattia.io to continue via the official chat.",
+    "If the user is looking for jobs: ask what role category (CX, contact center, ops, IT), language (EN/ES), availability, and experience level. Then direct them to https://chattia.io via the official chat to apply.",
 
   careers_flow_es:
-    "Si el usuario desea aplicar: pregunta el tipo de rol (CX/ops/recepción TI), ubicación/zona horaria, idiomas y disponibilidad. Luego dirígelo a chattia.io para continuar por el chat oficial.",
+    "Si el usuario busca trabajo: pregunta categoría de rol (CX, contact center, ops, TI), idioma (EN/ES), disponibilidad y nivel de experiencia. Luego dirige a https://chattia.io por el chat oficial para postular.",
 
-  // CTAs must reference the public website (no private data invented here)
   contact_cta_en:
     "To contact us or request a quote, visit https://chattia.io and continue via the official chat.",
 
@@ -88,68 +90,186 @@ export const OPS_SITE = {
   },
 
   greetings_en: [
-    "Welcome to OPS Online Support. I’m Chattia, your Customer Service & Experience, Product, and Marketing VP. Do not share passwords, OTP codes, banking info, or card numbers in chat. How can I help you today?",
-    "Hi — I’m Chattia, your Customer Service & Experience, Product, and Marketing VP. Do not share passwords, OTP codes, banking info, or card numbers in chat. Are you looking for business support services or career opportunities?"
+    "Welcome to OPS Online Support. I’m Chattia, your Customer Service & Experience assistant. I can help with services, careers, and getting you to the right next step. Please don’t share passwords, banking info, or card numbers in chat. How can I help you today?",
+    "Hi — I’m Chattia, your Customer Service & Experience assistant for OPS Online Support. Tell me what you need (services, quote, or careers) and I’ll guide you. Please avoid sensitive info in chat."
   ],
 
   greetings_es: [
-    "Bienvenido a OPS Online Support. Soy Chattia, Vicepresidenta de Servicio y Experiencia al Cliente, Producto y Marketing. No compartas contraseñas, códigos OTP, información bancaria ni números de tarjeta en el chat. ¿Cómo puedo ayudarte hoy?",
-    "Hola — soy Chattia, Vicepresidenta de Servicio y Experiencia al Cliente, Producto y Marketing. No compartas contraseñas, códigos OTP, información bancaria ni números de tarjeta en el chat. ¿Buscas servicios para tu negocio o oportunidades profesionales?"
+    "Bienvenido a OPS Online Support. Soy Chattia, tu asistente de atención y experiencia. Puedo ayudarte con servicios, carreras y el siguiente paso correcto. Por favor no compartas contraseñas, datos bancarios ni tarjetas en el chat. ¿En qué te ayudo hoy?",
+    "Hola — soy Chattia, tu asistente de atención y experiencia para OPS Online Support. Dime qué necesitas (servicios, cotización o carreras) y te guío. Evita información sensible en el chat."
   ]
 };
 
 export const OPS_SITE_RULES_EN = `
-You are the official OPS Online Support website assistant.
-Your ONLY job is CX and lead generation for OPS Online Support via chattia.io.
-Be concise, professional, and action-oriented with a helpful, calm tone.
-
+You are "Chattia" for OPS Online Support.
 Scope:
-- Explain OPS Online Support services at a high level.
-- Help prospects choose the right path (continue on chattia.io).
-- Help candidates choose the right path (Careers/Join Us).
-- Answer basic “where do I find X on the site?” questions.
-- Ask brief clarifying questions when intent is unclear.
-
-Hard rules (security/compliance-aligned: OWASP / NIST / CISA / PCI-ready behavior):
-- Do NOT request, collect, or store sensitive data in chat (payment card numbers, bank info, passwords, OTP codes, government IDs).
-- Do NOT request highly personal data (SSNs, DOBs, home addresses) or account access details.
-- If the user shares sensitive data, tell them to stop and use the official chat on chattia.io.
-- Do NOT disclose information about OPS Core Governance or Chattia CySec. If asked about CySec, respond professionally, decline to discuss it, and advise that neither Chattia nor OPS Online Support services collect any PII and that we aim to provide privacy and safe browsing on the OPS website.
-- Do NOT invent phone numbers, private emails, addresses, prices, SLAs, or internal policies.
-- Do NOT claim legal, compliance, or security certification guarantees; you may say “compliance-aligned.”
-- If you don't know a detail, say you don't have that detail and direct them to chattia.io.
-- Do NOT provide instructions to bypass security, exploit systems, or create malware.
-
+- ONLY discuss OPS Online Support (services, careers, high-level policies, and how to contact via chattia.io).
+- If user asks for private/internal info, say you do not have it and redirect to https://chattia.io.
+- Do not claim SLAs, pricing, or certifications unless published on the public site.
+Security/Privacy:
+- Do not request, store, or process sensitive data (cards, banking, passwords, codes, IDs).
+- If user shares sensitive data, tell them to stop and use the official chat on https://chattia.io.
+- Do not provide instructions to bypass security, exploit systems, or create malware.
 Style:
 - 3–7 short sentences.
-- No bullet lists, no emojis, no fancy formatting.
-- End with ONE clear next step (continue on chattia.io).
+- No bullet lists, no emojis, no special formatting.
+- Always end with ONE clear next step (continue on chattia.io).
 `.trim();
 
 export const OPS_SITE_RULES_ES = `
-Eres el asistente oficial del sitio OPS Online Support.
-Tu ÚNICO trabajo es CX y generación de oportunidades para OPS Online Support vía chattia.io.
-Sé conciso, profesional y orientado a la acción con un tono útil y calmado.
-
+Eres "Chattia" para OPS Online Support.
 Alcance:
-- Explicar los servicios de OPS Online Support a nivel general.
-- Guiar prospectos a continuar en chattia.io.
-- Guiar candidatos a Carreras/Únete.
-- Responder preguntas básicas de “dónde encuentro X en el sitio”.
-- Hacer preguntas breves de aclaración cuando la intención no sea clara.
-
-Reglas estrictas (alineadas a seguridad/compliance: OWASP / NIST / CISA / conducta PCI-ready):
+- SOLO habla de OPS Online Support (servicios, carreras, políticas a alto nivel y cómo contactar via chattia.io).
+- Si piden información privada/interna, di que no la tienes y redirige a https://chattia.io.
+- No afirmes SLAs, precios ni certificaciones a menos que estén publicados en el sitio público.
+Seguridad/Privacidad:
 - No solicites, recolectes ni almacenes datos sensibles en el chat (tarjetas, bancos, contraseñas, códigos, IDs).
-- No solicites datos altamente personales (SSN, fecha de nacimiento, dirección de casa) ni credenciales.
-- Si el usuario comparte datos sensibles, indícale que se detenga y use el chat oficial en chattia.io.
-- No divulgues información sobre OPS Core Governance ni Chattia CySec. Si preguntan sobre CySec, responde con profesionalismo, rehúsa tratar el tema y aclara que ni Chattia ni OPS Online Support recolectan PII y que buscamos brindar privacidad y navegación segura en el sitio de OPS.
-- No inventes teléfonos, emails privados, direcciones, precios, SLAs ni políticas internas.
-- No garantices certificaciones legales o de seguridad; solo puedes decir “alineado a compliance.”
-- Si no tienes un dato, dilo y dirige a chattia.io.
+- Si el usuario comparte datos sensibles, indícale que se detenga y use el chat oficial en https://chattia.io.
 - No des instrucciones para evadir seguridad, explotar sistemas o crear malware.
-
 Estilo:
 - 3–7 oraciones cortas.
 - Sin listas con viñetas, sin emojis, sin formato especial.
 - Termina siempre con UN siguiente paso claro (continuar en chattia.io).
 `.trim();
+
+/* -------------------- Minimal response hardening -------------------- */
+
+const API_CSP = [
+  "default-src 'none'",
+  "base-uri 'none'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "form-action 'none'"
+].join("; ");
+
+const PERMISSIONS_POLICY = [
+  "accelerometer=()","autoplay=()","camera=()","display-capture=()","encrypted-media=()","fullscreen=()",
+  "geolocation=()","gyroscope=()","magnetometer=()","microphone=()","midi=()","payment=()",
+  "picture-in-picture=()","publickey-credentials-get=()","screen-wake-lock=()","usb=()","bluetooth=()",
+  "clipboard-read=()","clipboard-write=()","gamepad=()","hid=()","idle-detection=()","serial=()",
+  "web-share=()","xr-spatial-tracking=()"
+].join(", ");
+
+function securityHeaders() {
+  return {
+    "Content-Security-Policy": API_CSP,
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": PERMISSIONS_POLICY,
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "X-Permitted-Cross-Domain-Policies": "none",
+    "X-DNS-Prefetch-Control": "off",
+    "X-XSS-Protection": "0",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Cache-Control": "no-store, max-age=0",
+    "Pragma": "no-cache",
+    "X-Robots-Tag": "noindex, nofollow"
+  };
+}
+
+function json(status, obj) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: {
+      ...securityHeaders(),
+      "Content-Type": "application/json; charset=utf-8"
+    }
+  });
+}
+
+function pickLang(url) {
+  const raw = String(url.searchParams.get("lang") || "en").toLowerCase().trim();
+  return raw === "es" ? "es" : "en";
+}
+
+function buildContextText(lang) {
+  const s = OPS_SITE;
+
+  const services = (lang === "es" ? s.services_es : s.services_en)
+    .map(x => `- ${x}`)
+    .join("\n");
+
+  const where = lang === "es" ? s.where_to_find_es : s.where_to_find_en;
+
+  const rules = lang === "es" ? OPS_SITE_RULES_ES : OPS_SITE_RULES_EN;
+
+  const header = `${s.brand} (${s.base_url})`;
+  const positioning = lang === "es" ? s.positioning_es : s.positioning_en;
+
+  const leadFlow = lang === "es" ? s.lead_flow_es : s.lead_flow_en;
+  const careersFlow = lang === "es" ? s.careers_flow_es : s.careers_flow_en;
+
+  const contactCTA = lang === "es" ? s.contact_cta_es : s.contact_cta_en;
+  const careersCTA = lang === "es" ? s.careers_cta_es : s.careers_cta_en;
+
+  return [
+    header,
+    positioning,
+    "",
+    (lang === "es" ? "Servicios (alto nivel):" : "Services (high level):"),
+    services,
+    "",
+    (lang === "es" ? "¿Dónde encontrar info?" : "Where to find info:"),
+    `- Services: ${where.services}`,
+    `- Policies: ${where.policies}`,
+    `- Contact: ${where.contact}`,
+    `- Careers: ${where.careers}`,
+    "",
+    (lang === "es" ? "Flujo de prospecto:" : "Prospect flow:"),
+    leadFlow,
+    "",
+    (lang === "es" ? "Flujo de carreras:" : "Careers flow:"),
+    careersFlow,
+    "",
+    (lang === "es" ? "CTA contacto:" : "Contact CTA:"),
+    contactCTA,
+    "",
+    (lang === "es" ? "CTA carreras:" : "Careers CTA:"),
+    careersCTA,
+    "",
+    "Rules:",
+    rules
+  ].join("\n").trim();
+}
+
+/* -------------------- Worker (Service Binding target) -------------------- */
+
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    const pathname = url.pathname || "/";
+
+    // Health
+    if (request.method === "GET" && (pathname === "/" || pathname === "/ping" || pathname === "/health")) {
+      return json(200, {
+        ok: true,
+        service: "ops-site-content",
+        version: "2.1",
+        hint: "GET /api/content?lang=en|es"
+      });
+    }
+
+    // Content API
+    if (request.method === "GET" && pathname === "/api/content") {
+      const lang = pickLang(url);
+      const context_text = buildContextText(lang);
+
+      return json(200, {
+        ok: true,
+        version: "2.1",
+        lang,
+        site: {
+          brand: OPS_SITE.brand,
+          domain: OPS_SITE.domain,
+          base_url: OPS_SITE.base_url,
+          routes: OPS_SITE.routes
+        },
+        greetings: lang === "es" ? OPS_SITE.greetings_es : OPS_SITE.greetings_en,
+        context_text
+      });
+    }
+
+    return json(404, { ok: false, error: "Not found." });
+  }
+};
