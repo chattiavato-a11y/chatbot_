@@ -1,17 +1,13 @@
+# worker/wrangler.ops-brain.toml
+
 name = "ops-brain"
 main = "ops-brain.js"
-compatibility_date = "2024-10-01"
+compatibility_date = "2026-01-05"
 
-kv_namespaces = [
-  { binding = "OPS_EVENTS", id = "REPLACE_WITH_OPS_EVENTS_KV_ID" },
-  { binding = "OPS_NONCES", id = "REPLACE_WITH_OPS_NONCES_KV_ID" }
-]
-
-durable_objects = { bindings = [{ name = "NONCE_GUARD", class_name = "OpsNonceGuard" }] }
+# Brain can stay on workers.dev for debugging.
+# It still returns 404 publicly because ops-brain.js only serves host "brain.local".
+workers_dev = true
 
 [ai]
 binding = "AI"
 
-[[migrations]]
-tag = "v1"
-new_classes = ["OpsNonceGuard"]
