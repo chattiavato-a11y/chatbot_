@@ -6,10 +6,11 @@
  * ✅ Safe DOM writes (textContent only)
  *
  * IMPORTANT:
- * Set ENLACE_API to your Enlace worker endpoint:
- *   https://<your-enlace>.workers.dev/api/chat
+ * Since your UI is on GitHub Pages, ENLACE_API MUST be the full URL to:
+ *   https://enlace.<your>.workers.dev/api/chat
  */
-const ENLACE_API = "https://enlace.grabem-holdem-nuts-right.workers.dev/"; // <-- CHANGE THIS
+
+const ENLACE_API = "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat";
 
 // ---- DOM ----
 const elMessages  = document.getElementById("messages");
@@ -36,8 +37,7 @@ function scrollToBottom() {
 }
 
 function timeStamp() {
-  const d = new Date();
-  return d.toLocaleString();
+  return new Date().toLocaleString();
 }
 
 function addBubble(role, text) {
@@ -73,7 +73,7 @@ function clearChat() {
   setStatus("Ready", false);
 }
 
-// ---- Lightweight input cleanup (client-side) ----
+// ---- Lightweight input cleanup ----
 function safeTextOnly(s) {
   if (!s) return "";
   return String(s).replace(/\u0000/g, "").trim();
@@ -82,29 +82,21 @@ function safeTextOnly(s) {
 // ---- Token extraction (handles multiple shapes) ----
 function extractTokenFromAnyShape(obj) {
   if (!obj) return "";
-
-  // if already a string
   if (typeof obj === "string") return obj;
 
-  // common Workers AI streaming: { response: "..." }
   if (typeof obj.response === "string") return obj.response;
-
-  // sometimes: { text: "..." }
   if (typeof obj.text === "string") return obj.text;
 
-  // sometimes: { result: { response: "..." } }
   if (obj.result && typeof obj.result === "object") {
     if (typeof obj.result.response === "string") return obj.result.response;
     if (typeof obj.result.text === "string") return obj.result.text;
   }
 
-  // sometimes: { response: { content: "..." } } or { response: { response: "..." } }
   if (obj.response && typeof obj.response === "object") {
     if (typeof obj.response.content === "string") return obj.response.content;
     if (typeof obj.response.response === "string") return obj.response.response;
   }
 
-  // OpenAI-like shape: { choices: [ { delta: { content: "..." } } ] }
   if (Array.isArray(obj.choices) && obj.choices[0]) {
     const c = obj.choices[0];
     const delta = c.delta || c.message || c;
@@ -136,7 +128,7 @@ async function streamFromEnlace(payload, onToken) {
 
   const ct = (resp.headers.get("content-type") || "").toLowerCase();
 
-  // If somehow JSON comes back non-streaming, handle it once.
+  // If Enlace ever returns JSON (non-stream), handle once.
   if (ct.includes("application/json")) {
     const obj = await resp.json().catch(() => null);
     const token = extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
@@ -157,20 +149,16 @@ async function streamFromEnlace(payload, onToken) {
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
+    buffer = buffer.replace(/\r\n/g, "\n"); // normalize CRLF -> LF
 
-    // Normalize CRLF -> LF
-    buffer = buffer.replace(/\r\n/g, "\n");
-
-    // Process line-by-line (more robust than requiring \n\n)
     let nl;
     while ((nl = buffer.indexOf("\n")) !== -1) {
       const line = buffer.slice(0, nl).trimEnd();
       buffer = buffer.slice(nl + 1);
 
-      // ignore comments/empty lines
       if (!line) continue;
 
-      // Only parse SSE data lines
+      // only process SSE data lines
       if (!line.startsWith("data:")) continue;
 
       const data = line.slice(5).trim();
@@ -181,7 +169,6 @@ async function streamFromEnlace(payload, onToken) {
         break;
       }
 
-      // Try JSON, fallback to plain text
       let token = "";
       try {
         const obj = JSON.parse(data);
@@ -230,9 +217,7 @@ async function sendMessage(userText) {
       updateBubble(botBubble, botText);
     }
 
-    // Save assistant message
     history.push({ role: "assistant", content: botText });
-
     setStatus("Ready", false);
   } catch (err) {
     const msg =
