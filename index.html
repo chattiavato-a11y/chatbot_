@@ -12,17 +12,23 @@
 
 <body>
   <header class="topbar">
+    <div class="topbar-side" aria-hidden="true"></div>
     <div class="brand">
       <div class="dot" aria-hidden="true"></div>
       <div class="brandtext">
         <div class="title">Chattia Chat</div>
-        <div class="subtitle">UI → Enlace → Brain</div>
       </div>
     </div>
 
-    <div class="actions">
-      <button id="btnClear" class="btn secondary" type="button" title="Clear the chat">Clear</button>
-      <button id="btnStop" class="btn danger" type="button" title="Stop streaming" disabled>Stop</button>
+    <div class="topbar-controls">
+      <div class="statusbar statusbar--header" aria-label="Status">
+        <span id="statusDot" class="statusdot" aria-hidden="true"></span>
+        <span id="statusText" class="statustext">Ready</span>
+      </div>
+      <div class="actions">
+        <button id="btnClear" class="btn secondary" type="button" title="Clear the chat">Clear</button>
+        <button id="btnStop" class="btn danger" type="button" title="Stop streaming" disabled>Stop</button>
+      </div>
     </div>
   </header>
 
@@ -30,10 +36,6 @@
     <section class="chat" aria-label="Chat transcript">
       <div id="messages" class="messages" role="log" aria-live="polite" aria-relevant="additions"></div>
 
-      <div class="statusbar" aria-label="Status">
-        <span id="statusDot" class="statusdot" aria-hidden="true"></span>
-        <span id="statusText" class="statustext">Ready</span>
-      </div>
     </section>
 
     <section class="composer" aria-label="Message composer">

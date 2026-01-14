@@ -36,7 +36,8 @@ body{
   position: sticky;
   top: 0;
   z-index: 10;
-  display:flex;
+  display:grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items:center;
   justify-content:space-between;
   gap: 16px;
@@ -46,10 +47,16 @@ body{
   border-bottom: 1px solid rgba(255,255,255,.06);
 }
 
+.topbar-side{
+  min-height: 1px;
+}
+
 .brand{
   display:flex;
   align-items:center;
   gap: 12px;
+  justify-self:center;
+  text-align:center;
 }
 .dot{
   width:12px;height:12px;border-radius:50%;
@@ -59,9 +66,23 @@ body{
 .title{ font-weight: 700; letter-spacing:.2px; }
 .subtitle{ color: var(--muted); font-size: 12px; margin-top: 2px; }
 
+.topbar-controls{
+  display:flex;
+  align-items:center;
+  justify-self:end;
+  gap: 12px;
+}
+
 .actions{
   display:flex;
   gap: 10px;
+}
+
+.statusbar--header{
+  padding: 6px 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 999px;
+  background: rgba(17,21,34,.6);
 }
 
 .shell{
