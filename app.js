@@ -10,7 +10,7 @@
  *   https://<your-enlace>.workers.dev/api/chat
  */
 
-const ENLACE_API = "https://YOUR-ENLACE-WORKER.workers.dev/api/chat"; // <-- CHANGE THIS
+const ENLACE_API = "https://enlace.grabem-holdem-nuts-right.workers.dev/"; // <-- CHANGE THIS
 
 // ---- DOM ----
 const elMessages  = document.getElementById("messages");
