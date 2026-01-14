@@ -36,10 +36,8 @@ body{
   position: sticky;
   top: 0;
   z-index: 10;
-  display:grid;
-  grid-template-columns: 1fr auto 1fr;
+  display:flex;
   align-items:center;
-  justify-content:space-between;
   gap: 16px;
   padding: 14px 16px;
   background: rgba(10,12,18,.7);
@@ -48,15 +46,13 @@ body{
 }
 
 .topbar-side{
-  min-height: 1px;
+  display: none;
 }
 
 .brand{
   display:flex;
   align-items:center;
   gap: 12px;
-  justify-self:center;
-  text-align:center;
 }
 .dot{
   width:12px;height:12px;border-radius:50%;
@@ -69,7 +65,7 @@ body{
 .topbar-controls{
   display:flex;
   align-items:center;
-  justify-self:end;
+  margin-left:auto;
   gap: 12px;
 }
 
