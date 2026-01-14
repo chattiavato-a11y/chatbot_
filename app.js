@@ -9,7 +9,6 @@
  * Set ENLACE_API to your Enlace worker endpoint:
  *   https://<your-enlace>.workers.dev/api/chat
  */
-
 const ENLACE_API = "https://enlace.grabem-holdem-nuts-right.workers.dev/"; // <-- CHANGE THIS
 
 // ---- DOM ----
@@ -77,26 +76,46 @@ function clearChat() {
 // ---- Lightweight input cleanup (client-side) ----
 function safeTextOnly(s) {
   if (!s) return "";
-  // strip null bytes; keep normal unicode
-  return s.replace(/\u0000/g, "").trim();
+  return String(s).replace(/\u0000/g, "").trim();
 }
 
-// ---- SSE parsing ----
-function normalizeNewlines(s) {
-  // convert CRLF to LF to simplify parsing
-  return s.replace(/\r\n/g, "\n");
-}
+// ---- Token extraction (handles multiple shapes) ----
+function extractTokenFromAnyShape(obj) {
+  if (!obj) return "";
 
-function extractSseData(block) {
-  // SSE block is lines ending with \n\n; we keep "data:" lines
-  const lines = block.split("\n");
-  const dataLines = [];
-  for (const line of lines) {
-    if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+  // if already a string
+  if (typeof obj === "string") return obj;
+
+  // common Workers AI streaming: { response: "..." }
+  if (typeof obj.response === "string") return obj.response;
+
+  // sometimes: { text: "..." }
+  if (typeof obj.text === "string") return obj.text;
+
+  // sometimes: { result: { response: "..." } }
+  if (obj.result && typeof obj.result === "object") {
+    if (typeof obj.result.response === "string") return obj.result.response;
+    if (typeof obj.result.text === "string") return obj.result.text;
   }
-  return dataLines.join("\n");
+
+  // sometimes: { response: { content: "..." } } or { response: { response: "..." } }
+  if (obj.response && typeof obj.response === "object") {
+    if (typeof obj.response.content === "string") return obj.response.content;
+    if (typeof obj.response.response === "string") return obj.response.response;
+  }
+
+  // OpenAI-like shape: { choices: [ { delta: { content: "..." } } ] }
+  if (Array.isArray(obj.choices) && obj.choices[0]) {
+    const c = obj.choices[0];
+    const delta = c.delta || c.message || c;
+    if (delta && typeof delta.content === "string") return delta.content;
+    if (typeof c.text === "string") return c.text;
+  }
+
+  return "";
 }
 
+// ---- Streaming (SSE line tolerant) ----
 async function streamFromEnlace(payload, onToken) {
   abortCtrl = new AbortController();
 
@@ -110,7 +129,6 @@ async function streamFromEnlace(payload, onToken) {
     signal: abortCtrl.signal,
   });
 
-  // If Enlace returns a JSON error, show it cleanly
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
     throw new Error(`HTTP ${resp.status} ${resp.statusText}\n${text}`);
@@ -118,14 +136,11 @@ async function streamFromEnlace(payload, onToken) {
 
   const ct = (resp.headers.get("content-type") || "").toLowerCase();
 
-  // Fallback: if response is JSON (non-stream), parse once
+  // If somehow JSON comes back non-streaming, handle it once.
   if (ct.includes("application/json")) {
     const obj = await resp.json().catch(() => null);
-    const content =
-      (obj && typeof obj.response === "string" && obj.response) ||
-      (obj && typeof obj.text === "string" && obj.text) ||
-      JSON.stringify(obj || {});
-    onToken(content);
+    const token = extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
+    if (token) onToken(token);
     return;
   }
 
@@ -142,15 +157,23 @@ async function streamFromEnlace(payload, onToken) {
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
-    buffer = normalizeNewlines(buffer);
 
-    // SSE events end with a blank line
-    let idx;
-    while ((idx = buffer.indexOf("\n\n")) !== -1) {
-      const block = buffer.slice(0, idx);
-      buffer = buffer.slice(idx + 2);
+    // Normalize CRLF -> LF
+    buffer = buffer.replace(/\r\n/g, "\n");
 
-      const data = extractSseData(block);
+    // Process line-by-line (more robust than requiring \n\n)
+    let nl;
+    while ((nl = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, nl).trimEnd();
+      buffer = buffer.slice(nl + 1);
+
+      // ignore comments/empty lines
+      if (!line) continue;
+
+      // Only parse SSE data lines
+      if (!line.startsWith("data:")) continue;
+
+      const data = line.slice(5).trim();
       if (!data) continue;
 
       if (data === "[DONE]") {
@@ -158,14 +181,12 @@ async function streamFromEnlace(payload, onToken) {
         break;
       }
 
-      // Typical Workers AI streaming chunk: data: {"response":"token"}
+      // Try JSON, fallback to plain text
       let token = "";
       try {
         const obj = JSON.parse(data);
-        token = (obj && typeof obj.response === "string") ? obj.response : "";
-        if (!token && obj && typeof obj.text === "string") token = obj.text;
+        token = extractTokenFromAnyShape(obj);
       } catch {
-        // sometimes token may arrive as plain text
         token = data;
       }
 
@@ -197,11 +218,6 @@ async function sendMessage(userText) {
   let botText = "";
 
   try {
-    if (!ENLACE_API.includes("workers.dev")) {
-      // Not hard-required, but helps catch “forgot to set URL”
-      console.warn("ENLACE_API looks unset. Update it in app.js.");
-    }
-
     const payload = { messages: history };
 
     await streamFromEnlace(payload, (token) => {
@@ -209,8 +225,13 @@ async function sendMessage(userText) {
       updateBubble(botBubble, botText);
     });
 
+    if (!botText.trim()) {
+      botText = "(no output)";
+      updateBubble(botBubble, botText);
+    }
+
     // Save assistant message
-    history.push({ role: "assistant", content: botText || "(no output)" });
+    history.push({ role: "assistant", content: botText });
 
     setStatus("Ready", false);
   } catch (err) {
@@ -252,7 +273,6 @@ elBtnStop.addEventListener("click", () => {
 elBtnClear.addEventListener("click", () => {
   if (abortCtrl) abortCtrl.abort();
   clearChat();
-  // friendly greeting after clearing
   addBubble("bot", "Hi — I’m ready. Ask me anything (plain text).");
 });
 
