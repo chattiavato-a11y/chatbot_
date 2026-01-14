@@ -1,252 +1,263 @@
 /**
- * Cloudflare Worker: enlace (v0)
- * UI (GitHub Pages) -> Enlace -> Brain (/api/chat) -> stream back to UI
+ * app.js — Simple Chat UI -> Enlace (/api/chat) with SSE streaming over fetch()
  *
- * No KV. No secrets. No env variables.
- * (Requires Workers AI binding named "AI" for the Llama Guard call.)
+ * ✅ Keep simple
+ * ✅ No libraries
+ * ✅ Safe DOM writes (textContent only)
+ *
+ * IMPORTANT:
+ * Set ENLACE_API to your Enlace worker endpoint:
+ *   https://<your-enlace>.workers.dev/api/chat
  */
 
-const ALLOWED_ORIGINS = new Set([
-  "https://chattiavato-a11y.github.io",
-]);
+const ENLACE_API = "https://YOUR-ENLACE-WORKER.workers.dev/api/chat"; // <-- CHANGE THIS
 
-const BRAIN_CHAT_URL = "https://brain.grabem-holdem-nuts-right.workers.dev/api/chat";
-const GUARD_MODEL_ID = "@cf/meta/llama-guard-3-8b";
+// ---- DOM ----
+const elMessages  = document.getElementById("messages");
+const elForm      = document.getElementById("chatForm");
+const elInput     = document.getElementById("input");
+const elBtnSend   = document.getElementById("btnSend");
+const elBtnStop   = document.getElementById("btnStop");
+const elBtnClear  = document.getElementById("btnClear");
+const elStatusDot = document.getElementById("statusDot");
+const elStatusTxt = document.getElementById("statusText");
 
-// Limits (keep v0 stable)
-const MAX_BODY_CHARS = 24_000;
-const MAX_MESSAGES = 20;
-const MAX_MESSAGE_CHARS = 2_000;
+// ---- State ----
+let history = [];                 // { role: "user"|"assistant", content: string }[]
+let abortCtrl = null;
 
-function corsHeaders(origin) {
-  const h = new Headers();
-  if (origin && ALLOWED_ORIGINS.has(origin)) {
-    h.set("Access-Control-Allow-Origin", origin);
-    h.set("Vary", "Origin");
-  }
-  h.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  h.set("Access-Control-Allow-Headers", "content-type");
-  h.set("Access-Control-Max-Age", "86400");
-  return h;
+// ---- UI helpers ----
+function setStatus(text, busy) {
+  elStatusTxt.textContent = text;
+  elStatusDot.classList.toggle("busy", !!busy);
 }
 
-function securityHeaders() {
-  const h = new Headers();
-  h.set("X-Content-Type-Options", "nosniff");
-  h.set("X-Frame-Options", "DENY");
-  h.set("Referrer-Policy", "no-referrer");
-  h.set("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
-  h.set("Cache-Control", "no-store");
-  return h;
+function scrollToBottom() {
+  elMessages.scrollTop = elMessages.scrollHeight;
 }
 
-function json(status, obj, extraHeaders) {
-  const h = new Headers(extraHeaders || {});
-  h.set("content-type", "application/json; charset=utf-8");
-  securityHeaders().forEach((v, k) => h.set(k, v));
-  return new Response(JSON.stringify(obj), { status, headers: h });
+function timeStamp() {
+  const d = new Date();
+  return d.toLocaleString();
 }
 
-function sse(stream, extraHeaders) {
-  const h = new Headers(extraHeaders || {});
-  h.set("content-type", "text/event-stream; charset=utf-8");
-  h.set("cache-control", "no-cache");
-  h.set("connection", "keep-alive");
-  securityHeaders().forEach((v, k) => h.set(k, v));
-  return new Response(stream, { status: 200, headers: h });
+function addBubble(role, text) {
+  const row = document.createElement("div");
+  row.className = `msg ${role}`;
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = text || "";
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.textContent = `${role.toUpperCase()} • ${timeStamp()}`;
+
+  bubble.appendChild(meta);
+  row.appendChild(bubble);
+  elMessages.appendChild(row);
+
+  scrollToBottom();
+  return { row, bubble };
 }
 
+function updateBubble(bubble, text) {
+  const meta = bubble.querySelector(".meta");
+  bubble.textContent = text || "";
+  if (meta) bubble.appendChild(meta);
+  scrollToBottom();
+}
+
+function clearChat() {
+  elMessages.innerHTML = "";
+  history = [];
+  setStatus("Ready", false);
+}
+
+// ---- Lightweight input cleanup (client-side) ----
 function safeTextOnly(s) {
-  // remove null bytes + keep printable chars; preserve \n \r \t
-  let out = "";
-  for (let i = 0; i < s.length; i++) {
-    const c = s.charCodeAt(i);
-    if (c === 0) continue;
-    const ok = c === 9 || c === 10 || c === 13 || (c >= 32 && c <= 126) || c >= 160;
-    if (ok) out += s[i];
-  }
-  out = out.replace(/[ \t]{3,}/g, "  ").replace(/\n{4,}/g, "\n\n\n");
-  return out.trim();
+  if (!s) return "";
+  // strip null bytes; keep normal unicode
+  return s.replace(/\u0000/g, "").trim();
 }
 
-function looksLikeCodeOrMarkup(text) {
-  const t = text.toLowerCase();
-
-  // block code fences and HTML-ish tags
-  if (text.includes("```")) return true;
-  if (/<\/?[a-z][\s\S]*>/i.test(text)) return true;
-  if (t.includes("<script") || t.includes("javascript:")) return true;
-
-  // common code tokens (keep simple)
-  const patterns = [
-    /\bfunction\b/i,
-    /\bclass\b/i,
-    /\bimport\b/i,
-    /\bexport\b/i,
-    /\brequire\s*\(/i,
-    /\bconst\b/i,
-    /\blet\b/i,
-    /\bvar\b/i,
-    /=>/i,
-    /\bdocument\./i,
-    /\bwindow\./i,
-    /\beval\s*\(/i,
-  ];
-  return patterns.some((re) => re.test(text));
+// ---- SSE parsing ----
+function normalizeNewlines(s) {
+  // convert CRLF to LF to simplify parsing
+  return s.replace(/\r\n/g, "\n");
 }
 
-function normalizeMessages(input) {
-  if (!Array.isArray(input)) return [];
-
-  const out = [];
-  for (const m of input.slice(-MAX_MESSAGES)) {
-    if (!m || typeof m !== "object") continue;
-
-    const role = String(m.role || "").toLowerCase();
-    // only allow user/assistant from the browser
-    if (role !== "user" && role !== "assistant") continue;
-
-    let content = typeof m.content === "string" ? m.content : "";
-    content = safeTextOnly(content);
-    if (!content) continue;
-
-    if (content.length > MAX_MESSAGE_CHARS) {
-      content = content.slice(0, MAX_MESSAGE_CHARS);
-    }
-
-    out.push({ role, content });
+function extractSseData(block) {
+  // SSE block is lines ending with \n\n; we keep "data:" lines
+  const lines = block.split("\n");
+  const dataLines = [];
+  for (const line of lines) {
+    if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
   }
-  return out;
+  return dataLines.join("\n");
 }
 
-function parseGuardResult(res) {
-  // Fail-closed parsing (different models can return slightly different shapes)
-  const r = res && res.response;
+async function streamFromEnlace(payload, onToken) {
+  abortCtrl = new AbortController();
 
-  if (r && typeof r === "object" && typeof r.safe === "boolean") {
-    return { safe: r.safe, categories: Array.isArray(r.categories) ? r.categories : [] };
+  const resp = await fetch(ENLACE_API, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "accept": "text/event-stream",
+    },
+    body: JSON.stringify(payload),
+    signal: abortCtrl.signal,
+  });
+
+  // If Enlace returns a JSON error, show it cleanly
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`HTTP ${resp.status} ${resp.statusText}\n${text}`);
   }
 
-  if (typeof r === "string") {
-    const lower = r.toLowerCase();
-    if (lower.includes("unsafe")) return { safe: false, categories: [] };
-    if (lower.includes("safe")) return { safe: true, categories: [] };
+  const ct = (resp.headers.get("content-type") || "").toLowerCase();
+
+  // Fallback: if response is JSON (non-stream), parse once
+  if (ct.includes("application/json")) {
+    const obj = await resp.json().catch(() => null);
+    const content =
+      (obj && typeof obj.response === "string" && obj.response) ||
+      (obj && typeof obj.text === "string" && obj.text) ||
+      JSON.stringify(obj || {});
+    onToken(content);
+    return;
   }
 
-  return { safe: false, categories: ["GUARD_UNPARSEABLE"] };
+  if (!resp.body) throw new Error("No response body (stream missing).");
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+
+  let buffer = "";
+  let doneSeen = false;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    buffer = normalizeNewlines(buffer);
+
+    // SSE events end with a blank line
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+
+      const data = extractSseData(block);
+      if (!data) continue;
+
+      if (data === "[DONE]") {
+        doneSeen = true;
+        break;
+      }
+
+      // Typical Workers AI streaming chunk: data: {"response":"token"}
+      let token = "";
+      try {
+        const obj = JSON.parse(data);
+        token = (obj && typeof obj.response === "string") ? obj.response : "";
+        if (!token && obj && typeof obj.text === "string") token = obj.text;
+      } catch {
+        // sometimes token may arrive as plain text
+        token = data;
+      }
+
+      if (token) onToken(token);
+    }
+
+    if (doneSeen) break;
+  }
 }
 
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    const origin = request.headers.get("Origin") || "";
+// ---- Main send handler ----
+async function sendMessage(userText) {
+  userText = safeTextOnly(userText);
+  if (!userText) return;
 
-    // CORS preflight
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders(origin) });
-    }
+  // UI: show user bubble
+  addBubble("user", userText);
 
-    // health
-    if (url.pathname === "/" || url.pathname === "/health") {
-      const h = corsHeaders(origin);
-      securityHeaders().forEach((v, k) => h.set(k, v));
-      return new Response("enlace: ok", { status: 200, headers: h });
-    }
+  // Add to history
+  history.push({ role: "user", content: userText });
 
-    // only route in v0
-    if (url.pathname !== "/api/chat") {
-      return json(404, { error: "Not found" }, corsHeaders(origin));
-    }
+  // UI: create bot bubble that we keep updating
+  const { bubble: botBubble } = addBubble("bot", "");
 
-    if (request.method !== "POST") {
-      return json(405, { error: "Method not allowed" }, corsHeaders(origin));
-    }
+  elBtnSend.disabled = true;
+  elBtnStop.disabled = false;
+  setStatus("Thinking…", true);
 
-    // enforce allowed origin (v0)
-    if (!origin || !ALLOWED_ORIGINS.has(origin)) {
-      return json(403, { error: "Origin not allowed" }, corsHeaders(origin));
+  let botText = "";
+
+  try {
+    if (!ENLACE_API.includes("workers.dev")) {
+      // Not hard-required, but helps catch “forgot to set URL”
+      console.warn("ENLACE_API looks unset. Update it in app.js.");
     }
 
-    const ct = (request.headers.get("content-type") || "").toLowerCase();
-    if (!ct.includes("application/json")) {
-      return json(415, { error: "content-type must be application/json" }, corsHeaders(origin));
-    }
+    const payload = { messages: history };
 
-    // read + size guard
-    let raw = "";
-    try {
-      raw = await request.text();
-    } catch {
-      return json(400, { error: "Failed to read body" }, corsHeaders(origin));
-    }
-    if (!raw || raw.length > MAX_BODY_CHARS) {
-      return json(413, { error: "Request too large" }, corsHeaders(origin));
-    }
+    await streamFromEnlace(payload, (token) => {
+      botText += token;
+      updateBubble(botBubble, botText);
+    });
 
-    // parse
-    let body;
-    try {
-      body = JSON.parse(raw);
-    } catch {
-      return json(400, { error: "Invalid JSON" }, corsHeaders(origin));
-    }
+    // Save assistant message
+    history.push({ role: "assistant", content: botText || "(no output)" });
 
-    const messages = normalizeMessages(body.messages);
-    if (!messages.length) {
-      return json(400, { error: "messages[] required" }, corsHeaders(origin));
-    }
+    setStatus("Ready", false);
+  } catch (err) {
+    const msg =
+      err && err.name === "AbortError"
+        ? "Stopped."
+        : `Error:\n${String(err?.message || err)}`;
 
-    // quick local block: last user message
-    const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content || "";
-    if (!lastUser) {
-      return json(400, { error: "Missing user message" }, corsHeaders(origin));
-    }
-    if (looksLikeCodeOrMarkup(lastUser)) {
-      return json(403, { error: "Blocked: code/markup detected" }, corsHeaders(origin));
-    }
+    updateBubble(botBubble, msg);
+    setStatus("Ready", false);
+  } finally {
+    elBtnSend.disabled = false;
+    elBtnStop.disabled = true;
+    abortCtrl = null;
+  }
+}
 
-    // Llama Guard check BEFORE Brain
-    let guardRes;
-    try {
-      guardRes = await env.AI.run(GUARD_MODEL_ID, { messages });
-    } catch {
-      return json(502, { error: "Safety check unavailable" }, corsHeaders(origin));
-    }
+// ---- Events ----
+elForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = elInput.value || "";
+  elInput.value = "";
+  await sendMessage(text);
+  elInput.focus();
+});
 
-    const verdict = parseGuardResult(guardRes);
-    if (!verdict.safe) {
-      return json(
-        403,
-        { error: "Blocked by safety filter", categories: verdict.categories || [] },
-        corsHeaders(origin)
-      );
-    }
+elInput.addEventListener("keydown", (e) => {
+  // Enter sends, Shift+Enter new line
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    elForm.requestSubmit();
+  }
+});
 
-    // forward to Brain, stream back
-    let brainResp;
-    try {
-      brainResp = await fetch(BRAIN_CHAT_URL, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "accept": "text/event-stream",
-        },
-        body: JSON.stringify({ messages }),
-      });
-    } catch {
-      return json(502, { error: "Brain unreachable" }, corsHeaders(origin));
-    }
+elBtnStop.addEventListener("click", () => {
+  if (abortCtrl) abortCtrl.abort();
+});
 
-    if (!brainResp.ok) {
-      const t = await brainResp.text().catch(() => "");
-      return json(
-        502,
-        { error: "Brain error", status: brainResp.status, detail: t.slice(0, 2000) },
-        corsHeaders(origin)
-      );
-    }
+elBtnClear.addEventListener("click", () => {
+  if (abortCtrl) abortCtrl.abort();
+  clearChat();
+  // friendly greeting after clearing
+  addBubble("bot", "Hi — I’m ready. Ask me anything (plain text).");
+});
 
-    // pass-through SSE stream
-    return sse(brainResp.body, corsHeaders(origin));
-  },
-};
+// ---- Boot ----
+clearChat();
+addBubble("bot", "Hi — I’m ready. Ask me anything (plain text).");
+elBtnStop.disabled = true;
+elInput.focus();
