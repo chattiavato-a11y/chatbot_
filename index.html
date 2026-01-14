@@ -35,7 +35,7 @@
   <main class="shell">
     <section class="chat" aria-label="Chat transcript">
       <div id="messages" class="messages" role="log" aria-live="polite" aria-relevant="additions"></div>
-
+      <div class="chat-reserve" aria-hidden="true"></div>
     </section>
 
     <section class="composer" aria-label="Message composer">
@@ -64,6 +64,6 @@
   </main>
 
   <!-- If you keep JS in a separate file -->
-  <script src="app.js"></script>
+  <script src="app.js" defer></script>
 </body>
 </html>
