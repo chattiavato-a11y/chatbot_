@@ -101,16 +101,26 @@ body{
   flex-direction:column;
 }
 
+.chat-reserve{
+  min-height: 28px;
+  border-top: 1px solid rgba(255,255,255,.04);
+  background: rgba(10,12,18,.25);
+}
+
 .messages{
   padding: 16px;
   overflow:auto;
   height: calc(100vh - 210px);
+  min-height: 320px;
+  scrollbar-gutter: stable;
 }
 
 .msg{
   display:flex;
   margin: 10px 0;
   gap: 10px;
+  content-visibility: auto;
+  contain-intrinsic-size: 80px;
 }
 .msg .bubble{
   max-width: min(780px, 92%);

@@ -203,14 +203,31 @@ async function sendMessage(userText) {
   setStatus("Thinking…", true);
 
   let botText = "";
+  let rafId = null;
+  const scheduleUpdate = () => {
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = null;
+      updateBubble(botBubble, botText);
+    });
+  };
 
   try {
     const payload = { messages: history };
 
     await streamFromEnlace(payload, (token) => {
       botText += token;
-      updateBubble(botBubble, botText);
+      scheduleUpdate();
     });
+
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+
+    if (botText.trim()) {
+      updateBubble(botBubble, botText);
+    }
 
     if (!botText.trim()) {
       botText = "(no output)";
