@@ -1,18 +1,23 @@
-const CONFIG = {
-  links: {
-    tc: "/terms",
-    cookies: "/cookies",
-    contact: "/contact",
-    support: "/support",
-    about: "/about"
-  },
-  assetIdentity: {
-    id: "",
-    sha256: ""
-  }
-};
+/**
+ * app.js — Simple Chat UI -> Enlace (/api/chat) with SSE streaming over fetch()
+ *
+ * ✅ No libraries
+ * ✅ Safe DOM writes (textContent only)
+ * ✅ SSE parsing (multi-line tolerant)
+ * ✅ Optional ASSET_ID + SHA256 identification headers
+ *
+ * IMPORTANT:
+ * If Enlace has OPS_ASSET_ALLOWLIST enabled, you MUST set these two constants
+ * to match your allowlist values, or requests will be blocked.
+ */
 
 const ENLACE_API = "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat";
+
+// ---- Asset identity (OPTIONAL but recommended) ----
+// If you enforce allowlist on Enlace, set these.
+// If you leave empty, headers won’t be sent.
+const OPS_ASSET_ID = "";       // e.g. "CHATTIA_WEB_01"
+const OPS_ASSET_SHA256 = "";   // e.g. "9f2c... (hex sha256)"
 
 // ---- DOM ----
 const elApp = document.getElementById("app");
@@ -45,17 +50,8 @@ const elLinkAbout = document.getElementById("lnkAbout");
 
 // ---- State ----
 const MAX_INPUT_CHARS = 1500;
-const MAX_TRANSCRIPT_LINES = 200;
-
-const state = {
-  lang: "EN",
-  theme: document.body.classList.contains("dark") ? "dark" : "light",
-  transcript: [],
-  history: [],
-  sending: false,
-  listening: false,
-  sideOpen: true
-};
+let history = []; // { role: "user"|"assistant", content: string }[]
+let abortCtrl = null;
 
 // ---- UI helpers ----
 function setStatus(text, busy) {
@@ -71,93 +67,51 @@ function updateLinks() {
   if (elLinkAbout) elLinkAbout.href = CONFIG.links.about || "#";
 }
 
-function renderTranscript() {
-  if (!elMainList || !elSideList) return;
-
-  const fragment = document.createDocumentFragment();
-  const fragmentSide = document.createDocumentFragment();
-
-  state.transcript.forEach((item) => {
-    const line = document.createElement("div");
-    line.className = "line";
-    line.textContent = `${item.label}: ${item.text}`;
-    fragment.appendChild(line);
-
-    const sideLine = document.createElement("div");
-    sideLine.className = "line";
-    sideLine.textContent = `${item.label}: ${item.text}`;
-    fragmentSide.appendChild(sideLine);
-  });
-
-  elMainList.innerHTML = "";
-  elSideList.innerHTML = "";
-  elMainList.appendChild(fragment);
-  elSideList.appendChild(fragmentSide);
-
-  if (state.transcript.length) {
-    elMainList.parentElement.scrollTop = elMainList.parentElement.scrollHeight;
-    elSideList.parentElement.scrollTop = elSideList.parentElement.scrollHeight;
-  }
+function scrollToBottom() {
+  elMessages.scrollTop = elMessages.scrollHeight;
 }
 
-function renderControls() {
-  const isDark = state.theme === "dark";
-  document.body.classList.toggle("dark", isDark);
-  document.body.classList.toggle("listening", state.listening);
-
-  const themeLabel = isDark ? "Light" : "Dark";
-  if (elBtnThemeTop) elBtnThemeTop.textContent = themeLabel;
-  if (elBtnThemeLower) elBtnThemeLower.textContent = themeLabel;
-  if (elSideMode) elSideMode.textContent = themeLabel.toUpperCase();
-
-  if (elBtnLangTop) elBtnLangTop.textContent = state.lang;
-  if (elBtnLangLower) elBtnLangLower.textContent = state.lang;
-  if (elSideLang) elSideLang.textContent = state.lang;
-
-  if (elBtnMic) elBtnMic.setAttribute("aria-pressed", String(state.listening));
-  if (elBtnWave) elBtnWave.setAttribute("aria-pressed", String(state.listening));
-
-  if (elApp) elApp.classList.toggle("side-collapsed", !state.sideOpen);
+function timeStamp() {
+  return new Date().toLocaleString();
 }
 
-function render() {
-  renderTranscript();
-  renderControls();
+function addBubble(role, text) {
+  const row = document.createElement("div");
+  row.className = `msg ${role}`;
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = text || "";
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.textContent = `${role.toUpperCase()} • ${timeStamp()}`;
+
+  bubble.appendChild(meta);
+  row.appendChild(bubble);
+  elMessages.appendChild(row);
+
+  scrollToBottom();
+  return { row, bubble };
 }
 
-function addLine(role, text) {
-  const label = role === "assistant" ? "Chattia" : role === "user" ? "You" : "System";
-  state.transcript.push({ role, label, text });
-  if (state.transcript.length > MAX_TRANSCRIPT_LINES) {
-    state.transcript.shift();
-  }
-  renderTranscript();
+function updateBubble(bubble, text) {
+  const meta = bubble.querySelector(".meta");
+  bubble.textContent = text || "";
+  if (meta) bubble.appendChild(meta);
+  scrollToBottom();
 }
 
-function toggleLang() {
-  state.lang = state.lang === "EN" ? "ES" : "EN";
-  renderControls();
-}
-
-function toggleTheme() {
-  state.theme = state.theme === "dark" ? "light" : "dark";
-  renderControls();
-}
-
-function toggleSidePanel() {
-  state.sideOpen = !state.sideOpen;
-  renderControls();
-}
-
-function clearTranscript() {
-  state.transcript = [];
-  state.history = [];
-  renderTranscript();
+function clearChat() {
+  elMessages.innerHTML = "";
+  history = [];
   setStatus("Ready", false);
 }
 
+// ---- Lightweight input cleanup ----
 function safeTextOnly(s) {
   if (!s) return "";
+  // Remove NUL, trim, clamp
   return String(s).replace(/\u0000/g, "").trim().slice(0, MAX_INPUT_CHARS);
 }
 
@@ -168,12 +122,7 @@ function updateCharCount() {
   elCharCount.textContent = `${clamped} / ${MAX_INPUT_CHARS}`;
 }
 
-function syncInputs(value, source) {
-  if (elInput && source !== "composer") elInput.value = value;
-  if (elChatInput && source !== "quick") elChatInput.value = value;
-  updateCharCount();
-}
-
+// ---- Token extraction (handles multiple shapes) ----
 function extractTokenFromAnyShape(obj) {
   if (!obj) return "";
   if (typeof obj === "string") return obj;
@@ -201,16 +150,49 @@ function extractTokenFromAnyShape(obj) {
   return "";
 }
 
-async function requestFromEnlace(payload) {
+// ---- SSE event parser (more correct than line-only) ----
+// SSE frames are separated by a blank line.
+// We collect all "data:" lines for an event, join with "\n", then process.
+function processSseEventData(data, onToken) {
+  const trimmed = String(data || "").trim();
+  if (!trimmed) return { done: false };
+
+  if (trimmed === "[DONE]") return { done: true };
+
+  let token = "";
+  try {
+    const obj = JSON.parse(trimmed);
+    token = extractTokenFromAnyShape(obj);
+  } catch {
+    token = trimmed;
+  }
+
+  if (token) onToken(token);
+  return { done: false };
+}
+
+// ---- Streaming (SSE) ----
+async function streamFromEnlace(payload, onToken) {
+  abortCtrl = new AbortController();
+
+  const headers = {
+    "content-type": "application/json",
+    "accept": "text/event-stream",
+  };
+
+  // Optional asset identity headers (only attach if configured)
+  if (OPS_ASSET_ID) headers["x-ops-asset-id"] = OPS_ASSET_ID;
+  if (OPS_ASSET_SHA256) headers["x-ops-asset-sha256"] = OPS_ASSET_SHA256;
+
   const resp = await fetch(ENLACE_API, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "accept": "application/json",
-      "x-ops-asset-id": CONFIG.assetIdentity.id || "",
-      "x-ops-asset-sha256": CONFIG.assetIdentity.sha256 || "",
-    },
+    mode: "cors",
+    credentials: "omit",
+    cache: "no-store",
+    referrerPolicy: "no-referrer",
+    headers,
     body: JSON.stringify(payload),
+    signal: abortCtrl.signal,
   });
 
   if (!resp.ok) {
@@ -219,101 +201,126 @@ async function requestFromEnlace(payload) {
   }
 
   const ct = (resp.headers.get("content-type") || "").toLowerCase();
+
+  // If Enlace ever returns JSON (non-stream), handle once.
   if (ct.includes("application/json")) {
     const obj = await resp.json().catch(() => null);
-    return extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
-  }
-
-  return resp.text();
-}
-
-async function sendMessage(userText) {
-  const cleaned = safeTextOnly(userText);
-  if (!cleaned || state.sending) return;
-
-  state.sending = true;
-  setStatus("Thinking…", true);
-  addLine("user", cleaned);
-  state.history.push({ role: "user", content: cleaned });
-
-  try {
-    const responseText = await requestFromEnlace({ messages: state.history });
-    const assistantText = responseText && responseText.trim() ? responseText : "(no output)";
-    addLine("assistant", assistantText);
-    state.history.push({ role: "assistant", content: assistantText });
-    setStatus("Ready", false);
-  } catch (err) {
-    addLine("system", `Error: ${String(err?.message || err)}`);
-    setStatus("Error", false);
-  } finally {
-    state.sending = false;
-  }
-}
-
-let recognition = null;
-
-function canSpeech() {
-  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-}
-
-function startSpeech() {
-  if (!canSpeech()) {
-    addLine("system", "Voice input not supported in this browser. (Try Chrome/Edge.)");
+    const token = extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
+    if (token) onToken(token);
     return;
   }
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SR();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = state.lang === "EN" ? "en-US" : "es-ES";
 
-  let finalText = "";
+  if (!resp.body) throw new Error("No response body (stream missing).");
 
-  recognition.onresult = (event) => {
-    let interim = "";
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const chunk = event.results[i][0].transcript;
-      if (event.results[i].isFinal) finalText += chunk + " ";
-      else interim += chunk;
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+
+  let buffer = "";
+  let eventData = "";
+  let doneSeen = false;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    buffer = buffer.replace(/\r\n/g, "\n"); // normalize CRLF -> LF
+
+    // Process line by line
+    let nl;
+    while ((nl = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, nl);
+      buffer = buffer.slice(nl + 1);
+
+      // Blank line means "dispatch event"
+      if (line === "") {
+        const res = processSseEventData(eventData, onToken);
+        eventData = "";
+        if (res.done) {
+          doneSeen = true;
+          break;
+        }
+        continue;
+      }
+
+      // Ignore comments/fields except data:
+      if (line.startsWith("data:")) {
+        // Per SSE spec, keep exact data after "data:"
+        let chunk = line.slice(5);
+        if (chunk.startsWith(" ")) chunk = chunk.slice(1);
+        // multiple data lines append with newline
+        eventData += (eventData ? "\n" : "") + chunk;
+      }
     }
-    syncInputs((finalText + interim).trim(), "voice");
-  };
 
-  recognition.onerror = () => {
-    stopSpeech();
-    addLine("system", "Voice error. Try again.");
-  };
-
-  recognition.onend = () => {
-    if (!state.listening) return;
-    state.listening = false;
-    renderControls();
-  };
-
-  state.listening = true;
-  renderControls();
-  recognition.start();
-}
-
-function stopSpeech() {
-  try {
-    if (recognition) recognition.stop();
-  } catch (_) {
-    // no-op
+    if (doneSeen) break;
   }
-  state.listening = false;
-  renderControls();
+
+  // Flush any trailing event without final blank line
+  if (!doneSeen && eventData) {
+    processSseEventData(eventData, onToken);
+  }
 }
 
-function toggleSpeech() {
-  if (state.listening) stopSpeech();
-  else startSpeech();
-}
+// ---- Main send handler ----
+async function sendMessage(userText) {
+  userText = safeTextOnly(userText);
+  if (!userText) return;
 
-function handleActionKey(event, action) {
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault();
-    action();
+  // UI: show user bubble
+  addBubble("user", userText);
+
+  // Add to history
+  history.push({ role: "user", content: userText });
+
+  // UI: create bot bubble that we keep updating
+  const { bubble: botBubble } = addBubble("bot", "");
+
+  elBtnSend.disabled = true;
+  elBtnStop.disabled = false;
+  setStatus("Thinking…", true);
+
+  let botText = "";
+  let rafId = null;
+
+  const scheduleUpdate = () => {
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = null;
+      updateBubble(botBubble, botText);
+    });
+  };
+
+  try {
+    const payload = { messages: history };
+
+    await streamFromEnlace(payload, (token) => {
+      botText += token;
+      scheduleUpdate();
+    });
+
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+
+    if (!botText.trim()) botText = "(no output)";
+    updateBubble(botBubble, botText);
+
+    history.push({ role: "assistant", content: botText });
+    setStatus("Ready", false);
+  } catch (err) {
+    const msg =
+      err && err.name === "AbortError"
+        ? "Stopped."
+        : `Error:\n${String(err?.message || err)}`;
+
+    updateBubble(botBubble, msg);
+    setStatus("Ready", false);
+  } finally {
+    elBtnSend.disabled = false;
+    elBtnStop.disabled = true;
+    abortCtrl = null;
   }
 }
 
@@ -328,11 +335,13 @@ if (elForm) {
   });
 }
 
-if (elInput) {
-  elInput.addEventListener("input", () => {
-    syncInputs(elInput.value || "", "composer");
-  });
-}
+elInput.addEventListener("keydown", (e) => {
+  // Enter sends, Shift+Enter new line
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    elForm.requestSubmit();
+  }
+});
 
 if (elChatInput) {
   elChatInput.addEventListener("input", () => {
@@ -348,42 +357,15 @@ if (elChatInput) {
   });
 }
 
-if (elBtnLangTop) {
-  elBtnLangTop.addEventListener("click", toggleLang);
-  elBtnLangTop.addEventListener("keydown", (e) => handleActionKey(e, toggleLang));
-}
-if (elBtnLangLower) {
-  elBtnLangLower.addEventListener("click", toggleLang);
-  elBtnLangLower.addEventListener("keydown", (e) => handleActionKey(e, toggleLang));
-}
-if (elBtnThemeTop) {
-  elBtnThemeTop.addEventListener("click", toggleTheme);
-  elBtnThemeTop.addEventListener("keydown", (e) => handleActionKey(e, toggleTheme));
-}
-if (elBtnThemeLower) {
-  elBtnThemeLower.addEventListener("click", toggleTheme);
-  elBtnThemeLower.addEventListener("keydown", (e) => handleActionKey(e, toggleTheme));
-}
+elBtnStop.addEventListener("click", () => {
+  if (abortCtrl) abortCtrl.abort();
+});
 
-if (elBtnMenu) {
-  elBtnMenu.addEventListener("click", toggleSidePanel);
-  elBtnMenu.addEventListener("keydown", (e) => handleActionKey(e, toggleSidePanel));
-}
-if (elBtnMiniMenu) {
-  elBtnMiniMenu.addEventListener("click", toggleSidePanel);
-  elBtnMiniMenu.addEventListener("keydown", (e) => handleActionKey(e, toggleSidePanel));
-}
-
-if (elBtnMic) {
-  elBtnMic.addEventListener("click", toggleSpeech);
-  elBtnMic.addEventListener("keydown", (e) => handleActionKey(e, toggleSpeech));
-}
-if (elBtnWave) {
-  elBtnWave.addEventListener("click", toggleSpeech);
-  elBtnWave.addEventListener("keydown", (e) => handleActionKey(e, toggleSpeech));
-}
-
-if (elBtnClear) elBtnClear.addEventListener("click", clearTranscript);
+elBtnClear.addEventListener("click", () => {
+  if (abortCtrl) abortCtrl.abort();
+  clearChat();
+  addBubble("bot", "Hi — I’m ready. Ask me anything (plain text).");
+});
 
 // ---- Boot ----
 updateLinks();
