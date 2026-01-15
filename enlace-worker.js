@@ -15,29 +15,98 @@ const ALLOWED_ORIGINS = new Set([
 
 const GUARD_MODEL_ID = "@cf/meta/llama-guard-3-8b";
 
+// Limits (keep stable)
 const MAX_BODY_CHARS = 24_000;
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 2_000;
 
-function corsHeaders(origin) {
+// ---- Header allowlist for CORS ----
+const BASE_ALLOWED_HEADERS = new Set([
+  "content-type",
+  "x-ops-asset-id",
+  "x-ops-asset-sha256",
+]);
+
+function parseAllowlist(raw) {
+  // Returns Map(assetId -> hashOrEmptyString)
+  const map = new Map();
+  const s = String(raw || "").trim();
+  if (!s) return map;
+
+  for (const part of s.split(",")) {
+    const item = part.trim();
+    if (!item) continue;
+
+    const eq = item.indexOf("=");
+    if (eq === -1) {
+      map.set(item, "");
+    } else {
+      const id = item.slice(0, eq).trim();
+      const hash = item.slice(eq + 1).trim();
+      if (id) map.set(id, hash || "");
+    }
+  }
+  return map;
+}
+
+function corsHeaders(origin, request) {
   const h = new Headers();
+
+  // CORS origin
   if (origin && ALLOWED_ORIGINS.has(origin)) {
     h.set("Access-Control-Allow-Origin", origin);
-    h.set("Vary", "Origin");
+    h.set("Vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
   }
+
   h.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  h.set("Access-Control-Allow-Headers", "content-type");
+
+  // CORS requested headers: only allow known-safe headers
+  const reqHdrs = (request?.headers?.get("Access-Control-Request-Headers") || "")
+    .split(",")
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean);
+
+  const safe = [];
+  for (const name of reqHdrs) {
+    if (BASE_ALLOWED_HEADERS.has(name)) safe.push(name);
+  }
+  // Always include minimal set (so client can send these)
+  safe.push("content-type");
+  safe.push("x-ops-asset-id");
+  safe.push("x-ops-asset-sha256");
+
+  // De-dupe
+  const unique = Array.from(new Set(safe));
+  h.set("Access-Control-Allow-Headers", unique.join(", "));
   h.set("Access-Control-Max-Age", "86400");
+
   return h;
 }
 
 function securityHeaders() {
   const h = new Headers();
+
+  // Anti-sniff / framing / leakage
   h.set("X-Content-Type-Options", "nosniff");
   h.set("X-Frame-Options", "DENY");
-  h.set("Referrer-Policy", "no-referrer");
-  h.set("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  h.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  h.set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()");
+
+  // HSTS (API side; Cloudflare already terminates TLS, still safe to set)
+  h.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+
+  // Conservative CSP for an API response (helps scanners; does not break fetch)
+  h.set(
+    "Content-Security-Policy",
+    "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+  );
+
+  // Don’t cache sensitive responses
   h.set("Cache-Control", "no-store");
+
+  // Reduce inadvertent transformations/buffering on intermediaries
+  h.set("Cache-Control", "no-store, no-transform");
+
   return h;
 }
 
@@ -129,6 +198,7 @@ async function callBrain(env, messages) {
       "accept": "application/json",
     },
     body: JSON.stringify({ messages }),
+    signal,
   });
 }
 
@@ -137,75 +207,98 @@ export default {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin") || "";
 
+    // Preflight
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders(origin) });
+      const h = corsHeaders(origin, request);
+      securityHeaders().forEach((v, k) => h.set(k, v));
+      return new Response(null, { status: 204, headers: h });
     }
 
+    // Health
     if (url.pathname === "/" || url.pathname === "/health") {
-      const h = corsHeaders(origin);
+      const h = corsHeaders(origin, request);
       securityHeaders().forEach((v, k) => h.set(k, v));
       return new Response("enlace: ok", { status: 200, headers: h });
     }
 
+    // Route guard
     if (url.pathname !== "/api/chat") {
-      return json(404, { error: "Not found" }, corsHeaders(origin));
+      return json(404, { error: "Not found" }, corsHeaders(origin, request));
     }
 
     if (request.method !== "POST") {
-      return json(405, { error: "Method not allowed" }, corsHeaders(origin));
+      return json(405, { error: "Method not allowed" }, corsHeaders(origin, request));
     }
 
+    // Strict CORS origin allowlist
     if (!origin || !ALLOWED_ORIGINS.has(origin)) {
-      return json(403, { error: "Origin not allowed" }, corsHeaders(origin));
+      return json(403, { error: "Origin not allowed" }, corsHeaders(origin, request));
     }
 
+    // Asset identity (anti-clone / identification) — optional but recommended
+    const assetCheck = enforceAssetIdentity(request, env);
+    if (!assetCheck.ok) {
+      return json(403, { error: "Blocked: asset identity", detail: assetCheck.reason }, corsHeaders(origin, request));
+    }
+
+    // Content-Type strict
     const ct = (request.headers.get("content-type") || "").toLowerCase();
     if (!ct.includes("application/json")) {
-      return json(415, { error: "content-type must be application/json" }, corsHeaders(origin));
+      return json(415, { error: "content-type must be application/json" }, corsHeaders(origin, request));
     }
 
+    // Read + size limit
     let raw = "";
     try {
       raw = await request.text();
     } catch {
-      return json(400, { error: "Failed to read body" }, corsHeaders(origin));
+      return json(400, { error: "Failed to read body" }, corsHeaders(origin, request));
     }
     if (!raw || raw.length > MAX_BODY_CHARS) {
-      return json(413, { error: "Request too large" }, corsHeaders(origin));
+      return json(413, { error: "Request too large" }, corsHeaders(origin, request));
     }
 
+    // Parse JSON
     let body;
     try {
       body = JSON.parse(raw);
     } catch {
-      return json(400, { error: "Invalid JSON" }, corsHeaders(origin));
+      return json(400, { error: "Invalid JSON" }, corsHeaders(origin, request));
     }
 
+    // Normalize messages
     const messages = normalizeMessages(body.messages);
     if (!messages.length) {
-      return json(400, { error: "messages[] required" }, corsHeaders(origin));
+      return json(400, { error: "messages[] required" }, corsHeaders(origin, request));
     }
 
+    // Minimal injection hardening (plain-text only)
     const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content || "";
-    if (!lastUser) return json(400, { error: "Missing user message" }, corsHeaders(origin));
+    if (!lastUser) return json(400, { error: "Missing user message" }, corsHeaders(origin, request));
     if (looksLikeCodeOrMarkup(lastUser)) {
-      return json(403, { error: "Blocked: code/markup detected" }, corsHeaders(origin));
+      return json(403, { error: "Blocked: code/markup detected" }, corsHeaders(origin, request));
     }
 
+    // Workers AI binding check
     if (!env?.AI || typeof env.AI.run !== "function") {
-      return json(500, { error: "Missing AI binding (env.AI)" }, corsHeaders(origin));
+      return json(500, { error: "Missing AI binding (env.AI)" }, corsHeaders(origin, request));
     }
 
+    // Safety gate (Llama Guard)
     let guardRes;
     try {
       guardRes = await env.AI.run(GUARD_MODEL_ID, { messages });
     } catch {
-      return json(502, { error: "Safety check unavailable" }, corsHeaders(origin));
+      return json(502, { error: "Safety check unavailable" }, corsHeaders(origin, request));
     }
 
     const verdict = parseGuardResult(guardRes);
     if (!verdict.safe) {
-      return json(403, { error: "Blocked by safety filter", categories: verdict.categories || [] }, corsHeaders(origin));
+      return json(
+        403,
+        { error: "Blocked by safety filter", categories: verdict.categories || [] },
+        corsHeaders(origin, request)
+      );
     }
 
     let brainResp;

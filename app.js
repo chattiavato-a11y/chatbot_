@@ -1,14 +1,16 @@
-/**
- * app.js — Simple Chat UI -> Enlace (/api/chat) with SSE streaming over fetch()
- *
- * ✅ Keep simple
- * ✅ No libraries
- * ✅ Safe DOM writes (textContent only)
- *
- * IMPORTANT:
- * Since your UI is on GitHub Pages, ENLACE_API MUST be the full URL to:
- *   https://enlace.<your>.workers.dev/api/chat
- */
+const CONFIG = {
+  links: {
+    tc: "/terms",
+    cookies: "/cookies",
+    contact: "/contact",
+    support: "/support",
+    about: "/about"
+  },
+  assetIdentity: {
+    id: "",
+    sha256: ""
+  }
+};
 
 const ENLACE_API = "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat";
 
@@ -201,6 +203,38 @@ function stopSpeech() {
     sendMessage(spoken);
     chatInput.value = "";
   }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = (state.lang === "EN") ? "en-US" : "es-ES";
+
+  let finalText = "";
+
+  recognition.onresult = (event) => {
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const chunk = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalText += chunk + " ";
+      else interim += chunk;
+    }
+    chatInput.value = (finalText + interim).trim();
+  };
+
+  recognition.onerror = () => {
+    stopSpeech();
+    addLine("system", "Voice error. Try again.");
+  };
+
+  recognition.onend = () => {
+    if (!state.listening) return;
+    state.listening = false;
+    render();
+  };
+
+  state.listening = true;
+  render();
+  recognition.start();
 }
 
 // ---- Events ----
@@ -222,9 +256,15 @@ elInput.addEventListener("input", () => {
   updateCharCount();
 });
 
-elBtnStop.addEventListener("click", () => {
-  if (abortCtrl) abortCtrl.abort();
-});
+function toggleSpeech() {
+  if (state.listening) stopSpeech();
+  else startSpeech();
+}
+
+btnLangTop.addEventListener("click", toggleLang);
+btnLangLower.addEventListener("click", toggleLang);
+btnThemeTop.addEventListener("click", toggleTheme);
+btnThemeLower.addEventListener("click", toggleTheme);
 
 chatInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {

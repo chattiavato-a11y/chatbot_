@@ -129,6 +129,7 @@ body.dark .toggle:hover{ border-color:rgba(255,255,255,.20); }
   position:relative;
   overflow:auto;
 }
+body.dark .line{ border-bottom-color: rgba(255,255,255,.10); }
 
 .transcriptList{
   padding:10px;
@@ -209,6 +210,9 @@ input.chatInput{
   background:transparent;
   color:inherit;
 }
+body.dark .footer a{ color:var(--text); }
+
+.footer a:hover{ text-decoration:underline; }
 
 .iconBtn{
   width:18px;height:18px;
