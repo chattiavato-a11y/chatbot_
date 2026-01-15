@@ -82,40 +82,83 @@
           <a href="#" id="lnkSupport">SUPPORT</a>
           <a href="#" id="lnkAbout">ABOUT US</a>
         </div>
-
-    <section class="composer" aria-label="Message composer">
-      <form id="chatForm" class="form" autocomplete="off">
-        <label class="sr-only" for="input">Message</label>
-
-        <textarea
-          id="input"
-          class="input"
-          placeholder="Type your message… (Enter to send, Shift+Enter for newline)"
-          rows="2"
-          maxlength="1500"
-          required
-          spellcheck="true"
-        ></textarea>
-
-        <div class="composer-side">
-          <div
-            class="cf-turnstile turnstile"
-            data-sitekey="0x4AAAAAACLhJ4hj3wHeJm8jnF2g2EHn0E8"
-            data-theme="dark"
-          ></div>
-          <div class="composer-meta">
-            <div id="charCount" class="char-count" aria-live="polite">0 / 1500</div>
-            <button id="btnSend" class="btn primary" type="submit">
-              Send
-            </button>
-          </div>
+        <div class="footerRight">
+          <span class="statusdot" id="statusDot" aria-hidden="true"></span>
+          <span class="statustext" id="statusText">Ready</span>
         </div>
-      </form>
-
-      <div class="hint">
-        Plain text only. Code/markup gets blocked upstream. Max 1500 characters.
       </div>
     </section>
+
+    <div class="gap" aria-hidden="true">
+      <div class="arrow"></div>
+    </div>
+
+    <aside class="side" aria-label="Transcript panel">
+      <div class="sideTop">
+        <div class="sideIcons">
+          <div class="iconBtn" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path class="purpleStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3Zm6-3a6 6 0 0 1-12 0m6 6v3m-4 0h8" />
+            </svg>
+          </div>
+          <div class="iconBtn" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <g class="waveBars" transform="translate(5,6)">
+                <rect class="purpleFill" x="0" y="6" width="2" height="6" rx="1"></rect>
+                <rect class="purpleFill" x="5" y="3" width="2" height="12" rx="1"></rect>
+                <rect class="purpleFill" x="10" y="6" width="2" height="6" rx="1"></rect>
+              </g>
+            </svg>
+          </div>
+        </div>
+        <div class="sideLabel">
+          <span class="lang" id="sideLang">EN</span>
+          <span class="mode" id="sideMode">DARK</span>
+        </div>
+      </div>
+
+      <div class="sideBody">
+        <div class="sideTranscript" id="sideList"></div>
+      </div>
+
+      <button class="clearBtn" id="btnClear" type="button">Clear Transcript</button>
+      <div class="powered">Powered by OPS</div>
+    </aside>
+  </div>
+  <section class="composer" aria-label="Message composer">
+    <form id="chatForm" class="form" autocomplete="off">
+      <label class="sr-only" for="input">Message</label>
+
+      <textarea
+        id="input"
+        class="input"
+        placeholder="Type your message… (Enter to send, Shift+Enter for newline)"
+        rows="2"
+        maxlength="1500"
+        required
+        spellcheck="true"
+      ></textarea>
+
+      <div class="composer-side">
+        <div
+          class="cf-turnstile turnstile"
+          data-sitekey="0x4AAAAAACLhJ4hj3wHeJm8jnF2g2EHn0E8"
+          data-theme="dark"
+        ></div>
+        <div class="composer-meta">
+          <div id="charCount" class="char-count" aria-live="polite">0 / 1500</div>
+          <button id="btnSend" class="btn primary" type="submit">
+            Send
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <div class="hint">
+      Plain text only. Code/markup gets blocked upstream. Max 1500 characters.
+    </div>
+  </section>
 
   <!-- If you keep JS in a separate file -->
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>
