@@ -3,67 +3,123 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Chattia • Chat</title>
-  <meta name="description" content="Simple chatbot UI connected to Enlace." />
-
-  <!-- If you keep CSS in a separate file -->
+  <title>Chattia UI (Picture Match)</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
-  <header class="topbar">
-    <div class="topbar-side" aria-hidden="true"></div>
-    <div class="brand">
-      <div class="dot" aria-hidden="true"></div>
-      <div class="brandtext">
-        <div class="title">Chattia</div>
-      </div>
-    </div>
+  <div class="frame" id="app">
+    <section class="main">
+      <div class="topbar">
+        <div class="topbar-left">
+          <div class="burger" id="btnMenu" title="Menu" aria-label="Menu" role="button" tabindex="0">
+            <span></span><span></span><span></span>
+          </div>
 
-    <div class="topbar-controls">
-      <div class="statusbar statusbar--header" aria-label="Status">
-        <span id="statusDot" class="statusdot" aria-hidden="true"></span>
-        <span id="statusText" class="statustext">Ready</span>
-      </div>
-      <div class="actions">
-        <button id="btnClear" class="btn secondary" type="button" title="Clear the chat">Clear</button>
-        <button id="btnStop" class="btn danger" type="button" title="Stop streaming" disabled>Stop</button>
-      </div>
-    </div>
-  </header>
+          <div class="brand">
+            <div class="homeIcon" title="Home" aria-label="Home">⌂</div>
+            <div class="brandName">Chattia</div>
+          </div>
+        </div>
 
-  <main class="shell">
-    <section class="chat" aria-label="Chat transcript">
-      <div id="messages" class="messages" role="log" aria-live="polite" aria-relevant="additions"></div>
-      <div class="chat-reserve" aria-hidden="true"></div>
+        <div class="topbar-right">
+          <div class="toggle lang" id="btnLangTop" role="button" tabindex="0" aria-label="Toggle language">EN</div>
+          <div class="toggle" id="btnThemeTop" role="button" tabindex="0" aria-label="Toggle theme">Dark</div>
+        </div>
+      </div>
+
+      <div class="transcriptArea" id="mainTranscript">
+        <div class="transcriptList" id="mainList"></div>
+      </div>
+
+      <div class="lower">
+        <div class="lowerHeader">
+          <div class="title">Transcript</div>
+
+          <div class="lowerControls">
+            <div class="toggle lang" id="btnLangLower" role="button" tabindex="0" aria-label="Toggle language">EN</div>
+            <div class="toggle" id="btnThemeLower" role="button" tabindex="0" aria-label="Toggle theme">Dark</div>
+            <div class="miniBurger" id="btnMiniMenu" title="Options" aria-label="Options" role="button" tabindex="0">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="chatRow">
+          <div class="chatLabel">Chat</div>
+
+          <div class="chatInputWrap">
+            <input class="chatInput" id="chatInput" placeholder="Type Your Message" />
+          </div>
+
+          <div class="iconBtn" id="btnMic" title="Voice (optional)" aria-label="Voice input">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path class="purpleStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3Zm6-3a6 6 0 0 1-12 0m6 6v3m-4 0h8" />
+            </svg>
+          </div>
+
+          <div class="iconBtn" id="btnWave" title="Listening indicator" aria-label="Listening indicator">
+            <svg viewBox="0 0 24 24" fill="none" id="waveSvg">
+              <g class="waveBars" transform="translate(5,6)">
+                <rect class="purpleFill" x="0" y="6" width="2" height="6" rx="1"></rect>
+                <rect class="purpleFill" x="5" y="3" width="2" height="12" rx="1"></rect>
+                <rect class="purpleFill" x="10" y="6" width="2" height="6" rx="1"></rect>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="footerLeft">
+          <a href="#" id="lnkTc">T&amp;C</a>
+          <a href="#" id="lnkCookies">COOKIES</a>
+          <a href="#" id="lnkContact">CONTACT US</a>
+          <a href="#" id="lnkSupport">SUPPORT</a>
+          <a href="#" id="lnkAbout">ABOUT US</a>
+        </div>
+
+        <div class="footerRight">
+          <span>Chattia ©</span>
+          <span style="font-weight:900;">◎</span>
+        </div>
+      </div>
     </section>
 
-    <section class="composer" aria-label="Message composer">
-      <form id="chatForm" class="form" autocomplete="off">
-        <label class="sr-only" for="input">Message</label>
+    <div class="gap" aria-hidden="true">
+      <div class="arrow"></div>
+    </div>
 
-        <textarea
-          id="input"
-          class="input"
-          placeholder="Type your message… (Enter to send, Shift+Enter for newline)"
-          rows="2"
-          maxlength="3000"
-          required
-          spellcheck="true"
-        ></textarea>
+    <aside class="side">
+      <div class="sideTop">
+        <div class="sideIcons">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+            <path class="purpleStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3Zm6-3a6 6 0 0 1-12 0" />
+          </svg>
 
-        <button id="btnSend" class="btn primary" type="submit">
-          Send
-        </button>
-      </form>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+            <path class="purpleStroke" stroke-width="2" stroke-linecap="round"
+              d="M4 12h2m2-5v10m3-12v14m3-10v6m3-8v10m3-5h2" />
+          </svg>
+        </div>
 
-      <div class="hint">
-        Plain text only. Code/markup gets blocked upstream.
+        <div class="sideLabel">
+          <span class="lang" id="sideLang">EN</span>
+          <span class="mode" id="sideMode">DARK</span>
+        </div>
       </div>
-    </section>
-  </main>
 
-  <!-- If you keep JS in a separate file -->
+      <div class="sideBody">
+        <div class="sideTranscript" id="sideList"></div>
+      </div>
+
+      <button class="clearBtn" id="btnClear">Clear Transcript</button>
+      <div class="powered">Powered by OPS</div>
+    </aside>
+  </div>
+
   <script src="app.js" defer></script>
 </body>
 </html>

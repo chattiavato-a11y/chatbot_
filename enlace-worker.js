@@ -1,10 +1,22 @@
 /**
- * Cloudflare Worker: enlace (v0)
- * UI -> Enlace -> (Service Binding) -> SSE stream back to UI
+ * Cloudflare Worker: enlace (v0.1 hardened)
+ * UI -> Enlace -> (Service Binding: brain -> nettunian-io) -> SSE stream back to UI
  *
  * Required bindings:
- * - env.AI        (Workers AI) for Llama Guard
- * - env.UPSTREAM  (Service Binding) to your LLM worker
+ * - env.AI     (Workers AI) for Llama Guard
+ * - env.brain  (Service Binding) -> nettunian-io
+ *
+ * Optional (recommended) bindings:
+ * - env.BRAIN_TOKEN          (Secret) shared token Enlace -> Brain (prevents direct calls)
+ * - env.OPS_ASSET_ALLOWLIST  (Text) allowlist of UI Asset IDs (+ optional hash)
+ *     Format:
+ *       "ASSET_ID_1=SHA256HEX_1,ASSET_ID_2=SHA256HEX_2"
+ *     Or ID-only:
+ *       "ASSET_ID_1,ASSET_ID_2"
+ *
+ * Client must send (when OPS_ASSET_ALLOWLIST is set):
+ * - x-ops-asset-id: <ASSET_ID>
+ * - x-ops-asset-sha256: <SHA256HEX>   (required only if allowlist maps ID->hash)
  */
 
 const ALLOWED_ORIGINS = new Set([
@@ -15,29 +27,98 @@ const ALLOWED_ORIGINS = new Set([
 
 const GUARD_MODEL_ID = "@cf/meta/llama-guard-3-8b";
 
+// Limits (keep stable)
 const MAX_BODY_CHARS = 24_000;
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 2_000;
 
-function corsHeaders(origin) {
+// ---- Header allowlist for CORS ----
+const BASE_ALLOWED_HEADERS = new Set([
+  "content-type",
+  "x-ops-asset-id",
+  "x-ops-asset-sha256",
+]);
+
+function parseAllowlist(raw) {
+  // Returns Map(assetId -> hashOrEmptyString)
+  const map = new Map();
+  const s = String(raw || "").trim();
+  if (!s) return map;
+
+  for (const part of s.split(",")) {
+    const item = part.trim();
+    if (!item) continue;
+
+    const eq = item.indexOf("=");
+    if (eq === -1) {
+      map.set(item, "");
+    } else {
+      const id = item.slice(0, eq).trim();
+      const hash = item.slice(eq + 1).trim();
+      if (id) map.set(id, hash || "");
+    }
+  }
+  return map;
+}
+
+function corsHeaders(origin, request) {
   const h = new Headers();
+
+  // CORS origin
   if (origin && ALLOWED_ORIGINS.has(origin)) {
     h.set("Access-Control-Allow-Origin", origin);
-    h.set("Vary", "Origin");
+    h.set("Vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
   }
+
   h.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  h.set("Access-Control-Allow-Headers", "content-type");
+
+  // CORS requested headers: only allow known-safe headers
+  const reqHdrs = (request?.headers?.get("Access-Control-Request-Headers") || "")
+    .split(",")
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean);
+
+  const safe = [];
+  for (const name of reqHdrs) {
+    if (BASE_ALLOWED_HEADERS.has(name)) safe.push(name);
+  }
+  // Always include minimal set (so client can send these)
+  safe.push("content-type");
+  safe.push("x-ops-asset-id");
+  safe.push("x-ops-asset-sha256");
+
+  // De-dupe
+  const unique = Array.from(new Set(safe));
+  h.set("Access-Control-Allow-Headers", unique.join(", "));
   h.set("Access-Control-Max-Age", "86400");
+
   return h;
 }
 
 function securityHeaders() {
   const h = new Headers();
+
+  // Anti-sniff / framing / leakage
   h.set("X-Content-Type-Options", "nosniff");
   h.set("X-Frame-Options", "DENY");
-  h.set("Referrer-Policy", "no-referrer");
-  h.set("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  h.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  h.set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()");
+
+  // HSTS (API side; Cloudflare already terminates TLS, still safe to set)
+  h.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+
+  // Conservative CSP for an API response (helps scanners; does not break fetch)
+  h.set(
+    "Content-Security-Policy",
+    "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+  );
+
+  // Don’t cache sensitive responses
   h.set("Cache-Control", "no-store");
+
+  // Reduce inadvertent transformations/buffering on intermediaries
+  h.set("Cache-Control", "no-store, no-transform");
+
   return h;
 }
 
@@ -51,8 +132,8 @@ function json(status, obj, extraHeaders) {
 function sse(stream, extraHeaders) {
   const h = new Headers(extraHeaders || {});
   h.set("content-type", "text/event-stream; charset=utf-8");
-  h.set("cache-control", "no-cache");
-  h.set("connection", "keep-alive");
+  h.set("cache-control", "no-cache, no-transform");
+  // NOTE: Do NOT set "Connection" header on Workers (often stripped/forbidden).
   securityHeaders().forEach((v, k) => h.set(k, v));
   return new Response(stream, { status: 200, headers: h });
 }
@@ -126,18 +207,51 @@ function parseGuardResult(res) {
   return { safe: false, categories: ["GUARD_UNPARSEABLE"] };
 }
 
-async function callUpstream(env, messages) {
-  if (!env?.UPSTREAM || typeof env.UPSTREAM.fetch !== "function") {
-    throw new Error("Missing Service Binding: env.UPSTREAM");
+function enforceAssetIdentity(request, env) {
+  const allowMap = parseAllowlist(env?.OPS_ASSET_ALLOWLIST);
+
+  // If no allowlist configured, do not enforce (safe default for rollout).
+  if (!allowMap.size) return { ok: true };
+
+  const assetId = String(request.headers.get("x-ops-asset-id") || "").trim();
+  if (!assetId) return { ok: false, reason: "Missing x-ops-asset-id" };
+
+  if (!allowMap.has(assetId)) return { ok: false, reason: "Unknown asset id" };
+
+  const expectedHash = String(allowMap.get(assetId) || "").trim();
+  if (expectedHash) {
+    const gotHash = String(request.headers.get("x-ops-asset-sha256") || "").trim();
+    if (!gotHash) return { ok: false, reason: "Missing x-ops-asset-sha256" };
+    if (gotHash.toLowerCase() !== expectedHash.toLowerCase()) return { ok: false, reason: "Bad asset hash" };
   }
 
-  return env.UPSTREAM.fetch("https://service/api/chat", {
+  return { ok: true };
+}
+
+async function callBrain(env, messages, clientRequest) {
+  if (!env?.brain || typeof env.brain.fetch !== "function") {
+    throw new Error("Missing Service Binding: env.brain");
+  }
+
+  const headers = {
+    "content-type": "application/json",
+    "accept": "text/event-stream",
+  };
+
+  // Optional: shared-token lock so only Enlace can call Brain
+  if (env.BRAIN_TOKEN) {
+    headers["x-brain-token"] = env.BRAIN_TOKEN;
+  }
+
+  // Pass abort signal through so upstream cancels if client disconnects
+  const signal = clientRequest?.signal;
+
+  // Service bindings use the special host "https://service"
+  return env.brain.fetch("https://service/api/chat", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "accept": "text/event-stream",
-    },
+    headers,
     body: JSON.stringify({ messages }),
+    signal,
   });
 }
 
@@ -146,89 +260,118 @@ export default {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin") || "";
 
+    // Preflight
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders(origin) });
+      const h = corsHeaders(origin, request);
+      securityHeaders().forEach((v, k) => h.set(k, v));
+      return new Response(null, { status: 204, headers: h });
     }
 
+    // Health
     if (url.pathname === "/" || url.pathname === "/health") {
-      const h = corsHeaders(origin);
+      const h = corsHeaders(origin, request);
       securityHeaders().forEach((v, k) => h.set(k, v));
       return new Response("enlace: ok", { status: 200, headers: h });
     }
 
+    // Route guard
     if (url.pathname !== "/api/chat") {
-      return json(404, { error: "Not found" }, corsHeaders(origin));
+      return json(404, { error: "Not found" }, corsHeaders(origin, request));
     }
 
     if (request.method !== "POST") {
-      return json(405, { error: "Method not allowed" }, corsHeaders(origin));
+      return json(405, { error: "Method not allowed" }, corsHeaders(origin, request));
     }
 
+    // Strict CORS origin allowlist
     if (!origin || !ALLOWED_ORIGINS.has(origin)) {
-      return json(403, { error: "Origin not allowed" }, corsHeaders(origin));
+      return json(403, { error: "Origin not allowed" }, corsHeaders(origin, request));
     }
 
+    // Asset identity (anti-clone / identification) — optional but recommended
+    const assetCheck = enforceAssetIdentity(request, env);
+    if (!assetCheck.ok) {
+      return json(403, { error: "Blocked: asset identity", detail: assetCheck.reason }, corsHeaders(origin, request));
+    }
+
+    // Content-Type strict
     const ct = (request.headers.get("content-type") || "").toLowerCase();
     if (!ct.includes("application/json")) {
-      return json(415, { error: "content-type must be application/json" }, corsHeaders(origin));
+      return json(415, { error: "content-type must be application/json" }, corsHeaders(origin, request));
     }
 
+    // Read + size limit
     let raw = "";
     try {
       raw = await request.text();
     } catch {
-      return json(400, { error: "Failed to read body" }, corsHeaders(origin));
+      return json(400, { error: "Failed to read body" }, corsHeaders(origin, request));
     }
     if (!raw || raw.length > MAX_BODY_CHARS) {
-      return json(413, { error: "Request too large" }, corsHeaders(origin));
+      return json(413, { error: "Request too large" }, corsHeaders(origin, request));
     }
 
+    // Parse JSON
     let body;
     try {
       body = JSON.parse(raw);
     } catch {
-      return json(400, { error: "Invalid JSON" }, corsHeaders(origin));
+      return json(400, { error: "Invalid JSON" }, corsHeaders(origin, request));
     }
 
+    // Normalize messages
     const messages = normalizeMessages(body.messages);
     if (!messages.length) {
-      return json(400, { error: "messages[] required" }, corsHeaders(origin));
+      return json(400, { error: "messages[] required" }, corsHeaders(origin, request));
     }
 
+    // Minimal injection hardening (plain-text only)
     const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content || "";
-    if (!lastUser) return json(400, { error: "Missing user message" }, corsHeaders(origin));
+    if (!lastUser) return json(400, { error: "Missing user message" }, corsHeaders(origin, request));
     if (looksLikeCodeOrMarkup(lastUser)) {
-      return json(403, { error: "Blocked: code/markup detected" }, corsHeaders(origin));
+      return json(403, { error: "Blocked: code/markup detected" }, corsHeaders(origin, request));
     }
 
+    // Workers AI binding check
     if (!env?.AI || typeof env.AI.run !== "function") {
-      return json(500, { error: "Missing AI binding (env.AI)" }, corsHeaders(origin));
+      return json(500, { error: "Missing AI binding (env.AI)" }, corsHeaders(origin, request));
     }
 
+    // Safety gate (Llama Guard)
     let guardRes;
     try {
       guardRes = await env.AI.run(GUARD_MODEL_ID, { messages });
     } catch {
-      return json(502, { error: "Safety check unavailable" }, corsHeaders(origin));
+      return json(502, { error: "Safety check unavailable" }, corsHeaders(origin, request));
     }
 
     const verdict = parseGuardResult(guardRes);
     if (!verdict.safe) {
-      return json(403, { error: "Blocked by safety filter", categories: verdict.categories || [] }, corsHeaders(origin));
+      return json(
+        403,
+        { error: "Blocked by safety filter", categories: verdict.categories || [] },
+        corsHeaders(origin, request)
+      );
     }
 
-    let upstreamResp;
+    // Call brain and stream SSE back
+    let brainResp;
     try {
-      upstreamResp = await callUpstream(env, messages);
-    } catch {
-      return json(502, { error: "Upstream unreachable" }, corsHeaders(origin));
+      brainResp = await callBrain(env, messages, request);
+    } catch (e) {
+      return json(502, { error: "Brain unreachable", detail: String(e?.message || e) }, corsHeaders(origin, request));
     }
 
-    if (!upstreamResp.ok) {
-      const t = await upstreamResp.text().catch(() => "");
-      return json(502, { error: "Upstream error", status: upstreamResp.status, detail: t.slice(0, 2000) }, corsHeaders(origin));
+    if (!brainResp.ok) {
+      const t = await brainResp.text().catch(() => "");
+      return json(
+        502,
+        { error: "Brain error", status: brainResp.status, detail: t.slice(0, 2000) },
+        corsHeaders(origin, request)
+      );
     }
 
-    return sse(upstreamResp.body, corsHeaders(origin));
+    // Stream raw SSE body back to the browser
+    return sse(brainResp.body, corsHeaders(origin, request));
   },
 };
