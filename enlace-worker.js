@@ -1,10 +1,10 @@
 /**
  * Cloudflare Worker: enlace (v0)
- * UI -> Enlace -> (Service Binding) -> SSE stream back to UI
+ * UI -> Enlace -> (Service Binding: brain) -> SSE stream back to UI
  *
  * Required bindings:
- * - env.AI        (Workers AI) for Llama Guard
- * - env.UPSTREAM  (Service Binding) to your LLM worker
+ * - env.AI     (Workers AI) for Llama Guard
+ * - env.brain  (Service Binding) -> nettunian-io
  */
 
 const ALLOWED_ORIGINS = new Set([
@@ -126,12 +126,12 @@ function parseGuardResult(res) {
   return { safe: false, categories: ["GUARD_UNPARSEABLE"] };
 }
 
-async function callUpstream(env, messages) {
-  if (!env?.UPSTREAM || typeof env.UPSTREAM.fetch !== "function") {
-    throw new Error("Missing Service Binding: env.UPSTREAM");
+async function callBrain(env, messages) {
+  if (!env?.brain || typeof env.brain.fetch !== "function") {
+    throw new Error("Missing Service Binding: env.brain");
   }
 
-  return env.UPSTREAM.fetch("https://service/api/chat", {
+  return env.brain.fetch("https://service/api/chat", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -217,18 +217,18 @@ export default {
       return json(403, { error: "Blocked by safety filter", categories: verdict.categories || [] }, corsHeaders(origin));
     }
 
-    let upstreamResp;
+    let brainResp;
     try {
-      upstreamResp = await callUpstream(env, messages);
-    } catch {
-      return json(502, { error: "Upstream unreachable" }, corsHeaders(origin));
+      brainResp = await callBrain(env, messages);
+    } catch (e) {
+      return json(502, { error: "Brain unreachable", detail: String(e?.message || e) }, corsHeaders(origin));
     }
 
-    if (!upstreamResp.ok) {
-      const t = await upstreamResp.text().catch(() => "");
-      return json(502, { error: "Upstream error", status: upstreamResp.status, detail: t.slice(0, 2000) }, corsHeaders(origin));
+    if (!brainResp.ok) {
+      const t = await brainResp.text().catch(() => "");
+      return json(502, { error: "Brain error", status: brainResp.status, detail: t.slice(0, 2000) }, corsHeaders(origin));
     }
 
-    return sse(upstreamResp.body, corsHeaders(origin));
+    return sse(brainResp.body, corsHeaders(origin));
   },
 };
