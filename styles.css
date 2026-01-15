@@ -208,6 +208,32 @@ body{
   box-shadow: 0 0 0 4px rgba(79,140,255,.12);
 }
 
+.composer-side{
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+  align-items:flex-end;
+}
+
+.composer-meta{
+  display:flex;
+  gap: 10px;
+  align-items:center;
+}
+
+.turnstile{
+  width: 100%;
+  max-width: 320px;
+  display:flex;
+  justify-content:flex-end;
+}
+
+.char-count{
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
 .btn{
   border: 1px solid rgba(255,255,255,.10);
   background: linear-gradient(180deg, var(--btn), var(--btn2));
