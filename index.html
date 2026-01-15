@@ -47,23 +47,34 @@
           class="input"
           placeholder="Type your message… (Enter to send, Shift+Enter for newline)"
           rows="2"
-          maxlength="3000"
+          maxlength="1500"
           required
           spellcheck="true"
         ></textarea>
 
-        <button id="btnSend" class="btn primary" type="submit">
-          Send
-        </button>
+        <div class="composer-side">
+          <div
+            class="cf-turnstile turnstile"
+            data-sitekey="0x4AAAAAACLhJ4hj3wHeJm8jnF2g2EHn0E8"
+            data-theme="dark"
+          ></div>
+          <div class="composer-meta">
+            <div id="charCount" class="char-count" aria-live="polite">0 / 1500</div>
+            <button id="btnSend" class="btn primary" type="submit">
+              Send
+            </button>
+          </div>
+        </div>
       </form>
 
       <div class="hint">
-        Plain text only. Code/markup gets blocked upstream.
+        Plain text only. Code/markup gets blocked upstream. Max 1500 characters.
       </div>
     </section>
   </main>
 
   <!-- If you keep JS in a separate file -->
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>

@@ -21,8 +21,10 @@ const elBtnStop   = document.getElementById("btnStop");
 const elBtnClear  = document.getElementById("btnClear");
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
+const elCharCount = document.getElementById("charCount");
 
 // ---- State ----
+const MAX_INPUT_CHARS = 1500;
 let history = [];                 // { role: "user"|"assistant", content: string }[]
 let abortCtrl = null;
 
@@ -71,12 +73,20 @@ function clearChat() {
   elMessages.innerHTML = "";
   history = [];
   setStatus("Ready", false);
+  updateCharCount();
 }
 
 // ---- Lightweight input cleanup ----
 function safeTextOnly(s) {
   if (!s) return "";
-  return String(s).replace(/\u0000/g, "").trim();
+  return String(s).replace(/\u0000/g, "").trim().slice(0, MAX_INPUT_CHARS);
+}
+
+function updateCharCount() {
+  if (!elCharCount) return;
+  const length = (elInput.value || "").length;
+  const clamped = Math.min(length, MAX_INPUT_CHARS);
+  elCharCount.textContent = `${clamped} / ${MAX_INPUT_CHARS}`;
 }
 
 // ---- Token extraction (handles multiple shapes) ----
@@ -256,6 +266,7 @@ elForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const text = elInput.value || "";
   elInput.value = "";
+  updateCharCount();
   await sendMessage(text);
   elInput.focus();
 });
@@ -266,6 +277,10 @@ elInput.addEventListener("keydown", (e) => {
     e.preventDefault();
     elForm.requestSubmit();
   }
+});
+
+elInput.addEventListener("input", () => {
+  updateCharCount();
 });
 
 elBtnStop.addEventListener("click", () => {
@@ -283,3 +298,4 @@ clearChat();
 addBubble("bot", "Hi — I’m ready. Ask me anything (plain text).");
 elBtnStop.disabled = true;
 elInput.focus();
+updateCharCount();
