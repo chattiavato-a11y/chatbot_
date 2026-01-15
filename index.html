@@ -52,17 +52,22 @@
           <div class="chatLabel">Chat</div>
 
           <div class="chatInputWrap">
-            <input class="chatInput" id="chatInput" placeholder="Type Your Message" />
+            <input
+              class="chatInput"
+              id="chatInput"
+              placeholder="Type Your Message"
+              aria-label="Chat message"
+            />
           </div>
 
-          <div class="iconBtn" id="btnMic" title="Voice (optional)" aria-label="Voice input">
+          <div class="iconBtn" id="btnMic" title="Voice (optional)" aria-label="Voice input" role="button" tabindex="0">
             <svg viewBox="0 0 24 24" fill="none">
               <path class="purpleStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                 d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3Zm6-3a6 6 0 0 1-12 0m6 6v3m-4 0h8" />
             </svg>
           </div>
 
-          <div class="iconBtn" id="btnWave" title="Listening indicator" aria-label="Listening indicator">
+          <div class="iconBtn" id="btnWave" title="Listening indicator" aria-label="Listening indicator" role="button" tabindex="0">
             <svg viewBox="0 0 24 24" fill="none" id="waveSvg">
               <g class="waveBars" transform="translate(5,6)">
                 <rect class="purpleFill" x="0" y="6" width="2" height="6" rx="1"></rect>

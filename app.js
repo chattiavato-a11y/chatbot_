@@ -20,15 +20,33 @@ const OPS_ASSET_ID = "";       // e.g. "CHATTIA_WEB_01"
 const OPS_ASSET_SHA256 = "";   // e.g. "9f2c... (hex sha256)"
 
 // ---- DOM ----
-const elMessages  = document.getElementById("messages");
-const elForm      = document.getElementById("chatForm");
-const elInput     = document.getElementById("input");
-const elBtnSend   = document.getElementById("btnSend");
-const elBtnStop   = document.getElementById("btnStop");
-const elBtnClear  = document.getElementById("btnClear");
+const elApp = document.getElementById("app");
+const elMainList = document.getElementById("mainList");
+const elSideList = document.getElementById("sideList");
+const elForm = document.getElementById("chatForm");
+const elInput = document.getElementById("input");
+const elChatInput = document.getElementById("chatInput");
+const elBtnSend = document.getElementById("btnSend");
+const elBtnClear = document.getElementById("btnClear");
+const elBtnMenu = document.getElementById("btnMenu");
+const elBtnMiniMenu = document.getElementById("btnMiniMenu");
+const elBtnMic = document.getElementById("btnMic");
+const elBtnWave = document.getElementById("btnWave");
+const elBtnLangTop = document.getElementById("btnLangTop");
+const elBtnLangLower = document.getElementById("btnLangLower");
+const elBtnThemeTop = document.getElementById("btnThemeTop");
+const elBtnThemeLower = document.getElementById("btnThemeLower");
+const elSideLang = document.getElementById("sideLang");
+const elSideMode = document.getElementById("sideMode");
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
 const elCharCount = document.getElementById("charCount");
+
+const elLinkTc = document.getElementById("lnkTc");
+const elLinkCookies = document.getElementById("lnkCookies");
+const elLinkContact = document.getElementById("lnkContact");
+const elLinkSupport = document.getElementById("lnkSupport");
+const elLinkAbout = document.getElementById("lnkAbout");
 
 // ---- State ----
 const MAX_INPUT_CHARS = 1500;
@@ -37,8 +55,16 @@ let abortCtrl = null;
 
 // ---- UI helpers ----
 function setStatus(text, busy) {
-  elStatusTxt.textContent = text;
-  elStatusDot.classList.toggle("busy", !!busy);
+  if (elStatusTxt) elStatusTxt.textContent = text;
+  if (elStatusDot) elStatusDot.classList.toggle("busy", !!busy);
+}
+
+function updateLinks() {
+  if (elLinkTc) elLinkTc.href = CONFIG.links.tc || "#";
+  if (elLinkCookies) elLinkCookies.href = CONFIG.links.cookies || "#";
+  if (elLinkContact) elLinkContact.href = CONFIG.links.contact || "#";
+  if (elLinkSupport) elLinkSupport.href = CONFIG.links.support || "#";
+  if (elLinkAbout) elLinkAbout.href = CONFIG.links.about || "#";
 }
 
 function scrollToBottom() {
@@ -80,7 +106,6 @@ function clearChat() {
   elMessages.innerHTML = "";
   history = [];
   setStatus("Ready", false);
-  updateCharCount();
 }
 
 // ---- Lightweight input cleanup ----
@@ -91,7 +116,7 @@ function safeTextOnly(s) {
 }
 
 function updateCharCount() {
-  if (!elCharCount) return;
+  if (!elCharCount || !elInput) return;
   const length = (elInput.value || "").length;
   const clamped = Math.min(length, MAX_INPUT_CHARS);
   elCharCount.textContent = `${clamped} / ${MAX_INPUT_CHARS}`;
@@ -300,14 +325,15 @@ async function sendMessage(userText) {
 }
 
 // ---- Events ----
-elForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = elInput.value || "";
-  elInput.value = "";
-  updateCharCount();
-  await sendMessage(text);
-  elInput.focus();
-});
+if (elForm) {
+  elForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = elInput ? elInput.value || "" : "";
+    syncInputs("", "composer");
+    await sendMessage(text);
+    if (elInput) elInput.focus();
+  });
+}
 
 elInput.addEventListener("keydown", (e) => {
   // Enter sends, Shift+Enter new line
@@ -317,9 +343,19 @@ elInput.addEventListener("keydown", (e) => {
   }
 });
 
-elInput.addEventListener("input", () => {
-  updateCharCount();
-});
+if (elChatInput) {
+  elChatInput.addEventListener("input", () => {
+    syncInputs(elChatInput.value || "", "quick");
+  });
+  elChatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const current = elChatInput.value || "";
+      syncInputs("", "quick");
+      sendMessage(current);
+    }
+  });
+}
 
 elBtnStop.addEventListener("click", () => {
   if (abortCtrl) abortCtrl.abort();
@@ -332,8 +368,10 @@ elBtnClear.addEventListener("click", () => {
 });
 
 // ---- Boot ----
-clearChat();
-addBubble("bot", "Hi — I’m ready. Ask me anything (plain text).");
-elBtnStop.disabled = true;
-elInput.focus();
+updateLinks();
+renderControls();
+renderTranscript();
+setStatus("Ready", false);
 updateCharCount();
+if (elBtnSend) elBtnSend.disabled = false;
+if (elInput) elInput.focus();
