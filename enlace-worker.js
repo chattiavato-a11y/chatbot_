@@ -1,10 +1,10 @@
 /**
  * Cloudflare Worker: enlace (v0)
- * UI -> Enlace -> (Service Binding) -> SSE stream back to UI
+ * UI -> Enlace -> (Service Binding: brain) -> response back to UI
  *
  * Required bindings:
- * - env.AI        (Workers AI) for Llama Guard
- * - env.UPSTREAM  (Service Binding) to your LLM worker
+ * - env.AI     (Workers AI) for Llama Guard
+ * - env.brain  (Service Binding) -> nettunian-io
  */
 
 const ALLOWED_ORIGINS = new Set([
@@ -46,15 +46,6 @@ function json(status, obj, extraHeaders) {
   h.set("content-type", "application/json; charset=utf-8");
   securityHeaders().forEach((v, k) => h.set(k, v));
   return new Response(JSON.stringify(obj), { status, headers: h });
-}
-
-function sse(stream, extraHeaders) {
-  const h = new Headers(extraHeaders || {});
-  h.set("content-type", "text/event-stream; charset=utf-8");
-  h.set("cache-control", "no-cache");
-  h.set("connection", "keep-alive");
-  securityHeaders().forEach((v, k) => h.set(k, v));
-  return new Response(stream, { status: 200, headers: h });
 }
 
 function safeTextOnly(s) {
@@ -126,16 +117,16 @@ function parseGuardResult(res) {
   return { safe: false, categories: ["GUARD_UNPARSEABLE"] };
 }
 
-async function callUpstream(env, messages) {
-  if (!env?.UPSTREAM || typeof env.UPSTREAM.fetch !== "function") {
-    throw new Error("Missing Service Binding: env.UPSTREAM");
+async function callBrain(env, messages) {
+  if (!env?.brain || typeof env.brain.fetch !== "function") {
+    throw new Error("Missing Service Binding: env.brain");
   }
 
-  return env.UPSTREAM.fetch("https://service/api/chat", {
+  return env.brain.fetch("https://service/api/chat", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "accept": "text/event-stream",
+      "accept": "application/json",
     },
     body: JSON.stringify({ messages }),
   });
@@ -217,18 +208,25 @@ export default {
       return json(403, { error: "Blocked by safety filter", categories: verdict.categories || [] }, corsHeaders(origin));
     }
 
-    let upstreamResp;
+    let brainResp;
     try {
-      upstreamResp = await callUpstream(env, messages);
-    } catch {
-      return json(502, { error: "Upstream unreachable" }, corsHeaders(origin));
+      brainResp = await callBrain(env, messages);
+    } catch (e) {
+      return json(502, { error: "Brain unreachable", detail: String(e?.message || e) }, corsHeaders(origin));
     }
 
-    if (!upstreamResp.ok) {
-      const t = await upstreamResp.text().catch(() => "");
-      return json(502, { error: "Upstream error", status: upstreamResp.status, detail: t.slice(0, 2000) }, corsHeaders(origin));
+    if (!brainResp.ok) {
+      const t = await brainResp.text().catch(() => "");
+      return json(502, { error: "Brain error", status: brainResp.status, detail: t.slice(0, 2000) }, corsHeaders(origin));
     }
 
-    return sse(upstreamResp.body, corsHeaders(origin));
+    const brainCt = (brainResp.headers.get("content-type") || "").toLowerCase();
+    if (brainCt.includes("application/json")) {
+      const payload = await brainResp.json().catch(() => ({}));
+      return json(200, payload, corsHeaders(origin));
+    }
+
+    const text = await brainResp.text().catch(() => "");
+    return json(200, { response: text }, corsHeaders(origin));
   },
 };

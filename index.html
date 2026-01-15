@@ -11,32 +11,77 @@
 </head>
 
 <body>
-  <header class="topbar">
-    <div class="topbar-side" aria-hidden="true"></div>
-    <div class="brand">
-      <div class="dot" aria-hidden="true"></div>
-      <div class="brandtext">
-        <div class="title">Chattia</div>
-      </div>
-    </div>
+  <div class="frame" id="app">
+    <section class="main">
+      <div class="topbar">
+        <div class="topbar-left">
+          <div class="burger" id="btnMenu" title="Menu" aria-label="Menu" role="button" tabindex="0">
+            <span></span><span></span><span></span>
+          </div>
 
-    <div class="topbar-controls">
-      <div class="statusbar statusbar--header" aria-label="Status">
-        <span id="statusDot" class="statusdot" aria-hidden="true"></span>
-        <span id="statusText" class="statustext">Ready</span>
-      </div>
-      <div class="actions">
-        <button id="btnClear" class="btn secondary" type="button" title="Clear the chat">Clear</button>
-        <button id="btnStop" class="btn danger" type="button" title="Stop streaming" disabled>Stop</button>
-      </div>
-    </div>
-  </header>
+          <div class="brand">
+            <div class="homeIcon" title="Home" aria-label="Home">⌂</div>
+            <div class="brandName">Chattia</div>
+          </div>
+        </div>
 
-  <main class="shell">
-    <section class="chat" aria-label="Chat transcript">
-      <div id="messages" class="messages" role="log" aria-live="polite" aria-relevant="additions"></div>
-      <div class="chat-reserve" aria-hidden="true"></div>
-    </section>
+        <div class="topbar-right">
+          <div class="toggle lang" id="btnLangTop" role="button" tabindex="0" aria-label="Toggle language">EN</div>
+          <div class="toggle" id="btnThemeTop" role="button" tabindex="0" aria-label="Toggle theme">Dark</div>
+        </div>
+      </div>
+
+      <div class="transcriptArea" id="mainTranscript">
+        <div class="transcriptList" id="mainList"></div>
+      </div>
+
+      <div class="lower">
+        <div class="lowerHeader">
+          <div class="title">Transcript</div>
+
+          <div class="lowerControls">
+            <div class="toggle lang" id="btnLangLower" role="button" tabindex="0" aria-label="Toggle language">EN</div>
+            <div class="toggle" id="btnThemeLower" role="button" tabindex="0" aria-label="Toggle theme">Dark</div>
+            <div class="miniBurger" id="btnMiniMenu" title="Options" aria-label="Options" role="button" tabindex="0">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="chatRow">
+          <div class="chatLabel">Chat</div>
+
+          <div class="chatInputWrap">
+            <input class="chatInput" id="chatInput" placeholder="Type Your Message" />
+          </div>
+
+          <div class="iconBtn" id="btnMic" title="Voice (optional)" aria-label="Voice input">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path class="purpleStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3Zm6-3a6 6 0 0 1-12 0m6 6v3m-4 0h8" />
+            </svg>
+          </div>
+
+          <div class="iconBtn" id="btnWave" title="Listening indicator" aria-label="Listening indicator">
+            <svg viewBox="0 0 24 24" fill="none" id="waveSvg">
+              <g class="waveBars" transform="translate(5,6)">
+                <rect class="purpleFill" x="0" y="6" width="2" height="6" rx="1"></rect>
+                <rect class="purpleFill" x="5" y="3" width="2" height="12" rx="1"></rect>
+                <rect class="purpleFill" x="10" y="6" width="2" height="6" rx="1"></rect>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="footerLeft">
+          <a href="#" id="lnkTc">T&amp;C</a>
+          <a href="#" id="lnkCookies">COOKIES</a>
+          <a href="#" id="lnkContact">CONTACT US</a>
+          <a href="#" id="lnkSupport">SUPPORT</a>
+          <a href="#" id="lnkAbout">ABOUT US</a>
+        </div>
 
     <section class="composer" aria-label="Message composer">
       <form id="chatForm" class="form" autocomplete="off">
@@ -71,7 +116,6 @@
         Plain text only. Code/markup gets blocked upstream. Max 1500 characters.
       </div>
     </section>
-  </main>
 
   <!-- If you keep JS in a separate file -->
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>

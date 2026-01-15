@@ -34,39 +34,26 @@ function setStatus(text, busy) {
   elStatusDot.classList.toggle("busy", !!busy);
 }
 
-function scrollToBottom() {
-  elMessages.scrollTop = elMessages.scrollHeight;
+  if (state.transcript.length) {
+    mainList.parentElement.scrollTop = mainList.parentElement.scrollHeight;
+    sideList.parentElement.scrollTop = sideList.parentElement.scrollHeight;
+  }
 }
 
-function timeStamp() {
-  return new Date().toLocaleString();
+function toggleLang() {
+  state.lang = (state.lang === "EN") ? "ES" : "EN";
+  render();
 }
 
-function addBubble(role, text) {
-  const row = document.createElement("div");
-  row.className = `msg ${role}`;
-
-  const bubble = document.createElement("div");
-  bubble.className = "bubble";
-  bubble.textContent = text || "";
-
-  const meta = document.createElement("div");
-  meta.className = "meta";
-  meta.textContent = `${role.toUpperCase()} • ${timeStamp()}`;
-
-  bubble.appendChild(meta);
-  row.appendChild(bubble);
-  elMessages.appendChild(row);
-
-  scrollToBottom();
-  return { row, bubble };
+function toggleTheme() {
+  state.theme = (state.theme === "dark") ? "light" : "dark";
+  render();
 }
 
-function updateBubble(bubble, text) {
-  const meta = bubble.querySelector(".meta");
-  bubble.textContent = text || "";
-  if (meta) bubble.appendChild(meta);
-  scrollToBottom();
+function clearTranscript() {
+  state.transcript = [];
+  state.history = [];
+  render();
 }
 
 function clearChat() {
@@ -76,7 +63,6 @@ function clearChat() {
   updateCharCount();
 }
 
-// ---- Lightweight input cleanup ----
 function safeTextOnly(s) {
   if (!s) return "";
   return String(s).replace(/\u0000/g, "").trim().slice(0, MAX_INPUT_CHARS);
@@ -89,7 +75,6 @@ function updateCharCount() {
   elCharCount.textContent = `${clamped} / ${MAX_INPUT_CHARS}`;
 }
 
-// ---- Token extraction (handles multiple shapes) ----
 function extractTokenFromAnyShape(obj) {
   if (!obj) return "";
   if (typeof obj === "string") return obj;
@@ -117,18 +102,14 @@ function extractTokenFromAnyShape(obj) {
   return "";
 }
 
-// ---- Streaming (SSE line tolerant) ----
-async function streamFromEnlace(payload, onToken) {
-  abortCtrl = new AbortController();
-
+async function requestFromEnlace(payload) {
   const resp = await fetch(ENLACE_API, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "accept": "text/event-stream",
+      "accept": "application/json",
     },
     body: JSON.stringify(payload),
-    signal: abortCtrl.signal,
   });
 
   if (!resp.ok) {
@@ -137,127 +118,88 @@ async function streamFromEnlace(payload, onToken) {
   }
 
   const ct = (resp.headers.get("content-type") || "").toLowerCase();
-
-  // If Enlace ever returns JSON (non-stream), handle once.
   if (ct.includes("application/json")) {
     const obj = await resp.json().catch(() => null);
-    const token = extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
-    if (token) onToken(token);
-    return;
+    return extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
   }
 
-  if (!resp.body) throw new Error("No response body (stream missing).");
+  return resp.text();
+}
 
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder("utf-8");
+async function sendMessage(userText) {
+  const cleaned = safeTextOnly(userText);
+  if (!cleaned || state.sending) return;
 
-  let buffer = "";
-  let doneSeen = false;
+  state.sending = true;
+  addLine("user", cleaned);
+  state.history.push({ role: "user", content: cleaned });
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    buffer = buffer.replace(/\r\n/g, "\n"); // normalize CRLF -> LF
-
-    let nl;
-    while ((nl = buffer.indexOf("\n")) !== -1) {
-      const line = buffer.slice(0, nl).trimEnd();
-      buffer = buffer.slice(nl + 1);
-
-      if (!line) continue;
-
-      // only process SSE data lines
-      if (!line.startsWith("data:")) continue;
-
-      const data = line.slice(5).trim();
-      if (!data) continue;
-
-      if (data === "[DONE]") {
-        doneSeen = true;
-        break;
-      }
-
-      let token = "";
-      try {
-        const obj = JSON.parse(data);
-        token = extractTokenFromAnyShape(obj);
-      } catch {
-        token = data;
-      }
-
-      if (token) onToken(token);
-    }
-
-    if (doneSeen) break;
+  try {
+    const responseText = await requestFromEnlace({ messages: state.history });
+    const assistantText = responseText && responseText.trim() ? responseText : "(no output)";
+    addLine("assistant", assistantText);
+    state.history.push({ role: "assistant", content: assistantText });
+  } catch (err) {
+    addLine("system", `Error: ${String(err?.message || err)}`);
+  } finally {
+    state.sending = false;
   }
 }
 
-// ---- Main send handler ----
-async function sendMessage(userText) {
-  userText = safeTextOnly(userText);
-  if (!userText) return;
+let recognition = null;
 
-  // UI: show user bubble
-  addBubble("user", userText);
+function canSpeech() {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
 
-  // Add to history
-  history.push({ role: "user", content: userText });
+function startSpeech() {
+  if (!canSpeech()) {
+    addLine("system", "Voice input not supported in this browser. (Try Chrome/Edge.)");
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = (state.lang === "EN") ? "en-US" : "es-ES";
 
-  // UI: create bot bubble that we keep updating
-  const { bubble: botBubble } = addBubble("bot", "");
+  let finalText = "";
 
-  elBtnSend.disabled = true;
-  elBtnStop.disabled = false;
-  setStatus("Thinking…", true);
-
-  let botText = "";
-  let rafId = null;
-  const scheduleUpdate = () => {
-    if (rafId) return;
-    rafId = requestAnimationFrame(() => {
-      rafId = null;
-      updateBubble(botBubble, botText);
-    });
+  recognition.onresult = (event) => {
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const chunk = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalText += chunk + " ";
+      else interim += chunk;
+    }
+    chatInput.value = (finalText + interim).trim();
   };
 
-  try {
-    const payload = { messages: history };
+  recognition.onerror = () => {
+    stopSpeech();
+    addLine("system", "Voice error. Try again.");
+  };
 
-    await streamFromEnlace(payload, (token) => {
-      botText += token;
-      scheduleUpdate();
-    });
+  recognition.onend = () => {
+    if (!state.listening) return;
+    state.listening = false;
+    render();
+  };
 
-    if (rafId) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
-    }
+  state.listening = true;
+  render();
+  recognition.start();
+}
 
-    if (botText.trim()) {
-      updateBubble(botBubble, botText);
-    }
+function stopSpeech() {
+  try { recognition && recognition.stop(); } catch (_) {}
+  state.listening = false;
+  render();
 
-    if (!botText.trim()) {
-      botText = "(no output)";
-      updateBubble(botBubble, botText);
-    }
-
-    history.push({ role: "assistant", content: botText });
-    setStatus("Ready", false);
-  } catch (err) {
-    const msg =
-      err && err.name === "AbortError"
-        ? "Stopped."
-        : `Error:\n${String(err?.message || err)}`;
-
-    updateBubble(botBubble, msg);
-    setStatus("Ready", false);
-  } finally {
-    elBtnSend.disabled = false;
-    elBtnStop.disabled = true;
-    abortCtrl = null;
+  const spoken = chatInput.value.trim();
+  if (spoken) {
+    sendMessage(spoken);
+    chatInput.value = "";
   }
 }
 
@@ -271,13 +213,10 @@ elForm.addEventListener("submit", async (e) => {
   elInput.focus();
 });
 
-elInput.addEventListener("keydown", (e) => {
-  // Enter sends, Shift+Enter new line
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    elForm.requestSubmit();
-  }
-});
+btnLangTop.addEventListener("click", toggleLang);
+btnLangLower.addEventListener("click", toggleLang);
+btnThemeTop.addEventListener("click", toggleTheme);
+btnThemeLower.addEventListener("click", toggleTheme);
 
 elInput.addEventListener("input", () => {
   updateCharCount();
@@ -287,10 +226,13 @@ elBtnStop.addEventListener("click", () => {
   if (abortCtrl) abortCtrl.abort();
 });
 
-elBtnClear.addEventListener("click", () => {
-  if (abortCtrl) abortCtrl.abort();
-  clearChat();
-  addBubble("bot", "Hi — I’m ready. Ask me anything (plain text).");
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const current = chatInput.value;
+    chatInput.value = "";
+    sendMessage(current);
+  }
 });
 
 // ---- Boot ----
