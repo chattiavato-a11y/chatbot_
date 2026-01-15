@@ -15,54 +15,145 @@ const CONFIG = {
 const ENLACE_API = "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat";
 
 // ---- DOM ----
-const elMessages  = document.getElementById("messages");
-const elForm      = document.getElementById("chatForm");
-const elInput     = document.getElementById("input");
-const elBtnSend   = document.getElementById("btnSend");
-const elBtnStop   = document.getElementById("btnStop");
-const elBtnClear  = document.getElementById("btnClear");
+const elApp = document.getElementById("app");
+const elMainList = document.getElementById("mainList");
+const elSideList = document.getElementById("sideList");
+const elForm = document.getElementById("chatForm");
+const elInput = document.getElementById("input");
+const elChatInput = document.getElementById("chatInput");
+const elBtnSend = document.getElementById("btnSend");
+const elBtnClear = document.getElementById("btnClear");
+const elBtnMenu = document.getElementById("btnMenu");
+const elBtnMiniMenu = document.getElementById("btnMiniMenu");
+const elBtnMic = document.getElementById("btnMic");
+const elBtnWave = document.getElementById("btnWave");
+const elBtnLangTop = document.getElementById("btnLangTop");
+const elBtnLangLower = document.getElementById("btnLangLower");
+const elBtnThemeTop = document.getElementById("btnThemeTop");
+const elBtnThemeLower = document.getElementById("btnThemeLower");
+const elSideLang = document.getElementById("sideLang");
+const elSideMode = document.getElementById("sideMode");
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
 const elCharCount = document.getElementById("charCount");
 
+const elLinkTc = document.getElementById("lnkTc");
+const elLinkCookies = document.getElementById("lnkCookies");
+const elLinkContact = document.getElementById("lnkContact");
+const elLinkSupport = document.getElementById("lnkSupport");
+const elLinkAbout = document.getElementById("lnkAbout");
+
 // ---- State ----
 const MAX_INPUT_CHARS = 1500;
-let history = [];                 // { role: "user"|"assistant", content: string }[]
-let abortCtrl = null;
+const MAX_TRANSCRIPT_LINES = 200;
+
+const state = {
+  lang: "EN",
+  theme: document.body.classList.contains("dark") ? "dark" : "light",
+  transcript: [],
+  history: [],
+  sending: false,
+  listening: false,
+  sideOpen: true
+};
 
 // ---- UI helpers ----
 function setStatus(text, busy) {
-  elStatusTxt.textContent = text;
-  elStatusDot.classList.toggle("busy", !!busy);
+  if (elStatusTxt) elStatusTxt.textContent = text;
+  if (elStatusDot) elStatusDot.classList.toggle("busy", !!busy);
 }
 
+function updateLinks() {
+  if (elLinkTc) elLinkTc.href = CONFIG.links.tc || "#";
+  if (elLinkCookies) elLinkCookies.href = CONFIG.links.cookies || "#";
+  if (elLinkContact) elLinkContact.href = CONFIG.links.contact || "#";
+  if (elLinkSupport) elLinkSupport.href = CONFIG.links.support || "#";
+  if (elLinkAbout) elLinkAbout.href = CONFIG.links.about || "#";
+}
+
+function renderTranscript() {
+  if (!elMainList || !elSideList) return;
+
+  const fragment = document.createDocumentFragment();
+  const fragmentSide = document.createDocumentFragment();
+
+  state.transcript.forEach((item) => {
+    const line = document.createElement("div");
+    line.className = "line";
+    line.textContent = `${item.label}: ${item.text}`;
+    fragment.appendChild(line);
+
+    const sideLine = document.createElement("div");
+    sideLine.className = "line";
+    sideLine.textContent = `${item.label}: ${item.text}`;
+    fragmentSide.appendChild(sideLine);
+  });
+
+  elMainList.innerHTML = "";
+  elSideList.innerHTML = "";
+  elMainList.appendChild(fragment);
+  elSideList.appendChild(fragmentSide);
+
   if (state.transcript.length) {
-    mainList.parentElement.scrollTop = mainList.parentElement.scrollHeight;
-    sideList.parentElement.scrollTop = sideList.parentElement.scrollHeight;
+    elMainList.parentElement.scrollTop = elMainList.parentElement.scrollHeight;
+    elSideList.parentElement.scrollTop = elSideList.parentElement.scrollHeight;
   }
 }
 
+function renderControls() {
+  const isDark = state.theme === "dark";
+  document.body.classList.toggle("dark", isDark);
+  document.body.classList.toggle("listening", state.listening);
+
+  const themeLabel = isDark ? "Light" : "Dark";
+  if (elBtnThemeTop) elBtnThemeTop.textContent = themeLabel;
+  if (elBtnThemeLower) elBtnThemeLower.textContent = themeLabel;
+  if (elSideMode) elSideMode.textContent = themeLabel.toUpperCase();
+
+  if (elBtnLangTop) elBtnLangTop.textContent = state.lang;
+  if (elBtnLangLower) elBtnLangLower.textContent = state.lang;
+  if (elSideLang) elSideLang.textContent = state.lang;
+
+  if (elBtnMic) elBtnMic.setAttribute("aria-pressed", String(state.listening));
+  if (elBtnWave) elBtnWave.setAttribute("aria-pressed", String(state.listening));
+
+  if (elApp) elApp.classList.toggle("side-collapsed", !state.sideOpen);
+}
+
+function render() {
+  renderTranscript();
+  renderControls();
+}
+
+function addLine(role, text) {
+  const label = role === "assistant" ? "Chattia" : role === "user" ? "You" : "System";
+  state.transcript.push({ role, label, text });
+  if (state.transcript.length > MAX_TRANSCRIPT_LINES) {
+    state.transcript.shift();
+  }
+  renderTranscript();
+}
+
 function toggleLang() {
-  state.lang = (state.lang === "EN") ? "ES" : "EN";
-  render();
+  state.lang = state.lang === "EN" ? "ES" : "EN";
+  renderControls();
 }
 
 function toggleTheme() {
-  state.theme = (state.theme === "dark") ? "light" : "dark";
-  render();
+  state.theme = state.theme === "dark" ? "light" : "dark";
+  renderControls();
+}
+
+function toggleSidePanel() {
+  state.sideOpen = !state.sideOpen;
+  renderControls();
 }
 
 function clearTranscript() {
   state.transcript = [];
   state.history = [];
-  render();
-}
-
-function clearChat() {
-  elMessages.innerHTML = "";
-  history = [];
+  renderTranscript();
   setStatus("Ready", false);
-  updateCharCount();
 }
 
 function safeTextOnly(s) {
@@ -71,10 +162,16 @@ function safeTextOnly(s) {
 }
 
 function updateCharCount() {
-  if (!elCharCount) return;
+  if (!elCharCount || !elInput) return;
   const length = (elInput.value || "").length;
   const clamped = Math.min(length, MAX_INPUT_CHARS);
   elCharCount.textContent = `${clamped} / ${MAX_INPUT_CHARS}`;
+}
+
+function syncInputs(value, source) {
+  if (elInput && source !== "composer") elInput.value = value;
+  if (elChatInput && source !== "quick") elChatInput.value = value;
+  updateCharCount();
 }
 
 function extractTokenFromAnyShape(obj) {
@@ -110,6 +207,8 @@ async function requestFromEnlace(payload) {
     headers: {
       "content-type": "application/json",
       "accept": "application/json",
+      "x-ops-asset-id": CONFIG.assetIdentity.id || "",
+      "x-ops-asset-sha256": CONFIG.assetIdentity.sha256 || "",
     },
     body: JSON.stringify(payload),
   });
@@ -133,6 +232,7 @@ async function sendMessage(userText) {
   if (!cleaned || state.sending) return;
 
   state.sending = true;
+  setStatus("Thinking…", true);
   addLine("user", cleaned);
   state.history.push({ role: "user", content: cleaned });
 
@@ -141,8 +241,10 @@ async function sendMessage(userText) {
     const assistantText = responseText && responseText.trim() ? responseText : "(no output)";
     addLine("assistant", assistantText);
     state.history.push({ role: "assistant", content: assistantText });
+    setStatus("Ready", false);
   } catch (err) {
     addLine("system", `Error: ${String(err?.message || err)}`);
+    setStatus("Error", false);
   } finally {
     state.sending = false;
   }
@@ -163,7 +265,7 @@ function startSpeech() {
   recognition = new SR();
   recognition.continuous = true;
   recognition.interimResults = true;
-  recognition.lang = (state.lang === "EN") ? "en-US" : "es-ES";
+  recognition.lang = state.lang === "EN" ? "en-US" : "es-ES";
 
   let finalText = "";
 
@@ -174,7 +276,7 @@ function startSpeech() {
       if (event.results[i].isFinal) finalText += chunk + " ";
       else interim += chunk;
     }
-    chatInput.value = (finalText + interim).trim();
+    syncInputs((finalText + interim).trim(), "voice");
   };
 
   recognition.onerror = () => {
@@ -185,99 +287,109 @@ function startSpeech() {
   recognition.onend = () => {
     if (!state.listening) return;
     state.listening = false;
-    render();
+    renderControls();
   };
 
   state.listening = true;
-  render();
+  renderControls();
   recognition.start();
 }
 
 function stopSpeech() {
-  try { recognition && recognition.stop(); } catch (_) {}
-  state.listening = false;
-  render();
-
-  const spoken = chatInput.value.trim();
-  if (spoken) {
-    sendMessage(spoken);
-    chatInput.value = "";
+  try {
+    if (recognition) recognition.stop();
+  } catch (_) {
+    // no-op
   }
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SR();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = (state.lang === "EN") ? "en-US" : "es-ES";
-
-  let finalText = "";
-
-  recognition.onresult = (event) => {
-    let interim = "";
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const chunk = event.results[i][0].transcript;
-      if (event.results[i].isFinal) finalText += chunk + " ";
-      else interim += chunk;
-    }
-    chatInput.value = (finalText + interim).trim();
-  };
-
-  recognition.onerror = () => {
-    stopSpeech();
-    addLine("system", "Voice error. Try again.");
-  };
-
-  recognition.onend = () => {
-    if (!state.listening) return;
-    state.listening = false;
-    render();
-  };
-
-  state.listening = true;
-  render();
-  recognition.start();
+  state.listening = false;
+  renderControls();
 }
-
-// ---- Events ----
-elForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = elInput.value || "";
-  elInput.value = "";
-  updateCharCount();
-  await sendMessage(text);
-  elInput.focus();
-});
-
-btnLangTop.addEventListener("click", toggleLang);
-btnLangLower.addEventListener("click", toggleLang);
-btnThemeTop.addEventListener("click", toggleTheme);
-btnThemeLower.addEventListener("click", toggleTheme);
-
-elInput.addEventListener("input", () => {
-  updateCharCount();
-});
 
 function toggleSpeech() {
   if (state.listening) stopSpeech();
   else startSpeech();
 }
 
-btnLangTop.addEventListener("click", toggleLang);
-btnLangLower.addEventListener("click", toggleLang);
-btnThemeTop.addEventListener("click", toggleTheme);
-btnThemeLower.addEventListener("click", toggleTheme);
-
-chatInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    const current = chatInput.value;
-    chatInput.value = "";
-    sendMessage(current);
+function handleActionKey(event, action) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    action();
   }
-});
+}
+
+// ---- Events ----
+if (elForm) {
+  elForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = elInput ? elInput.value || "" : "";
+    syncInputs("", "composer");
+    await sendMessage(text);
+    if (elInput) elInput.focus();
+  });
+}
+
+if (elInput) {
+  elInput.addEventListener("input", () => {
+    syncInputs(elInput.value || "", "composer");
+  });
+}
+
+if (elChatInput) {
+  elChatInput.addEventListener("input", () => {
+    syncInputs(elChatInput.value || "", "quick");
+  });
+  elChatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const current = elChatInput.value || "";
+      syncInputs("", "quick");
+      sendMessage(current);
+    }
+  });
+}
+
+if (elBtnLangTop) {
+  elBtnLangTop.addEventListener("click", toggleLang);
+  elBtnLangTop.addEventListener("keydown", (e) => handleActionKey(e, toggleLang));
+}
+if (elBtnLangLower) {
+  elBtnLangLower.addEventListener("click", toggleLang);
+  elBtnLangLower.addEventListener("keydown", (e) => handleActionKey(e, toggleLang));
+}
+if (elBtnThemeTop) {
+  elBtnThemeTop.addEventListener("click", toggleTheme);
+  elBtnThemeTop.addEventListener("keydown", (e) => handleActionKey(e, toggleTheme));
+}
+if (elBtnThemeLower) {
+  elBtnThemeLower.addEventListener("click", toggleTheme);
+  elBtnThemeLower.addEventListener("keydown", (e) => handleActionKey(e, toggleTheme));
+}
+
+if (elBtnMenu) {
+  elBtnMenu.addEventListener("click", toggleSidePanel);
+  elBtnMenu.addEventListener("keydown", (e) => handleActionKey(e, toggleSidePanel));
+}
+if (elBtnMiniMenu) {
+  elBtnMiniMenu.addEventListener("click", toggleSidePanel);
+  elBtnMiniMenu.addEventListener("keydown", (e) => handleActionKey(e, toggleSidePanel));
+}
+
+if (elBtnMic) {
+  elBtnMic.addEventListener("click", toggleSpeech);
+  elBtnMic.addEventListener("keydown", (e) => handleActionKey(e, toggleSpeech));
+}
+if (elBtnWave) {
+  elBtnWave.addEventListener("click", toggleSpeech);
+  elBtnWave.addEventListener("keydown", (e) => handleActionKey(e, toggleSpeech));
+}
+
+if (elBtnClear) elBtnClear.addEventListener("click", clearTranscript);
 
 // ---- Boot ----
-clearChat();
-addBubble("bot", "Hi — I’m ready. Ask me anything (plain text).");
-elBtnStop.disabled = true;
-elInput.focus();
+updateLinks();
+renderControls();
+renderTranscript();
+setStatus("Ready", false);
 updateCharCount();
+if (elBtnSend) elBtnSend.disabled = false;
+if (elInput) elInput.focus();
