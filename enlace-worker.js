@@ -1,22 +1,10 @@
 /**
- * Cloudflare Worker: enlace (v0.1 hardened)
- * UI -> Enlace -> (Service Binding: brain -> nettunian-io) -> SSE stream back to UI
+ * Cloudflare Worker: enlace (v0)
+ * UI -> Enlace -> (Service Binding: brain) -> response back to UI
  *
  * Required bindings:
  * - env.AI     (Workers AI) for Llama Guard
  * - env.brain  (Service Binding) -> nettunian-io
- *
- * Optional (recommended) bindings:
- * - env.BRAIN_TOKEN          (Secret) shared token Enlace -> Brain (prevents direct calls)
- * - env.OPS_ASSET_ALLOWLIST  (Text) allowlist of UI Asset IDs (+ optional hash)
- *     Format:
- *       "ASSET_ID_1=SHA256HEX_1,ASSET_ID_2=SHA256HEX_2"
- *     Or ID-only:
- *       "ASSET_ID_1,ASSET_ID_2"
- *
- * Client must send (when OPS_ASSET_ALLOWLIST is set):
- * - x-ops-asset-id: <ASSET_ID>
- * - x-ops-asset-sha256: <SHA256HEX>   (required only if allowlist maps ID->hash)
  */
 
 const ALLOWED_ORIGINS = new Set([
@@ -129,15 +117,6 @@ function json(status, obj, extraHeaders) {
   return new Response(JSON.stringify(obj), { status, headers: h });
 }
 
-function sse(stream, extraHeaders) {
-  const h = new Headers(extraHeaders || {});
-  h.set("content-type", "text/event-stream; charset=utf-8");
-  h.set("cache-control", "no-cache, no-transform");
-  // NOTE: Do NOT set "Connection" header on Workers (often stripped/forbidden).
-  securityHeaders().forEach((v, k) => h.set(k, v));
-  return new Response(stream, { status: 200, headers: h });
-}
-
 function safeTextOnly(s) {
   let out = "";
   for (let i = 0; i < s.length; i++) {
@@ -207,49 +186,17 @@ function parseGuardResult(res) {
   return { safe: false, categories: ["GUARD_UNPARSEABLE"] };
 }
 
-function enforceAssetIdentity(request, env) {
-  const allowMap = parseAllowlist(env?.OPS_ASSET_ALLOWLIST);
-
-  // If no allowlist configured, do not enforce (safe default for rollout).
-  if (!allowMap.size) return { ok: true };
-
-  const assetId = String(request.headers.get("x-ops-asset-id") || "").trim();
-  if (!assetId) return { ok: false, reason: "Missing x-ops-asset-id" };
-
-  if (!allowMap.has(assetId)) return { ok: false, reason: "Unknown asset id" };
-
-  const expectedHash = String(allowMap.get(assetId) || "").trim();
-  if (expectedHash) {
-    const gotHash = String(request.headers.get("x-ops-asset-sha256") || "").trim();
-    if (!gotHash) return { ok: false, reason: "Missing x-ops-asset-sha256" };
-    if (gotHash.toLowerCase() !== expectedHash.toLowerCase()) return { ok: false, reason: "Bad asset hash" };
-  }
-
-  return { ok: true };
-}
-
-async function callBrain(env, messages, clientRequest) {
+async function callBrain(env, messages) {
   if (!env?.brain || typeof env.brain.fetch !== "function") {
     throw new Error("Missing Service Binding: env.brain");
   }
 
-  const headers = {
-    "content-type": "application/json",
-    "accept": "text/event-stream",
-  };
-
-  // Optional: shared-token lock so only Enlace can call Brain
-  if (env.BRAIN_TOKEN) {
-    headers["x-brain-token"] = env.BRAIN_TOKEN;
-  }
-
-  // Pass abort signal through so upstream cancels if client disconnects
-  const signal = clientRequest?.signal;
-
-  // Service bindings use the special host "https://service"
   return env.brain.fetch("https://service/api/chat", {
     method: "POST",
-    headers,
+    headers: {
+      "content-type": "application/json",
+      "accept": "application/json",
+    },
     body: JSON.stringify({ messages }),
     signal,
   });
@@ -354,24 +301,25 @@ export default {
       );
     }
 
-    // Call brain and stream SSE back
     let brainResp;
     try {
-      brainResp = await callBrain(env, messages, request);
+      brainResp = await callBrain(env, messages);
     } catch (e) {
-      return json(502, { error: "Brain unreachable", detail: String(e?.message || e) }, corsHeaders(origin, request));
+      return json(502, { error: "Brain unreachable", detail: String(e?.message || e) }, corsHeaders(origin));
     }
 
     if (!brainResp.ok) {
       const t = await brainResp.text().catch(() => "");
-      return json(
-        502,
-        { error: "Brain error", status: brainResp.status, detail: t.slice(0, 2000) },
-        corsHeaders(origin, request)
-      );
+      return json(502, { error: "Brain error", status: brainResp.status, detail: t.slice(0, 2000) }, corsHeaders(origin));
     }
 
-    // Stream raw SSE body back to the browser
-    return sse(brainResp.body, corsHeaders(origin, request));
+    const brainCt = (brainResp.headers.get("content-type") || "").toLowerCase();
+    if (brainCt.includes("application/json")) {
+      const payload = await brainResp.json().catch(() => ({}));
+      return json(200, payload, corsHeaders(origin));
+    }
+
+    const text = await brainResp.text().catch(() => "");
+    return json(200, { response: text }, corsHeaders(origin));
   },
 };

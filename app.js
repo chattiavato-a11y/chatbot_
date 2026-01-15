@@ -14,68 +14,27 @@ const CONFIG = {
 
 const ENLACE_API = "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat";
 
-let state = {
-  lang: "EN",
-  theme: "light",
-  listening: false,
-  transcript: [],
-  history: [],
-  streaming: false
-};
+// ---- DOM ----
+const elMessages  = document.getElementById("messages");
+const elForm      = document.getElementById("chatForm");
+const elInput     = document.getElementById("input");
+const elBtnSend   = document.getElementById("btnSend");
+const elBtnStop   = document.getElementById("btnStop");
+const elBtnClear  = document.getElementById("btnClear");
+const elStatusDot = document.getElementById("statusDot");
+const elStatusTxt = document.getElementById("statusText");
+const elCharCount = document.getElementById("charCount");
 
-const $ = (id) => document.getElementById(id);
+// ---- State ----
+const MAX_INPUT_CHARS = 1500;
+let history = [];                 // { role: "user"|"assistant", content: string }[]
+let abortCtrl = null;
 
-const mainList = $("mainList");
-const sideList = $("sideList");
-const chatInput = $("chatInput");
-
-const btnLangTop = $("btnLangTop");
-const btnThemeTop = $("btnThemeTop");
-const btnLangLower = $("btnLangLower");
-const btnThemeLower = $("btnThemeLower");
-
-const sideLang = $("sideLang");
-const sideMode = $("sideMode");
-
-const btnClear = $("btnClear");
-const btnMic = $("btnMic");
-const waveSvg = $("waveSvg");
-
-$("lnkTc").href = CONFIG.links.tc;
-$("lnkCookies").href = CONFIG.links.cookies;
-$("lnkContact").href = CONFIG.links.contact;
-$("lnkSupport").href = CONFIG.links.support;
-$("lnkAbout").href = CONFIG.links.about;
-
-function render() {
-  if (state.theme === "dark") document.body.classList.add("dark");
-  else document.body.classList.remove("dark");
-
-  btnLangTop.textContent = state.lang;
-  btnLangLower.textContent = state.lang;
-  sideLang.textContent = state.lang;
-  btnThemeTop.textContent = "Dark";
-  btnThemeLower.textContent = "Dark";
-  sideMode.textContent = state.theme === "dark" ? "DARK" : "DARK";
-
-  if (state.listening) waveSvg.classList.add("listening");
-  else waveSvg.classList.remove("listening");
-
-  mainList.innerHTML = "";
-  sideList.innerHTML = "";
-
-  for (const item of state.transcript) {
-    const label = item.role === "user" ? "You" : "System";
-    const line = document.createElement("div");
-    line.className = "line";
-    line.textContent = `${label}: ${item.text}`;
-    mainList.appendChild(line);
-
-    const s = document.createElement("div");
-    s.className = "line";
-    s.textContent = `${label}: ${item.text}`;
-    sideList.appendChild(s);
-  }
+// ---- UI helpers ----
+function setStatus(text, busy) {
+  elStatusTxt.textContent = text;
+  elStatusDot.classList.toggle("busy", !!busy);
+}
 
   if (state.transcript.length) {
     mainList.parentElement.scrollTop = mainList.parentElement.scrollHeight;
@@ -99,23 +58,23 @@ function clearTranscript() {
   render();
 }
 
-function addLine(role, text) {
-  const t = String(text || "").trim();
-  if (!t) return;
-  state.transcript.push({ role, text: t, ts: Date.now() });
-  render();
-}
-
-function updateLastAssistant(text) {
-  const last = [...state.transcript].reverse().find((item) => item.role === "assistant");
-  if (!last) return;
-  last.text = text;
-  render();
+function clearChat() {
+  elMessages.innerHTML = "";
+  history = [];
+  setStatus("Ready", false);
+  updateCharCount();
 }
 
 function safeTextOnly(s) {
   if (!s) return "";
-  return String(s).replace(/\u0000/g, "").trim();
+  return String(s).replace(/\u0000/g, "").trim().slice(0, MAX_INPUT_CHARS);
+}
+
+function updateCharCount() {
+  if (!elCharCount) return;
+  const length = (elInput.value || "").length;
+  const clamped = Math.min(length, MAX_INPUT_CHARS);
+  elCharCount.textContent = `${clamped} / ${MAX_INPUT_CHARS}`;
 }
 
 function extractTokenFromAnyShape(obj) {
@@ -145,26 +104,13 @@ function extractTokenFromAnyShape(obj) {
   return "";
 }
 
-function buildHeaders() {
-  const headers = {
-    "content-type": "application/json",
-    "accept": "text/event-stream",
-  };
-
-  if (CONFIG.assetIdentity.id) {
-    headers["x-ops-asset-id"] = CONFIG.assetIdentity.id;
-  }
-  if (CONFIG.assetIdentity.sha256) {
-    headers["x-ops-asset-sha256"] = CONFIG.assetIdentity.sha256;
-  }
-
-  return headers;
-}
-
-async function streamFromEnlace(payload, onToken) {
+async function requestFromEnlace(payload) {
   const resp = await fetch(ENLACE_API, {
     method: "POST",
-    headers: buildHeaders(),
+    headers: {
+      "content-type": "application/json",
+      "accept": "application/json",
+    },
     body: JSON.stringify(payload),
   });
 
@@ -174,90 +120,31 @@ async function streamFromEnlace(payload, onToken) {
   }
 
   const ct = (resp.headers.get("content-type") || "").toLowerCase();
-
   if (ct.includes("application/json")) {
     const obj = await resp.json().catch(() => null);
-    const token = extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
-    if (token) onToken(token);
-    return;
+    return extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
   }
 
-  if (!resp.body) throw new Error("No response body (stream missing).");
-
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-
-  let buffer = "";
-  let doneSeen = false;
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    buffer = buffer.replace(/\r\n/g, "\n");
-
-    let nl;
-    while ((nl = buffer.indexOf("\n")) !== -1) {
-      const line = buffer.slice(0, nl).trimEnd();
-      buffer = buffer.slice(nl + 1);
-
-      if (!line) continue;
-      if (!line.startsWith("data:")) continue;
-
-      const data = line.slice(5).trim();
-      if (!data) continue;
-
-      if (data === "[DONE]") {
-        doneSeen = true;
-        break;
-      }
-
-      let token = "";
-      try {
-        const obj = JSON.parse(data);
-        token = extractTokenFromAnyShape(obj);
-      } catch {
-        token = data;
-      }
-
-      if (token) onToken(token);
-    }
-
-    if (doneSeen) break;
-  }
+  return resp.text();
 }
 
 async function sendMessage(userText) {
   const cleaned = safeTextOnly(userText);
-  if (!cleaned || state.streaming) return;
+  if (!cleaned || state.sending) return;
 
-  state.streaming = true;
+  state.sending = true;
   addLine("user", cleaned);
   state.history.push({ role: "user", content: cleaned });
 
-  state.transcript.push({ role: "assistant", text: "", ts: Date.now() });
-  render();
-
-  let assistantText = "";
-
   try {
-    await streamFromEnlace({ messages: state.history }, (token) => {
-      assistantText += token;
-      updateLastAssistant(assistantText);
-    });
-
-    if (!assistantText.trim()) {
-      assistantText = "(no output)";
-      updateLastAssistant(assistantText);
-    }
-
+    const responseText = await requestFromEnlace({ messages: state.history });
+    const assistantText = responseText && responseText.trim() ? responseText : "(no output)";
+    addLine("assistant", assistantText);
     state.history.push({ role: "assistant", content: assistantText });
   } catch (err) {
-    const msg = `Error: ${String(err?.message || err)}`;
-    updateLastAssistant(msg);
+    addLine("system", `Error: ${String(err?.message || err)}`);
   } finally {
-    state.streaming = false;
+    state.sending = false;
   }
 }
 
@@ -316,7 +203,58 @@ function stopSpeech() {
     sendMessage(spoken);
     chatInput.value = "";
   }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = (state.lang === "EN") ? "en-US" : "es-ES";
+
+  let finalText = "";
+
+  recognition.onresult = (event) => {
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const chunk = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalText += chunk + " ";
+      else interim += chunk;
+    }
+    chatInput.value = (finalText + interim).trim();
+  };
+
+  recognition.onerror = () => {
+    stopSpeech();
+    addLine("system", "Voice error. Try again.");
+  };
+
+  recognition.onend = () => {
+    if (!state.listening) return;
+    state.listening = false;
+    render();
+  };
+
+  state.listening = true;
+  render();
+  recognition.start();
 }
+
+// ---- Events ----
+elForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = elInput.value || "";
+  elInput.value = "";
+  updateCharCount();
+  await sendMessage(text);
+  elInput.focus();
+});
+
+btnLangTop.addEventListener("click", toggleLang);
+btnLangLower.addEventListener("click", toggleLang);
+btnThemeTop.addEventListener("click", toggleTheme);
+btnThemeLower.addEventListener("click", toggleTheme);
+
+elInput.addEventListener("input", () => {
+  updateCharCount();
+});
 
 function toggleSpeech() {
   if (state.listening) stopSpeech();
@@ -328,9 +266,6 @@ btnLangLower.addEventListener("click", toggleLang);
 btnThemeTop.addEventListener("click", toggleTheme);
 btnThemeLower.addEventListener("click", toggleTheme);
 
-btnClear.addEventListener("click", clearTranscript);
-btnMic.addEventListener("click", toggleSpeech);
-
 chatInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
@@ -340,4 +275,9 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-render();
+// ---- Boot ----
+clearChat();
+addBubble("bot", "Hi — I’m ready. Ask me anything (plain text).");
+elBtnStop.disabled = true;
+elInput.focus();
+updateCharCount();
