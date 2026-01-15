@@ -1,77 +1,38 @@
-const CONFIG = {
-  links: {
-    tc: "/terms",
-    cookies: "/cookies",
-    contact: "/contact",
-    support: "/support",
-    about: "/about"
-  }
-};
+/**
+ * app.js — Simple Chat UI -> Enlace (/api/chat) with SSE streaming over fetch()
+ *
+ * ✅ Keep simple
+ * ✅ No libraries
+ * ✅ Safe DOM writes (textContent only)
+ *
+ * IMPORTANT:
+ * Since your UI is on GitHub Pages, ENLACE_API MUST be the full URL to:
+ *   https://enlace.<your>.workers.dev/api/chat
+ */
 
-const ENLACE_API = "https://enlace.example.workers.dev/api/chat";
+const ENLACE_API = "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat";
 
-let state = {
-  lang: "EN",
-  theme: "light",
-  listening: false,
-  transcript: [],
-  history: [],
-  sending: false
-};
+// ---- DOM ----
+const elMessages  = document.getElementById("messages");
+const elForm      = document.getElementById("chatForm");
+const elInput     = document.getElementById("input");
+const elBtnSend   = document.getElementById("btnSend");
+const elBtnStop   = document.getElementById("btnStop");
+const elBtnClear  = document.getElementById("btnClear");
+const elStatusDot = document.getElementById("statusDot");
+const elStatusTxt = document.getElementById("statusText");
+const elCharCount = document.getElementById("charCount");
 
-const $ = (id) => document.getElementById(id);
+// ---- State ----
+const MAX_INPUT_CHARS = 1500;
+let history = [];                 // { role: "user"|"assistant", content: string }[]
+let abortCtrl = null;
 
-const mainList = $("mainList");
-const sideList = $("sideList");
-const chatInput = $("chatInput");
-
-const btnLangTop = $("btnLangTop");
-const btnThemeTop = $("btnThemeTop");
-const btnLangLower = $("btnLangLower");
-const btnThemeLower = $("btnThemeLower");
-
-const sideLang = $("sideLang");
-const sideMode = $("sideMode");
-
-const btnClear = $("btnClear");
-const btnMic = $("btnMic");
-const waveSvg = $("waveSvg");
-
-$("lnkTc").href = CONFIG.links.tc;
-$("lnkCookies").href = CONFIG.links.cookies;
-$("lnkContact").href = CONFIG.links.contact;
-$("lnkSupport").href = CONFIG.links.support;
-$("lnkAbout").href = CONFIG.links.about;
-
-function render() {
-  if (state.theme === "dark") document.body.classList.add("dark");
-  else document.body.classList.remove("dark");
-
-  btnLangTop.textContent = state.lang;
-  btnLangLower.textContent = state.lang;
-  sideLang.textContent = state.lang;
-  btnThemeTop.textContent = "Dark";
-  btnThemeLower.textContent = "Dark";
-  sideMode.textContent = state.theme === "dark" ? "DARK" : "DARK";
-
-  if (state.listening) waveSvg.classList.add("listening");
-  else waveSvg.classList.remove("listening");
-
-  mainList.innerHTML = "";
-  sideList.innerHTML = "";
-
-  for (const item of state.transcript) {
-    const label = item.role === "user" ? "You" : "System";
-    const line = document.createElement("div");
-    line.className = "line";
-    line.textContent = `${label}: ${item.text}`;
-    mainList.appendChild(line);
-
-    const s = document.createElement("div");
-    s.className = "line";
-    s.textContent = `${label}: ${item.text}`;
-    sideList.appendChild(s);
-  }
+// ---- UI helpers ----
+function setStatus(text, busy) {
+  elStatusTxt.textContent = text;
+  elStatusDot.classList.toggle("busy", !!busy);
+}
 
   if (state.transcript.length) {
     mainList.parentElement.scrollTop = mainList.parentElement.scrollHeight;
@@ -95,16 +56,23 @@ function clearTranscript() {
   render();
 }
 
-function addLine(role, text) {
-  const t = String(text || "").trim();
-  if (!t) return;
-  state.transcript.push({ role, text: t, ts: Date.now() });
-  render();
+function clearChat() {
+  elMessages.innerHTML = "";
+  history = [];
+  setStatus("Ready", false);
+  updateCharCount();
 }
 
 function safeTextOnly(s) {
   if (!s) return "";
-  return String(s).replace(/\u0000/g, "").trim();
+  return String(s).replace(/\u0000/g, "").trim().slice(0, MAX_INPUT_CHARS);
+}
+
+function updateCharCount() {
+  if (!elCharCount) return;
+  const length = (elInput.value || "").length;
+  const clamped = Math.min(length, MAX_INPUT_CHARS);
+  elCharCount.textContent = `${clamped} / ${MAX_INPUT_CHARS}`;
 }
 
 function extractTokenFromAnyShape(obj) {
@@ -235,18 +203,28 @@ function stopSpeech() {
   }
 }
 
-function toggleSpeech() {
-  if (state.listening) stopSpeech();
-  else startSpeech();
-}
+// ---- Events ----
+elForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = elInput.value || "";
+  elInput.value = "";
+  updateCharCount();
+  await sendMessage(text);
+  elInput.focus();
+});
 
 btnLangTop.addEventListener("click", toggleLang);
 btnLangLower.addEventListener("click", toggleLang);
 btnThemeTop.addEventListener("click", toggleTheme);
 btnThemeLower.addEventListener("click", toggleTheme);
 
-btnClear.addEventListener("click", clearTranscript);
-btnMic.addEventListener("click", toggleSpeech);
+elInput.addEventListener("input", () => {
+  updateCharCount();
+});
+
+elBtnStop.addEventListener("click", () => {
+  if (abortCtrl) abortCtrl.abort();
+});
 
 chatInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
@@ -257,4 +235,9 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-render();
+// ---- Boot ----
+clearChat();
+addBubble("bot", "Hi — I’m ready. Ask me anything (plain text).");
+elBtnStop.disabled = true;
+elInput.focus();
+updateCharCount();
