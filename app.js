@@ -16,7 +16,7 @@ let state = {
   listening: false,
   transcript: [],
   history: [],
-  streaming: false
+  sending: false
 };
 
 const $ = (id) => document.getElementById(id);
@@ -102,13 +102,6 @@ function addLine(role, text) {
   render();
 }
 
-function updateLastAssistant(text) {
-  const last = [...state.transcript].reverse().find((item) => item.role === "assistant");
-  if (!last) return;
-  last.text = text;
-  render();
-}
-
 function safeTextOnly(s) {
   if (!s) return "";
   return String(s).replace(/\u0000/g, "").trim();
@@ -141,12 +134,12 @@ function extractTokenFromAnyShape(obj) {
   return "";
 }
 
-async function streamFromEnlace(payload, onToken) {
+async function requestFromEnlace(payload) {
   const resp = await fetch(ENLACE_API, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "accept": "text/event-stream",
+      "accept": "application/json",
     },
     body: JSON.stringify(payload),
   });
@@ -157,90 +150,31 @@ async function streamFromEnlace(payload, onToken) {
   }
 
   const ct = (resp.headers.get("content-type") || "").toLowerCase();
-
   if (ct.includes("application/json")) {
     const obj = await resp.json().catch(() => null);
-    const token = extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
-    if (token) onToken(token);
-    return;
+    return extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
   }
 
-  if (!resp.body) throw new Error("No response body (stream missing).");
-
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-
-  let buffer = "";
-  let doneSeen = false;
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    buffer = buffer.replace(/\r\n/g, "\n");
-
-    let nl;
-    while ((nl = buffer.indexOf("\n")) !== -1) {
-      const line = buffer.slice(0, nl).trimEnd();
-      buffer = buffer.slice(nl + 1);
-
-      if (!line) continue;
-      if (!line.startsWith("data:")) continue;
-
-      const data = line.slice(5).trim();
-      if (!data) continue;
-
-      if (data === "[DONE]") {
-        doneSeen = true;
-        break;
-      }
-
-      let token = "";
-      try {
-        const obj = JSON.parse(data);
-        token = extractTokenFromAnyShape(obj);
-      } catch {
-        token = data;
-      }
-
-      if (token) onToken(token);
-    }
-
-    if (doneSeen) break;
-  }
+  return resp.text();
 }
 
 async function sendMessage(userText) {
   const cleaned = safeTextOnly(userText);
-  if (!cleaned || state.streaming) return;
+  if (!cleaned || state.sending) return;
 
-  state.streaming = true;
+  state.sending = true;
   addLine("user", cleaned);
   state.history.push({ role: "user", content: cleaned });
 
-  state.transcript.push({ role: "assistant", text: "", ts: Date.now() });
-  render();
-
-  let assistantText = "";
-
   try {
-    await streamFromEnlace({ messages: state.history }, (token) => {
-      assistantText += token;
-      updateLastAssistant(assistantText);
-    });
-
-    if (!assistantText.trim()) {
-      assistantText = "(no output)";
-      updateLastAssistant(assistantText);
-    }
-
+    const responseText = await requestFromEnlace({ messages: state.history });
+    const assistantText = responseText && responseText.trim() ? responseText : "(no output)";
+    addLine("assistant", assistantText);
     state.history.push({ role: "assistant", content: assistantText });
   } catch (err) {
-    const msg = `Error: ${String(err?.message || err)}`;
-    updateLastAssistant(msg);
+    addLine("system", `Error: ${String(err?.message || err)}`);
   } finally {
-    state.streaming = false;
+    state.sending = false;
   }
 }
 

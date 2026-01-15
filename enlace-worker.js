@@ -1,6 +1,6 @@
 /**
  * Cloudflare Worker: enlace (v0)
- * UI -> Enlace -> (Service Binding: brain) -> SSE stream back to UI
+ * UI -> Enlace -> (Service Binding: brain) -> response back to UI
  *
  * Required bindings:
  * - env.AI     (Workers AI) for Llama Guard
@@ -46,15 +46,6 @@ function json(status, obj, extraHeaders) {
   h.set("content-type", "application/json; charset=utf-8");
   securityHeaders().forEach((v, k) => h.set(k, v));
   return new Response(JSON.stringify(obj), { status, headers: h });
-}
-
-function sse(stream, extraHeaders) {
-  const h = new Headers(extraHeaders || {});
-  h.set("content-type", "text/event-stream; charset=utf-8");
-  h.set("cache-control", "no-cache");
-  h.set("connection", "keep-alive");
-  securityHeaders().forEach((v, k) => h.set(k, v));
-  return new Response(stream, { status: 200, headers: h });
 }
 
 function safeTextOnly(s) {
@@ -135,7 +126,7 @@ async function callBrain(env, messages) {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "accept": "text/event-stream",
+      "accept": "application/json",
     },
     body: JSON.stringify({ messages }),
   });
@@ -229,6 +220,13 @@ export default {
       return json(502, { error: "Brain error", status: brainResp.status, detail: t.slice(0, 2000) }, corsHeaders(origin));
     }
 
-    return sse(brainResp.body, corsHeaders(origin));
+    const brainCt = (brainResp.headers.get("content-type") || "").toLowerCase();
+    if (brainCt.includes("application/json")) {
+      const payload = await brainResp.json().catch(() => ({}));
+      return json(200, payload, corsHeaders(origin));
+    }
+
+    const text = await brainResp.text().catch(() => "");
+    return json(200, { response: text }, corsHeaders(origin));
   },
 };
