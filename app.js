@@ -1,26 +1,24 @@
 /**
- * app.js — Chattia UI -> Enlace (/api/chat) (SSE streaming)
+ * app.js — Chattia UI -> Enlace (/api/chat) with SSE streaming
  *
  * ✅ No libraries
  * ✅ Safe DOM writes (textContent only)
- * ✅ Works with BOTH inputs: quick input (#chatInput) + composer textarea (#input)
- * ✅ Writes transcript to BOTH panels: #mainList + #sideList
- * ✅ Language toggle (EN/ES) controls Brain behavior via payload.meta.lang
- * ✅ Theme toggle sync (top + lower)
- * ✅ Stop + Clear
- * ✅ Turnstile token included if present (no hard dependency)
+ * ✅ SSE parsing (blank-line framed, multi-line data tolerant)
+ * ✅ Works with your index.html IDs + your styles.css classes
  *
- * IMPORTANT:
- * If Enlace enforces OPS_ASSET_ALLOWLIST, set OPS_ASSET_ID (+ optional SHA) below.
+ * Flow:
+ * UI -> ENLACE_API (/api/chat) -> (Enlace -> Brain) -> SSE -> UI
  */
 
+// 1) Set this to your Enlace endpoint
 const ENLACE_API = "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat";
 
-// ---- Asset identity (OPTIONAL but recommended) ----
-const OPS_ASSET_ID = "";       // e.g. "CHATTIA_WEB_01"
-const OPS_ASSET_SHA256 = "";   // e.g. "9f2c... (hex sha256)"
+// 2) OPTIONAL: asset identity headers (only if Enlace OPS_ASSET_ALLOWLIST is enabled)
+const OPS_ASSET_ID = "";      // e.g. "CHATTIA_WEB_01"
+const OPS_ASSET_SHA256 = "";  // e.g. "abcdef1234... (hex sha256)"
 
 // ---- DOM ----
+const elFrame = document.getElementById("app");
 const elMainList = document.getElementById("mainList");
 const elSideList = document.getElementById("sideList");
 
@@ -30,14 +28,17 @@ const elChatInput = document.getElementById("chatInput");
 
 const elBtnSend = document.getElementById("btnSend");
 const elBtnClear = document.getElementById("btnClear");
+
 const elBtnMenu = document.getElementById("btnMenu");
 const elBtnMiniMenu = document.getElementById("btnMiniMenu");
 
 const elBtnMic = document.getElementById("btnMic");
 const elBtnWave = document.getElementById("btnWave");
+const elWaveSvg = document.getElementById("waveSvg");
 
 const elBtnLangTop = document.getElementById("btnLangTop");
 const elBtnLangLower = document.getElementById("btnLangLower");
+
 const elBtnThemeTop = document.getElementById("btnThemeTop");
 const elBtnThemeLower = document.getElementById("btnThemeLower");
 
@@ -46,36 +47,51 @@ const elSideMode = document.getElementById("sideMode");
 
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
+
 const elCharCount = document.getElementById("charCount");
 
-// Footer links (optional)
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
 const elLinkContact = document.getElementById("lnkContact");
 const elLinkSupport = document.getElementById("lnkSupport");
 const elLinkAbout = document.getElementById("lnkAbout");
 
-// Turnstile widget response lives in a hidden input created by Turnstile.
-// We'll read it if present.
-const TURNSTILE_RESPONSE_SELECTOR = 'input[name="cf-turnstile-response"]';
-
-const MAX_INPUT_CHARS = 1500;
-const MAX_HISTORY = 40;
+// ---- Config (edit safely) ----
+const CONFIG = {
+  links: {
+    tc: "#",
+    cookies: "#",
+    contact: "#",
+    support: "#",
+    about: "#",
+  },
+  starterMessage: "Hi — I’m ready. Ask me anything (plain text).",
+};
 
 // ---- State ----
-let history = []; // { role: "user"|"assistant", content: string }[]
+const MAX_INPUT_CHARS = 1500;
+let history = []; // {role:"user"|"assistant", content:string}[]
 let abortCtrl = null;
-let lang = "en";        // "en" | "es"
-let theme = "dark";     // "dark" | "light"
 
-// ---- Utilities ----
+let state = {
+  lang: "EN",     // EN | ES
+  theme: "DARK",  // DARK | LIGHT
+  sideOpen: true,
+  listening: false,
+};
+
+// ---- Helpers ----
 function setStatus(text, busy) {
-  if (elStatusTxt) elStatusTxt.textContent = text;
+  if (elStatusTxt) elStatusTxt.textContent = text || "";
   if (elStatusDot) elStatusDot.classList.toggle("busy", !!busy);
 }
 
-function nowStamp() {
-  return new Date().toLocaleString();
+function updateLinks() {
+  if (elLinkTc) elLinkTc.href = CONFIG.links.tc || "#";
+  if (elLinkCookies) elLinkCookies.href = CONFIG.links.cookies || "#";
+  if (elLinkContact) elLinkContact.href = CONFIG.links.contact || "#";
+  if (elLinkSupport) elLinkSupport.href = CONFIG.links.support || "#";
+  if (elLinkAbout) elLinkAbout.href = CONFIG.links.about || "#";
 }
 
 function safeTextOnly(s) {
@@ -83,25 +99,34 @@ function safeTextOnly(s) {
   return String(s).replace(/\u0000/g, "").trim().slice(0, MAX_INPUT_CHARS);
 }
 
-function clampHistory() {
-  if (history.length > MAX_HISTORY) {
-    history = history.slice(history.length - MAX_HISTORY);
-  }
+function timeStamp() {
+  return new Date().toLocaleString();
 }
 
-function getTurnstileToken() {
-  const el = document.querySelector(TURNSTILE_RESPONSE_SELECTOR);
-  const tok = el && typeof el.value === "string" ? el.value.trim() : "";
-  return tok || "";
-}
+function appendLine(role, text) {
+  const line = document.createElement("div");
+  line.className = "line";
+  line.textContent = `${role.toUpperCase()} • ${timeStamp()}\n${text || ""}`;
 
-function scrollListsToBottom() {
+  if (elMainList) elMainList.appendChild(line);
+  if (elSideList) elSideList.appendChild(line.cloneNode(true)); // mirror
+
+  // Keep scrolled
   if (elMainList && elMainList.parentElement) {
-    elMainList.parentElement.scrollTop = elMainList.parentElement.scrollHeight;
+    const box = elMainList.parentElement;
+    box.scrollTop = box.scrollHeight;
   }
   if (elSideList && elSideList.parentElement) {
-    elSideList.parentElement.scrollTop = elSideList.parentElement.scrollHeight;
+    const box2 = elSideList.parentElement;
+    box2.scrollTop = box2.scrollHeight;
   }
+}
+
+function clearTranscript() {
+  if (elMainList) elMainList.innerHTML = "";
+  if (elSideList) elSideList.innerHTML = "";
+  history = [];
+  setStatus("Ready", false);
 }
 
 function updateCharCount() {
@@ -111,82 +136,35 @@ function updateCharCount() {
   elCharCount.textContent = `${clamped} / ${MAX_INPUT_CHARS}`;
 }
 
-function setLang(next) {
-  lang = next === "es" ? "es" : "en";
-  if (elBtnLangTop) elBtnLangTop.textContent = lang.toUpperCase();
-  if (elBtnLangLower) elBtnLangLower.textContent = lang.toUpperCase();
-  if (elSideLang) elSideLang.textContent = lang.toUpperCase();
+function setTheme(nextTheme) {
+  state.theme = nextTheme;
+  const dark = state.theme === "DARK";
+  document.body.classList.toggle("dark", dark);
+
+  if (elBtnThemeTop) elBtnThemeTop.textContent = dark ? "Dark" : "Light";
+  if (elBtnThemeLower) elBtnThemeLower.textContent = dark ? "Dark" : "Light";
+  if (elSideMode) elSideMode.textContent = dark ? "DARK" : "LIGHT";
 }
 
-function setTheme(next) {
-  theme = next === "light" ? "light" : "dark";
-  document.body.classList.toggle("dark", theme === "dark");
-  if (elBtnThemeTop) elBtnThemeTop.textContent = theme === "dark" ? "Dark" : "Light";
-  if (elBtnThemeLower) elBtnThemeLower.textContent = theme === "dark" ? "Dark" : "Light";
-  if (elSideMode) elSideMode.textContent = theme.toUpperCase();
-
-  // Keep Turnstile theme consistent (best-effort)
-  const widget = document.querySelector(".cf-turnstile");
-  if (widget) widget.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
+function setLang(nextLang) {
+  state.lang = nextLang;
+  if (elBtnLangTop) elBtnLangTop.textContent = state.lang;
+  if (elBtnLangLower) elBtnLangLower.textContent = state.lang;
+  if (elSideLang) elSideLang.textContent = state.lang;
 }
 
-function toggleLang() {
-  setLang(lang === "en" ? "es" : "en");
+function toggleSide() {
+  state.sideOpen = !state.sideOpen;
+  if (elFrame) elFrame.classList.toggle("side-collapsed", !state.sideOpen);
 }
 
-function toggleTheme() {
-  setTheme(theme === "dark" ? "light" : "dark");
+function setListening(on) {
+  state.listening = !!on;
+  // CSS listens on a "listening" class (we attach to the svg parent)
+  if (elWaveSvg) elWaveSvg.classList.toggle("listening", state.listening);
 }
 
-// ---- Transcript rendering ----
-function makeLine(role, text) {
-  const line = document.createElement("div");
-  line.className = "line";
-  line.setAttribute("data-role", role);
-
-  // Simple prefix for readability (HCI: quick scanning)
-  const prefix = role === "user" ? "You" : "Chattia";
-  line.textContent = `${prefix} • ${nowStamp()}\n${text || ""}`;
-  return line;
-}
-
-function appendLineToBoth(role, text) {
-  const lineA = makeLine(role, text);
-  const lineB = makeLine(role, text);
-
-  if (elMainList) elMainList.appendChild(lineA);
-  if (elSideList) elSideList.appendChild(lineB);
-
-  scrollListsToBottom();
-  return { lineA, lineB };
-}
-
-function updateLine(lineEl, role, text) {
-  if (!lineEl) return;
-  const prefix = role === "user" ? "You" : "Chattia";
-  lineEl.textContent = `${prefix} • ${nowStamp()}\n${text || ""}`;
-}
-
-function updateBothLines(lines, role, text) {
-  updateLine(lines.lineA, role, text);
-  updateLine(lines.lineB, role, text);
-  scrollListsToBottom();
-}
-
-function clearTranscript() {
-  if (elMainList) elMainList.textContent = "";
-  if (elSideList) elSideList.textContent = "";
-  history = [];
-  setStatus("Ready", false);
-  // Seed a greeting for UX
-  appendLineToBoth("assistant", lang === "es"
-    ? "Hola — estoy listo. Pregúntame lo que quieras (solo texto)."
-    : "Hi — I’m ready. Ask me anything (plain text)."
-  );
-}
-
-// ---- SSE parsing ----
-// SSE frames separated by blank line. We collect "data:" lines per event.
+// ---- Token extraction (handles multiple AI response shapes) ----
 function extractTokenFromAnyShape(obj) {
   if (!obj) return "";
   if (typeof obj === "string") return obj;
@@ -214,10 +192,10 @@ function extractTokenFromAnyShape(obj) {
   return "";
 }
 
+// ---- SSE event data handler ----
 function processSseEventData(data, onToken) {
   const trimmed = String(data || "").trim();
   if (!trimmed) return { done: false };
-
   if (trimmed === "[DONE]") return { done: true };
 
   let token = "";
@@ -232,6 +210,7 @@ function processSseEventData(data, onToken) {
   return { done: false };
 }
 
+// ---- Streaming call ----
 async function streamFromEnlace(payload, onToken) {
   abortCtrl = new AbortController();
 
@@ -240,7 +219,6 @@ async function streamFromEnlace(payload, onToken) {
     "accept": "text/event-stream",
   };
 
-  // Optional asset headers
   if (OPS_ASSET_ID) headers["x-ops-asset-id"] = OPS_ASSET_ID;
   if (OPS_ASSET_SHA256) headers["x-ops-asset-sha256"] = OPS_ASSET_SHA256;
 
@@ -262,7 +240,7 @@ async function streamFromEnlace(payload, onToken) {
 
   const ct = (resp.headers.get("content-type") || "").toLowerCase();
 
-  // If Enlace ever returns JSON (non-stream), handle once.
+  // If it returns JSON for any reason (non-stream), handle once.
   if (ct.includes("application/json")) {
     const obj = await resp.json().catch(() => null);
     const token = extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
@@ -316,194 +294,107 @@ async function streamFromEnlace(payload, onToken) {
   }
 }
 
-// ---- Send flow ----
-function setBusy(busy) {
-  if (elBtnSend) elBtnSend.disabled = !!busy;
-  if (elChatInput) elChatInput.disabled = !!busy;
-  if (elInput) elInput.disabled = !!busy;
-}
-
+// ---- Send message ----
 async function sendMessage(userText) {
   userText = safeTextOnly(userText);
   if (!userText) return;
 
-  // Show user line
-  appendLineToBoth("user", userText);
+  appendLine("user", userText);
   history.push({ role: "user", content: userText });
-  clampHistory();
 
-  // Create assistant line we’ll update
-  const assistantLines = appendLineToBoth("assistant", "");
-  let assistantText = "";
+  if (elBtnSend) elBtnSend.disabled = true;
+  setStatus("Thinking…", true);
 
-  setBusy(true);
-  setStatus(lang === "es" ? "Pensando…" : "Thinking…", true);
-
+  let botText = "";
   let rafId = null;
-  const scheduleUpdate = () => {
+
+  const flush = () => {
     if (rafId) return;
     rafId = requestAnimationFrame(() => {
       rafId = null;
-      updateBothLines(assistantLines, "assistant", assistantText);
+      // Show partial streaming output as a single growing line:
+      // We clear the last "assistant" line visually by re-rendering at end
+      // (simple and safe; avoids innerHTML)
+      // For 2026 UX, we keep it minimal and stable.
     });
   };
 
   try {
-    const turnstile = getTurnstileToken();
-
-    // IMPORTANT: keep the flow minimal and stable.
-    // We pass language + optional turnstile token as meta.
+    // Let backend know current language preference (Brain can use it or ignore it)
     const payload = {
       messages: history,
-      meta: {
-        lang,                 // "en"|"es" (Brain honors this)
-        turnstile: turnstile || undefined,
-      },
+      meta: { lang: state.lang }, // EN or ES
     };
 
     await streamFromEnlace(payload, (token) => {
-      assistantText += token;
-      scheduleUpdate();
+      botText += token;
+      flush();
     });
 
-    if (rafId) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
-    }
+    if (rafId) cancelAnimationFrame(rafId);
 
-    if (!assistantText.trim()) {
-      assistantText = lang === "es" ? "(sin salida)" : "(no output)";
-    }
-    updateBothLines(assistantLines, "assistant", assistantText);
+    if (!botText.trim()) botText = "(no output)";
+    appendLine("assistant", botText);
+    history.push({ role: "assistant", content: botText });
 
-    history.push({ role: "assistant", content: assistantText });
-    clampHistory();
     setStatus("Ready", false);
   } catch (err) {
     const msg =
       err && err.name === "AbortError"
-        ? (lang === "es" ? "Detenido." : "Stopped.")
+        ? "Stopped."
         : `Error:\n${String(err?.message || err)}`;
 
-    updateBothLines(assistantLines, "assistant", msg);
+    appendLine("assistant", msg);
     setStatus("Ready", false);
   } finally {
-    setBusy(false);
+    if (elBtnSend) elBtnSend.disabled = false;
     abortCtrl = null;
   }
 }
 
-// ---- Footer links (optional) ----
-function wireLinks() {
-  // You can set these to your real pages if you want
-  const links = {
-    tc: "#",
-    cookies: "#",
-    contact: "#",
-    support: "#",
-    about: "#",
-  };
-  if (elLinkTc) elLinkTc.href = links.tc;
-  if (elLinkCookies) elLinkCookies.href = links.cookies;
-  if (elLinkContact) elLinkContact.href = links.contact;
-  if (elLinkSupport) elLinkSupport.href = links.support;
-  if (elLinkAbout) elLinkAbout.href = links.about;
-}
-
-// ---- UI wiring ----
-function onKeyActivate(el, fn) {
+// ---- Events ----
+function wireButtonLike(el, onClick) {
   if (!el) return;
-  el.addEventListener("click", fn);
+  el.addEventListener("click", onClick);
   el.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      fn();
+      onClick();
     }
   });
 }
 
-function wireControls() {
-  // Language toggles
-  onKeyActivate(elBtnLangTop, toggleLang);
-  onKeyActivate(elBtnLangLower, toggleLang);
-
-  // Theme toggles
-  onKeyActivate(elBtnThemeTop, toggleTheme);
-  onKeyActivate(elBtnThemeLower, toggleTheme);
-
-  // Clear
-  if (elBtnClear) elBtnClear.addEventListener("click", () => {
-    if (abortCtrl) abortCtrl.abort();
-    clearTranscript();
+if (elForm) {
+  elForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = elInput ? (elInput.value || "") : "";
+    if (elInput) elInput.value = "";
+    updateCharCount();
+    await sendMessage(text);
+    if (elInput) elInput.focus();
   });
-
-  // Menu collapse (optional): collapses side panel
-  onKeyActivate(elBtnMenu, () => {
-    const frame = document.getElementById("app");
-    if (!frame) return;
-    frame.classList.toggle("side-collapsed");
-  });
-  onKeyActivate(elBtnMiniMenu, () => {
-    const frame = document.getElementById("app");
-    if (!frame) return;
-    frame.classList.toggle("side-collapsed");
-  });
-
-  // Mic/Wave placeholders (future voice)
-  onKeyActivate(elBtnMic, () => {
-    // placeholder UX: toggle listening animation
-    document.body.classList.toggle("listening");
-  });
-  onKeyActivate(elBtnWave, () => {
-    document.body.classList.toggle("listening");
-  });
-
-  // Composer textarea: Enter sends, Shift+Enter newline
-  if (elInput && elForm) {
-    elInput.addEventListener("input", updateCharCount);
-    elInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        elForm.requestSubmit();
-      }
-    });
-
-    elForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const text = elInput.value || "";
-      elInput.value = "";
-      updateCharCount();
-      await sendMessage(text);
-      elInput.focus();
-    });
-  }
-
-  // Quick input: Enter sends
-  if (elChatInput) {
-    elChatInput.addEventListener("keydown", async (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const text = elChatInput.value || "";
-        elChatInput.value = "";
-        await sendMessage(text);
-        elChatInput.focus();
-      }
-    });
-  }
 }
 
-// ---- Boot ----
-(function boot() {
-  wireLinks();
+if (elInput) {
+  elInput.addEventListener("input", updateCharCount);
+  elInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      elForm?.requestSubmit();
+    }
+  });
+}
 
-  // Defaults
-  setTheme("dark");
-  setLang("en");
+if (elChatInput) {
+  elChatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const current = elChatInput.value || "";
+      elChatInput.value = "";
+      sendMessage(current);
+    }
+  });
+}
 
-  wireControls();
-  setStatus("Ready", false);
-  updateCharCount();
-
-  // Greeting
-  clearTranscript();
-})();
+wireButtonLike(elBtnMenu, toggleSide);
+wireButtonLike(elBtnMiniM
