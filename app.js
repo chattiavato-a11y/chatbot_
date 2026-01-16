@@ -362,4 +362,28 @@ if (elChatInput) {
 }
 
 wireButtonLike(elBtnMenu, toggleSide);
-wireButtonLike(elBtnMiniM
+wireButtonLike(elBtnMiniMenu, toggleSide);
+
+wireButtonLike(elBtnClear, clearTranscript);
+
+function toggleTheme() {
+  setTheme(state.theme === "DARK" ? "LIGHT" : "DARK");
+}
+
+function toggleLang() {
+  setLang(state.lang === "EN" ? "ES" : "EN");
+}
+
+wireButtonLike(elBtnThemeTop, toggleTheme);
+wireButtonLike(elBtnThemeLower, toggleTheme);
+
+wireButtonLike(elBtnLangTop, toggleLang);
+wireButtonLike(elBtnLangLower, toggleLang);
+
+wireButtonLike(elBtnMic, () => setListening(!state.listening));
+wireButtonLike(elBtnWave, () => setListening(!state.listening));
+
+updateLinks();
+setTheme(state.theme);
+setLang(state.lang);
+setStatus("Ready", false);
