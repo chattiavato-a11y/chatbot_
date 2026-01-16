@@ -516,6 +516,9 @@ body.dark .sideBody{
   flex-direction:column;
   gap:24px;
 }
+.policyPage.is-hidden{
+  display:none;
+}
 
 .policyIntro h2{
   margin:8px 0 6px;
