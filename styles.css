@@ -222,8 +222,6 @@ body.dark .lower{
   background:rgba(42,121,199,.08);
   border-radius:999px;
   padding:4px 12px;
-  height:28px;
-  white-space:nowrap;
   cursor:pointer;
 }
 body.dark .transcriptBtn{
