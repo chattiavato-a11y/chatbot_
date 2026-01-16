@@ -49,6 +49,36 @@ function parseAllowlist(raw) {
   return map;
 }
 
+function enforceAssetIdentity(request, env) {
+  const allowlist = parseAllowlist(env?.OPS_ASSET_ALLOWLIST);
+  if (!allowlist.size) {
+    return { ok: true, reason: "Allowlist disabled" };
+  }
+
+  const assetId = (request.headers.get("x-ops-asset-id") || "").trim();
+  const assetHash = (request.headers.get("x-ops-asset-sha256") || "").trim();
+
+  if (!assetId) {
+    return { ok: false, reason: "Missing x-ops-asset-id" };
+  }
+
+  if (!allowlist.has(assetId)) {
+    return { ok: false, reason: "Asset ID not allowlisted" };
+  }
+
+  const expectedHash = allowlist.get(assetId);
+  if (expectedHash) {
+    if (!assetHash) {
+      return { ok: false, reason: "Missing x-ops-asset-sha256" };
+    }
+    if (assetHash.toLowerCase() !== expectedHash.toLowerCase()) {
+      return { ok: false, reason: "Asset hash mismatch" };
+    }
+  }
+
+  return { ok: true, reason: "Asset verified" };
+}
+
 function corsHeaders(origin, request) {
   const h = new Headers();
 
@@ -198,7 +228,6 @@ async function callBrain(env, messages) {
       "accept": "application/json",
     },
     body: JSON.stringify({ messages }),
-    signal,
   });
 }
 
