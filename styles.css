@@ -189,8 +189,6 @@ body.dark .toggle:hover{ border-color:rgba(255,255,255,.20); }
   position:relative;
   overflow:auto;
 }
-body.dark .line{ border-bottom-color: rgba(255,255,255,.10); }
-
 .transcriptList{
   padding:18px 20px;
   font-size:13px;
@@ -282,9 +280,6 @@ input.chatInput{
   color:inherit;
 }
 input.chatInput::placeholder{ color:var(--muted); }
-body.dark .footer a{ color:var(--text); }
-
-.footer a:hover{ text-decoration:underline; }
 
 .iconBtn{
   width:28px;height:28px;
@@ -322,7 +317,6 @@ body.dark .footer a{ color:var(--text); }
   font-weight:600;
 }
 body.dark .footer a{ color:var(--text); }
-
 .footer a:hover{ text-decoration:underline; }
 
 .footerRight{
@@ -361,6 +355,7 @@ body.dark .footer a{ color:var(--text); }
   gap: 12px;
   align-items:flex-end;
 }
+
 .input{
   width: 100%;
   resize: none;
@@ -401,7 +396,6 @@ body.dark .footer a{ color:var(--text); }
 .char-count{
   font-size: 12px;
   color: var(--muted);
-  font-family: var(--mono);
 }
 
 .btn{
