@@ -293,6 +293,7 @@ body.dark .chatLabel{ color:var(--text); }
   flex:1;
   display:flex;
   align-items:center;
+  flex-wrap:nowrap;
   border:1px solid var(--input-border);
   background:var(--input-bg);
   height:36px;
@@ -310,6 +311,7 @@ input.chatInput{
   outline:none;
   width:100%;
   flex:1;
+  min-width:0;
   font-size:13px;
   background:transparent;
   color:inherit;
@@ -320,6 +322,7 @@ input.chatInput::placeholder{ color:var(--muted); }
   display:flex;
   align-items:center;
   gap:4px;
+  flex-shrink:0;
 }
 
 .chatInputActions .iconBtn{
