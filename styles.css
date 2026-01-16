@@ -242,15 +242,25 @@ body.dark .transcriptBtn:hover{ border-color:rgba(255,255,255,.4); }
   gap:10px;
 }
 
-.lowerControls .miniBurger{
-  width:16px;height:12px; display:grid; gap:3px; cursor:pointer;
+.lowerControls .miniAction{
+  width:26px;
+  height:26px;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  border:0;
+  padding:0;
+  border-radius:8px;
+  background:rgba(255,122,24,.12);
 }
-.lowerControls .miniBurger span{ height:2px; background:var(--orange); display:block; }
-.lowerControls .miniBurger:focus-visible{
+.lowerControls .miniAction:hover{ background:rgba(255,122,24,.2); }
+.lowerControls .miniAction svg{ width:16px; height:16px; }
+.lowerControls .miniAction:focus-visible{
   outline:2px solid var(--focus);
   outline-offset:2px;
-  border-radius:4px;
+  border-radius:6px;
 }
+.accentStroke{ stroke:var(--orange); }
 
 .chatRow{
   display:flex;
