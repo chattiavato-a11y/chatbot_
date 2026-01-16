@@ -22,11 +22,8 @@ const elFrame = document.getElementById("app");
 const elMainList = document.getElementById("mainList");
 const elSideList = document.getElementById("sideList");
 
-const elForm = document.getElementById("chatForm");
-const elInput = document.getElementById("input");
 const elChatInput = document.getElementById("chatInput");
 
-const elBtnSend = document.getElementById("btnSend");
 const elBtnClear = document.getElementById("btnClear");
 
 const elBtnMenu = document.getElementById("btnMenu");
@@ -47,8 +44,6 @@ const elSideMode = document.getElementById("sideMode");
 
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
-
-const elCharCount = document.getElementById("charCount");
 
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
@@ -127,13 +122,6 @@ function clearTranscript() {
   if (elSideList) elSideList.innerHTML = "";
   history = [];
   setStatus("Ready", false);
-}
-
-function updateCharCount() {
-  if (!elCharCount || !elInput) return;
-  const length = (elInput.value || "").length;
-  const clamped = Math.min(length, MAX_INPUT_CHARS);
-  elCharCount.textContent = `${clamped} / ${MAX_INPUT_CHARS}`;
 }
 
 function setTheme(nextTheme) {
@@ -302,7 +290,6 @@ async function sendMessage(userText) {
   appendLine("user", userText);
   history.push({ role: "user", content: userText });
 
-  if (elBtnSend) elBtnSend.disabled = true;
   setStatus("Thinking…", true);
 
   let botText = "";
@@ -347,7 +334,6 @@ async function sendMessage(userText) {
     appendLine("assistant", msg);
     setStatus("Ready", false);
   } finally {
-    if (elBtnSend) elBtnSend.disabled = false;
     abortCtrl = null;
   }
 }
@@ -360,27 +346,6 @@ function wireButtonLike(el, onClick) {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       onClick();
-    }
-  });
-}
-
-if (elForm) {
-  elForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const text = elInput ? (elInput.value || "") : "";
-    if (elInput) elInput.value = "";
-    updateCharCount();
-    await sendMessage(text);
-    if (elInput) elInput.focus();
-  });
-}
-
-if (elInput) {
-  elInput.addEventListener("input", updateCharCount);
-  elInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      elForm?.requestSubmit();
     }
   });
 }
