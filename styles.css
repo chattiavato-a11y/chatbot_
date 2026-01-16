@@ -284,8 +284,9 @@ body.dark .chatLabel{ color:var(--text); }
   border:1px solid var(--input-border);
   background:var(--input-bg);
   height:36px;
-  padding:0 10px;
+  padding:0 6px 0 10px;
   border-radius:10px;
+  gap:6px;
 }
 .chatInputWrap:focus-within{
   border-color:var(--focus);
@@ -296,11 +297,26 @@ input.chatInput{
   border:0;
   outline:none;
   width:100%;
+  flex:1;
   font-size:13px;
   background:transparent;
   color:inherit;
 }
 input.chatInput::placeholder{ color:var(--muted); }
+
+.chatInputActions{
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+
+.chatInputActions .iconBtn{
+  width:24px;
+  height:24px;
+  border-radius:6px;
+  margin-left:0;
+}
+.chatInputActions .iconBtn svg{ width:16px; height:16px; }
 
 .iconBtn{
   width:28px;height:28px;
