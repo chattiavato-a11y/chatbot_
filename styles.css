@@ -3,6 +3,12 @@
   --orange:#ff6a00;
   --green:#12a012;
   --purple:#8a2be2;
+  --spring-mint: rgba(93, 221, 190, 0.45);
+  --spring-lilac: rgba(178, 156, 255, 0.35);
+  --spring-blush: rgba(255, 168, 214, 0.32);
+  --summer-aqua: rgba(92, 200, 255, 0.38);
+  --summer-sea: rgba(58, 179, 199, 0.35);
+  --summer-peri: rgba(136, 175, 255, 0.3);
   --bg:#ffffff;
   --text:#111;
   --muted:#666;
@@ -37,9 +43,15 @@ body{
   margin:0;
   font-family:var(--font);
   background:
-    radial-gradient(circle at top left, rgba(79,140,255,.18), transparent 45%),
-    radial-gradient(circle at 25% 20%, rgba(255,106,0,.15), transparent 40%),
+    radial-gradient(circle at 10% 15%, var(--spring-mint), transparent 55%),
+    radial-gradient(circle at 90% 10%, var(--summer-aqua), transparent 50%),
+    radial-gradient(circle at 65% 85%, var(--spring-blush), transparent 58%),
+    radial-gradient(circle at 20% 80%, var(--summer-sea), transparent 52%),
+    radial-gradient(circle at 80% 55%, var(--spring-lilac), transparent 60%),
+    radial-gradient(circle at 40% 40%, var(--summer-peri), transparent 62%),
     var(--bg);
+  background-size: 160% 160%;
+  animation: seasonal-shift 22s ease-in-out infinite;
   color:var(--text);
   display:flex;
   flex-direction:column;
@@ -477,6 +489,11 @@ body.dark .sideBody{
 @keyframes up{
   0%,100%{ transform:scaleY(0.5); opacity:.45; }
   50%{ transform:scaleY(1.2); opacity:1; }
+}
+
+@keyframes seasonal-shift{
+  0%,100%{ background-position: 0% 0%; }
+  50%{ background-position: 100% 100%; }
 }
 
 @media (max-width: 860px){
