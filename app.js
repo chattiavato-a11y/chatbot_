@@ -28,6 +28,7 @@ const elBtnClear = document.getElementById("btnClear");
 
 const elBtnMenu = document.getElementById("btnMenu");
 const elBtnMiniMenu = document.getElementById("btnMiniMenu");
+const elBtnTranscript = document.getElementById("btnTranscript");
 
 const elBtnMic = document.getElementById("btnMic");
 const elBtnWave = document.getElementById("btnWave");
@@ -370,6 +371,7 @@ if (elChatInput) {
 
 wireButtonLike(elBtnMenu, toggleSide);
 wireButtonLike(elBtnMiniMenu, toggleSide);
+wireButtonLike(elBtnTranscript, toggleSide);
 
 wireButtonLike(elBtnClear, clearTranscript);
 
