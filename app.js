@@ -32,6 +32,7 @@ const elBtnMiniMenu = document.getElementById("btnMiniMenu");
 const elBtnMic = document.getElementById("btnMic");
 const elBtnWave = document.getElementById("btnWave");
 const elWaveSvg = document.getElementById("waveSvg");
+const elBtnSend = document.getElementById("btnSend");
 
 const elBtnLangTop = document.getElementById("btnLangTop");
 const elBtnLangLower = document.getElementById("btnLangLower");
@@ -350,13 +351,19 @@ function wireButtonLike(el, onClick) {
   });
 }
 
+function sendFromInput() {
+  if (!elChatInput) return;
+  const current = elChatInput.value || "";
+  elChatInput.value = "";
+  sendMessage(current);
+  elChatInput.focus();
+}
+
 if (elChatInput) {
   elChatInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      const current = elChatInput.value || "";
-      elChatInput.value = "";
-      sendMessage(current);
+      sendFromInput();
     }
   });
 }
@@ -382,6 +389,7 @@ wireButtonLike(elBtnLangLower, toggleLang);
 
 wireButtonLike(elBtnMic, () => setListening(!state.listening));
 wireButtonLike(elBtnWave, () => setListening(!state.listening));
+wireButtonLike(elBtnSend, sendFromInput);
 
 updateLinks();
 setTheme(state.theme);
