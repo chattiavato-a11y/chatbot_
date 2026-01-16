@@ -39,8 +39,6 @@ const elBtnLangLower = document.getElementById("btnLangLower");
 const elBtnThemeTop = document.getElementById("btnThemeTop");
 const elBtnThemeLower = document.getElementById("btnThemeLower");
 
-const elSideLang = document.getElementById("sideLang");
-const elSideMode = document.getElementById("sideMode");
 
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
@@ -131,14 +129,12 @@ function setTheme(nextTheme) {
 
   if (elBtnThemeTop) elBtnThemeTop.textContent = dark ? "Dark" : "Light";
   if (elBtnThemeLower) elBtnThemeLower.textContent = dark ? "Dark" : "Light";
-  if (elSideMode) elSideMode.textContent = dark ? "DARK" : "LIGHT";
 }
 
 function setLang(nextLang) {
   state.lang = nextLang;
   if (elBtnLangTop) elBtnLangTop.textContent = state.lang;
   if (elBtnLangLower) elBtnLangLower.textContent = state.lang;
-  if (elSideLang) elSideLang.textContent = state.lang;
 }
 
 function toggleSide() {
