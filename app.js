@@ -97,12 +97,17 @@ function timeStamp() {
 }
 
 function appendLine(role, text) {
-  const line = document.createElement("div");
-  line.className = "line";
-  line.textContent = `${role.toUpperCase()} • ${timeStamp()}\n${text || ""}`;
+  const safeText = text || "";
+  const mainLine = document.createElement("div");
+  mainLine.className = "line";
+  mainLine.textContent = safeText;
 
-  if (elMainList) elMainList.appendChild(line);
-  if (elSideList) elSideList.appendChild(line.cloneNode(true)); // mirror
+  const sideLine = document.createElement("div");
+  sideLine.className = "line";
+  sideLine.textContent = `${role.toUpperCase()} • ${timeStamp()}\n${safeText}`;
+
+  if (elMainList) elMainList.appendChild(mainLine);
+  if (elSideList) elSideList.appendChild(sideLine);
 
   // Keep scrolled
   if (elMainList && elMainList.parentElement) {
