@@ -43,6 +43,8 @@ const elBtnThemeLower = document.getElementById("btnThemeLower");
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
 
+const elPolicyPage = document.getElementById("policyPage");
+
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
 const elLinkContact = document.getElementById("lnkContact");
@@ -140,6 +142,27 @@ function setLang(nextLang) {
 function toggleSide() {
   state.sideOpen = !state.sideOpen;
   if (elFrame) elFrame.classList.toggle("side-collapsed", !state.sideOpen);
+}
+
+function revealPolicyPage(sectionId) {
+  if (elPolicyPage) {
+    elPolicyPage.classList.remove("is-hidden");
+  }
+  if (sectionId) {
+    const target = document.getElementById(sectionId);
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (!target.hasAttribute("tabindex")) {
+        target.setAttribute("tabindex", "-1");
+      }
+      target.focus({ preventScroll: true });
+    }
+    if (window.history && window.history.pushState) {
+      window.history.pushState(null, "", `#${sectionId}`);
+    } else {
+      window.location.hash = `#${sectionId}`;
+    }
+  }
 }
 
 function setListening(on) {
@@ -385,7 +408,32 @@ wireButtonLike(elBtnMic, () => setListening(!state.listening));
 wireButtonLike(elBtnWave, () => setListening(!state.listening));
 wireButtonLike(elBtnSend, sendFromInput);
 
+if (elLinkContact) {
+  elLinkContact.addEventListener("click", (event) => {
+    event.preventDefault();
+    revealPolicyPage("contact");
+  });
+}
+
+if (elLinkSupport) {
+  elLinkSupport.addEventListener("click", (event) => {
+    event.preventDefault();
+    revealPolicyPage("support");
+  });
+}
+
+if (elLinkAbout) {
+  elLinkAbout.addEventListener("click", (event) => {
+    event.preventDefault();
+    revealPolicyPage("about");
+  });
+}
+
 updateLinks();
 setTheme(state.theme);
 setLang(state.lang);
 setStatus("Ready", false);
+
+if (["#contact", "#support", "#about"].includes(window.location.hash)) {
+  revealPolicyPage(window.location.hash.replace("#", ""));
+}
