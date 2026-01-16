@@ -296,7 +296,7 @@ body.dark .chatLabel{ color:var(--text); }
   flex-wrap:nowrap;
   border:1px solid var(--input-border);
   background:var(--input-bg);
-  height:36px;
+  min-height:36px;
   padding:0 6px 0 10px;
   border-radius:10px;
   gap:6px;
@@ -321,13 +321,14 @@ input.chatInput::placeholder{ color:var(--muted); }
 .chatInputActions{
   display:flex;
   align-items:center;
-  gap:4px;
+  flex-direction:column;
+  gap:2px;
   flex-shrink:0;
 }
 
 .chatInputActions .iconBtn{
-  width:24px;
-  height:24px;
+  width:22px;
+  height:22px;
   border-radius:6px;
   margin-left:0;
 }
@@ -489,16 +490,13 @@ body.dark .sideBody{
 
 .powered{
   margin:0 10px 10px;
-  height:26px;
-  border:1px solid var(--purple);
-  border-radius:10px;
   display:flex;
   align-items:center;
   justify-content:center;
   font-size:11px;
   font-weight:800;
   color:var(--purple);
-  background:rgba(138,43,226,.05);
+  background:transparent;
 }
 
 .waveBars rect{ opacity:.55; }
