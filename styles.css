@@ -322,8 +322,8 @@ input.chatInput::placeholder{ color:var(--muted); }
 .chatInputActions{
   display:flex;
   align-items:center;
-  flex-direction:column;
-  gap:2px;
+  flex-direction:row;
+  gap:6px;
   flex-shrink:0;
 }
 
