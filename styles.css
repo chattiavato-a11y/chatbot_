@@ -214,13 +214,6 @@ body.dark .lower{
   font-size:12px;
 }
 
-.lowerHeader .title{
-  font-weight:700;
-  color:#000;
-  letter-spacing:.2px;
-}
-body.dark .lowerHeader .title{ color:var(--text); }
-
 .lowerControls{
   display:flex;
   align-items:center;
