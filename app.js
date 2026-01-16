@@ -52,11 +52,11 @@ const elLinkAbout = document.getElementById("lnkAbout");
 // ---- Config (edit safely) ----
 const CONFIG = {
   links: {
-    tc: "#",
-    cookies: "#",
-    contact: "#",
-    support: "#",
-    about: "#",
+    tc: "#tc",
+    cookies: "#cookies",
+    contact: "#contact",
+    support: "#support",
+    about: "#about",
   },
   starterMessage: "Hi — I’m ready. Ask me anything (plain text).",
 };
