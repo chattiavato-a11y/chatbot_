@@ -284,6 +284,8 @@ input.chatInput::placeholder{ color:var(--muted); }
   margin-left:2px;
   border-radius:8px;
   background:rgba(138,43,226,.08);
+  border:0;
+  padding:0;
 }
 .iconBtn:hover{ background:rgba(138,43,226,.16); }
 .iconBtn svg{ width:18px;height:18px; }
