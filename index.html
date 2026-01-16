@@ -4,13 +4,31 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Chattia • Chat</title>
-  <meta name="description" content="Chattia AI a simple chatbot" />
+  <meta name="description" content="Chattia AI — simple chatbot UI (UI → Enlace)." />
 
-  <!-- If you keep CSS in a separate file -->
+  <!-- OPTIONAL CSP fallback (real CSP headers are better when served via CF Pages) -->
+  <!--
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    base-uri 'self';
+    object-src 'none';
+    frame-ancestors 'none';
+    form-action 'self';
+    img-src 'self' data:;
+    style-src 'self';
+    script-src 'self' https://challenges.cloudflare.com;
+    connect-src 'self' https://enlace.grabem-holdem-nuts-right.workers.dev https://challenges.cloudflare.com;
+    frame-src https://challenges.cloudflare.com;
+    font-src 'self' data:;
+    manifest-src 'self';
+    upgrade-insecure-requests
+  ">
+  -->
+
   <link rel="stylesheet" href="styles.css" />
 </head>
 
-<body>
+<body class="dark">
   <div class="frame" id="app">
     <section class="main">
       <div class="topbar">
@@ -31,8 +49,8 @@
         </div>
       </div>
 
-      <div class="transcriptArea" id="mainTranscript">
-        <div class="transcriptList" id="mainList"></div>
+      <div class="transcriptArea" id="mainTranscript" aria-label="Transcript">
+        <div class="transcriptList" id="mainList" aria-live="polite" aria-relevant="additions text"></div>
       </div>
 
       <div class="lower">
@@ -42,6 +60,7 @@
           <div class="lowerControls">
             <div class="toggle lang" id="btnLangLower" role="button" tabindex="0" aria-label="Toggle language">EN</div>
             <div class="toggle" id="btnThemeLower" role="button" tabindex="0" aria-label="Toggle theme">Dark</div>
+
             <div class="miniBurger" id="btnMiniMenu" title="Options" aria-label="Options" role="button" tabindex="0">
               <span></span><span></span><span></span>
             </div>
@@ -56,7 +75,8 @@
               class="chatInput"
               id="chatInput"
               placeholder="Type Your Message"
-              aria-label="Chat message"
+              aria-label="Quick chat message (Enter to send)"
+              autocomplete="off"
             />
           </div>
 
@@ -87,7 +107,7 @@
           <a href="#" id="lnkSupport">SUPPORT</a>
           <a href="#" id="lnkAbout">ABOUT US</a>
         </div>
-        <div class="footerRight">
+        <div class="footerRight" aria-live="polite">
           <span class="statusdot" id="statusDot" aria-hidden="true"></span>
           <span class="statustext" id="statusText">Ready</span>
         </div>
@@ -100,14 +120,14 @@
 
     <aside class="side" aria-label="Transcript panel">
       <div class="sideTop">
-        <div class="sideIcons">
-          <div class="iconBtn" aria-hidden="true">
+        <div class="sideIcons" aria-hidden="true">
+          <div class="iconBtn">
             <svg viewBox="0 0 24 24" fill="none">
               <path class="purpleStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                 d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3Zm6-3a6 6 0 0 1-12 0m6 6v3m-4 0h8" />
             </svg>
           </div>
-          <div class="iconBtn" aria-hidden="true">
+          <div class="iconBtn">
             <svg viewBox="0 0 24 24" fill="none">
               <g class="waveBars" transform="translate(5,6)">
                 <rect class="purpleFill" x="0" y="6" width="2" height="6" rx="1"></rect>
@@ -117,6 +137,7 @@
             </svg>
           </div>
         </div>
+
         <div class="sideLabel">
           <span class="lang" id="sideLang">EN</span>
           <span class="mode" id="sideMode">DARK</span>
@@ -124,13 +145,14 @@
       </div>
 
       <div class="sideBody">
-        <div class="sideTranscript" id="sideList"></div>
+        <div class="sideTranscript" id="sideList" aria-live="polite" aria-relevant="additions text"></div>
       </div>
 
       <button class="clearBtn" id="btnClear" type="button">Clear Transcript</button>
       <div class="powered">Powered by OPS</div>
     </aside>
   </div>
+
   <section class="composer" aria-label="Message composer">
     <form id="chatForm" class="form" autocomplete="off">
       <label class="sr-only" for="input">Message</label>
@@ -151,11 +173,10 @@
           data-sitekey="0x4AAAAAACLhJ4hj3wHeJm8jnF2g2EHn0E8"
           data-theme="dark"
         ></div>
+
         <div class="composer-meta">
           <div id="charCount" class="char-count" aria-live="polite">0 / 1500</div>
-          <button id="btnSend" class="btn primary" type="submit">
-            Send
-          </button>
+          <button id="btnSend" class="btn primary" type="submit">Send</button>
         </div>
       </div>
     </form>
@@ -165,7 +186,6 @@
     </div>
   </section>
 
-  <!-- If you keep JS in a separate file -->
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>
   <script src="app.js" defer></script>
 </body>
