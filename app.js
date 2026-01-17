@@ -33,11 +33,12 @@ const elBtnWave = document.getElementById("btnWave");
 const elWaveSvg = document.getElementById("waveSvg");
 const elBtnSend = document.getElementById("btnSend");
 
-const elBtnLangTop = document.getElementById("btnLangTop");
-const elBtnLangLower = document.getElementById("btnLangLower");
+const elBtnLangMenu = document.getElementById("btnLangMenu");
+const elBtnThemeMenu = document.getElementById("btnThemeMenu");
 
-const elBtnThemeTop = document.getElementById("btnThemeTop");
-const elBtnThemeLower = document.getElementById("btnThemeLower");
+const elMenuOverlay = document.getElementById("menuOverlay");
+const elAccordionMenu = document.getElementById("accordionMenu");
+const elMenuClose = document.getElementById("menuClose");
 
 
 const elStatusDot = document.getElementById("statusDot");
@@ -46,6 +47,13 @@ const elStatusTxt = document.getElementById("statusText");
 const elPolicyOverlay = document.getElementById("policyOverlay");
 const elPolicyPage = document.getElementById("policyPage");
 const elPolicyClose = document.getElementById("policyClose");
+
+const elSupportModal = document.getElementById("supportModal");
+const elSupportClose = document.getElementById("supportClose");
+const elSupportBackdrop = document.querySelector(".supportModalBackdrop");
+
+const elBtnCloseAbout = document.getElementById("btnCloseAbout");
+const elAboutModal = document.getElementById("aboutModal");
 
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
@@ -74,6 +82,7 @@ let state = {
   lang: "EN",     // EN | ES
   theme: "DARK",  // DARK | LIGHT
   sideOpen: true,
+  menuOpen: false,
   listening: false,
 };
 
@@ -138,19 +147,28 @@ function setTheme(nextTheme) {
   const dark = state.theme === "DARK";
   document.body.classList.toggle("dark", dark);
 
-  if (elBtnThemeTop) elBtnThemeTop.textContent = dark ? "Dark" : "Light";
-  if (elBtnThemeLower) elBtnThemeLower.textContent = dark ? "Dark" : "Light";
+  if (elBtnThemeMenu) elBtnThemeMenu.textContent = dark ? "Dark" : "Light";
 }
 
 function setLang(nextLang) {
   state.lang = nextLang;
-  if (elBtnLangTop) elBtnLangTop.textContent = state.lang;
-  if (elBtnLangLower) elBtnLangLower.textContent = state.lang;
+  if (elBtnLangMenu) elBtnLangMenu.textContent = state.lang;
 }
 
 function toggleSide() {
   state.sideOpen = !state.sideOpen;
   if (elFrame) elFrame.classList.toggle("side-collapsed", !state.sideOpen);
+}
+
+function setMenuOpen(isOpen) {
+  state.menuOpen = isOpen;
+  document.body.classList.toggle("menu-open", state.menuOpen);
+  if (elAccordionMenu) elAccordionMenu.setAttribute("aria-hidden", String(!state.menuOpen));
+  if (elMenuOverlay) elMenuOverlay.setAttribute("aria-hidden", String(!state.menuOpen));
+}
+
+function toggleMenu() {
+  setMenuOpen(!state.menuOpen);
 }
 
 function openPolicyModal() {
@@ -164,6 +182,10 @@ function closePolicyModal() {
   } else {
     window.location.hash = "";
   }
+}
+
+function closePolicyPage() {
+  closePolicyModal();
 }
 
 function revealPolicyPage(sectionId) {
@@ -428,7 +450,7 @@ if (elChatInput) {
   });
 }
 
-wireButtonLike(elBtnMenu, toggleSide);
+wireButtonLike(elBtnMenu, toggleMenu);
 wireButtonLike(elBtnMiniMenu, toggleSide);
 wireButtonLike(elBtnClear, clearTranscript);
 
@@ -440,11 +462,8 @@ function toggleLang() {
   setLang(state.lang === "EN" ? "ES" : "EN");
 }
 
-wireButtonLike(elBtnThemeTop, toggleTheme);
-wireButtonLike(elBtnThemeLower, toggleTheme);
-
-wireButtonLike(elBtnLangTop, toggleLang);
-wireButtonLike(elBtnLangLower, toggleLang);
+wireButtonLike(elBtnThemeMenu, toggleTheme);
+wireButtonLike(elBtnLangMenu, toggleLang);
 
 wireButtonLike(elBtnMic, () => setListening(!state.listening));
 wireButtonLike(elBtnWave, () => setListening(!state.listening));
@@ -461,15 +480,30 @@ if (elPolicyOverlay) {
   });
 }
 
+if (elMenuOverlay) {
+  elMenuOverlay.addEventListener("click", () => setMenuOpen(false));
+}
+
+if (elMenuClose) {
+  elMenuClose.addEventListener("click", () => setMenuOpen(false));
+}
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && elPolicyOverlay && !elPolicyOverlay.classList.contains("is-hidden")) {
     closePolicyModal();
   }
 });
 
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.menuOpen) {
+    setMenuOpen(false);
+  }
+});
+
 if (elLinkContact) {
   elLinkContact.addEventListener("click", (event) => {
     event.preventDefault();
+    setMenuOpen(false);
     setModalOpen(true, "contact");
   });
 }
@@ -477,6 +511,7 @@ if (elLinkContact) {
 if (elLinkTc) {
   elLinkTc.addEventListener("click", (event) => {
     event.preventDefault();
+    setMenuOpen(false);
     revealPolicyPage("tc");
   });
 }
@@ -484,6 +519,7 @@ if (elLinkTc) {
 if (elLinkCookies) {
   elLinkCookies.addEventListener("click", (event) => {
     event.preventDefault();
+    setMenuOpen(false);
     revealPolicyPage("cookies");
   });
 }
@@ -491,6 +527,7 @@ if (elLinkCookies) {
 if (elLinkSupport) {
   elLinkSupport.addEventListener("click", (event) => {
     event.preventDefault();
+    setMenuOpen(false);
     openSupportModal();
   });
 }
@@ -498,6 +535,7 @@ if (elLinkSupport) {
 if (elLinkAbout) {
   elLinkAbout.addEventListener("click", (event) => {
     event.preventDefault();
+    setMenuOpen(false);
     revealPolicyPage("about");
   });
 }
