@@ -23,10 +23,7 @@
           </div>
         </div>
 
-        <div class="topbar-right">
-          <div class="toggle lang" id="btnLangTop" role="button" tabindex="0" aria-label="Toggle language">EN</div>
-          <div class="toggle" id="btnThemeTop" role="button" tabindex="0" aria-label="Toggle theme">Dark</div>
-        </div>
+        <div class="topbar-right"></div>
       </div>
 
       <div class="transcriptArea" id="mainTranscript" aria-label="Transcript">
@@ -41,9 +38,6 @@
       <div class="lower">
         <div class="lowerHeader">
           <div class="lowerControls">
-            <div class="toggle lang" id="btnLangLower" role="button" tabindex="0" aria-label="Toggle language">EN</div>
-            <div class="toggle" id="btnThemeLower" role="button" tabindex="0" aria-label="Toggle theme">Dark</div>
-
             <button class="miniAction" id="btnMiniMenu" type="button" title="Download chat" aria-label="Download chat">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path class="accentStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -221,6 +215,35 @@
       <div class="powered">Powered by OPS</div>
     </aside>
   </div>
+
+  <div class="menuOverlay is-hidden" id="menuOverlay" aria-hidden="true"></div>
+  <aside class="accordionMenu" id="accordionMenu" aria-label="Accordion menu" aria-hidden="true">
+    <div class="accordionHeader">
+      <span class="accordionTitle">Menu</span>
+      <button class="menuClose" id="menuClose" type="button" aria-label="Close menu">✕</button>
+    </div>
+
+    <div class="accordionSections">
+      <details class="accordionSection" open>
+        <summary>Preferences</summary>
+        <div class="accordionPanel">
+          <button class="toggle lang" id="btnLangMenu" type="button" aria-label="Toggle language">EN</button>
+          <button class="toggle" id="btnThemeMenu" type="button" aria-label="Toggle theme">Dark</button>
+        </div>
+      </details>
+
+      <details class="accordionSection" open>
+        <summary>Quick links</summary>
+        <div class="accordionPanel links">
+          <a href="#tc" id="lnkTc">T&amp;C</a>
+          <a href="#cookies" id="lnkCookies">COOKIES</a>
+          <a href="#contact" id="lnkContact">CONTACT US</a>
+          <a href="#support" id="lnkSupport">SUPPORT</a>
+          <a href="#about" id="lnkAbout">ABOUT US</a>
+        </div>
+      </details>
+    </div>
+  </aside>
 
   <div class="modalOverlay is-hidden" id="contactModal" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
     <div class="modalPanel">
