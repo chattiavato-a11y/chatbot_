@@ -44,6 +44,8 @@ const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
 
 const elPolicyPage = document.getElementById("policyPage");
+const elPolicyModal = document.getElementById("policyModal");
+const elPolicyCloseTriggers = document.querySelectorAll("[data-policy-close]");
 
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
@@ -153,6 +155,10 @@ function revealPolicyPage(sectionId) {
   if (elPolicyPage) {
     elPolicyPage.classList.remove("is-hidden");
   }
+  if (elPolicyModal) {
+    elPolicyModal.classList.add("is-open");
+    elPolicyModal.setAttribute("aria-hidden", "false");
+  }
   if (sectionId) {
     const target = document.getElementById(sectionId);
     if (target) {
@@ -167,6 +173,21 @@ function revealPolicyPage(sectionId) {
     } else {
       window.location.hash = `#${sectionId}`;
     }
+  }
+}
+
+function closePolicyPage() {
+  if (elPolicyPage) {
+    elPolicyPage.classList.add("is-hidden");
+  }
+  if (elPolicyModal) {
+    elPolicyModal.classList.remove("is-open");
+    elPolicyModal.setAttribute("aria-hidden", "true");
+  }
+  if (window.history && window.history.pushState) {
+    window.history.pushState(null, "", "#");
+  } else {
+    window.location.hash = "#";
   }
 }
 
@@ -413,6 +434,21 @@ wireButtonLike(elBtnMic, () => setListening(!state.listening));
 wireButtonLike(elBtnWave, () => setListening(!state.listening));
 wireButtonLike(elBtnSend, sendFromInput);
 
+if (elPolicyCloseTriggers.length) {
+  elPolicyCloseTriggers.forEach((trigger) => {
+    trigger.addEventListener("click", (event) => {
+      event.preventDefault();
+      closePolicyPage();
+    });
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && elPolicyModal?.classList.contains("is-open")) {
+    closePolicyPage();
+  }
+});
+
 if (elLinkContact) {
   elLinkContact.addEventListener("click", (event) => {
     event.preventDefault();
@@ -434,11 +470,18 @@ if (elLinkAbout) {
   });
 }
 
+if (elLinkCookies) {
+  elLinkCookies.addEventListener("click", (event) => {
+    event.preventDefault();
+    revealPolicyPage("cookies");
+  });
+}
+
 updateLinks();
 setTheme(state.theme);
 setLang(state.lang);
 setStatus("Ready", false);
 
-if (["#contact", "#support", "#about"].includes(window.location.hash)) {
+if (["#contact", "#support", "#about", "#cookies"].includes(window.location.hash)) {
   revealPolicyPage(window.location.hash.replace("#", ""));
 }

@@ -102,6 +102,57 @@
           <span class="statustext" id="statusText">Ready</span>
         </div>
       </div>
+
+      <div class="policyModal" id="policyModal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="policyBackdrop" data-policy-close></div>
+        <section class="policyPage is-hidden" id="policyPage" aria-label="Policy center">
+          <button class="policyClose" type="button" data-policy-close aria-label="Close cookies policy">
+            ✕
+          </button>
+          <div class="policyIntro">
+            <p class="policyEyebrow">Policy Center</p>
+            <h2>Cookies</h2>
+            <p class="policyLead">
+              This page explains the cookies we use to keep the experience reliable, secure, and easy to
+              navigate. We only use cookies needed for core functionality, basic analytics, and your
+              preferences.
+            </p>
+          </div>
+
+          <div class="policyGrid">
+            <article class="policyCard" id="cookies">
+              <h3>Essential Cookies</h3>
+              <p>
+                Required for core functions like page routing, accessibility settings, and security
+                protections. These cookies cannot be disabled because the site would not operate correctly.
+              </p>
+            </article>
+
+            <article class="policyCard">
+              <h3>Preference Cookies</h3>
+              <p>
+                Remember choices such as theme or language so the interface stays consistent across sessions.
+              </p>
+            </article>
+
+            <article class="policyCard">
+              <h3>Analytics Cookies</h3>
+              <p>
+                Help us understand performance and usage trends in aggregate so we can improve speed and
+                usability. We do not store chat content in analytics cookies.
+              </p>
+            </article>
+
+            <article class="policyCard">
+              <h3>Your Choices</h3>
+              <p>
+                You can manage or delete cookies in your browser settings. Blocking essential cookies may
+                limit features or prevent the app from functioning as intended.
+              </p>
+            </article>
+          </div>
+        </section>
+      </div>
     </section>
 
     <div class="gap" aria-hidden="true">
