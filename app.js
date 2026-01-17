@@ -43,7 +43,9 @@ const elBtnThemeLower = document.getElementById("btnThemeLower");
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
 
+const elPolicyOverlay = document.getElementById("policyOverlay");
 const elPolicyPage = document.getElementById("policyPage");
+const elPolicyClose = document.getElementById("policyClose");
 
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
@@ -149,10 +151,21 @@ function toggleSide() {
   if (elFrame) elFrame.classList.toggle("side-collapsed", !state.sideOpen);
 }
 
-function revealPolicyPage(sectionId) {
-  if (elPolicyPage) {
-    elPolicyPage.classList.remove("is-hidden");
+function openPolicyModal() {
+  if (elPolicyOverlay) elPolicyOverlay.classList.remove("is-hidden");
+}
+
+function closePolicyModal() {
+  if (elPolicyOverlay) elPolicyOverlay.classList.add("is-hidden");
+  if (window.history && window.history.pushState) {
+    window.history.pushState(null, "", window.location.pathname);
+  } else {
+    window.location.hash = "";
   }
+}
+
+function revealPolicyPage(sectionId) {
+  openPolicyModal();
   if (sectionId) {
     const target = document.getElementById(sectionId);
     if (target) {
@@ -413,10 +426,40 @@ wireButtonLike(elBtnMic, () => setListening(!state.listening));
 wireButtonLike(elBtnWave, () => setListening(!state.listening));
 wireButtonLike(elBtnSend, sendFromInput);
 
+if (elPolicyClose) {
+  elPolicyClose.addEventListener("click", closePolicyModal);
+}
+
+if (elPolicyOverlay) {
+  elPolicyOverlay.addEventListener("click", (event) => {
+    if (event.target === elPolicyOverlay) closePolicyModal();
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && elPolicyOverlay && !elPolicyOverlay.classList.contains("is-hidden")) {
+    closePolicyModal();
+  }
+});
+
 if (elLinkContact) {
   elLinkContact.addEventListener("click", (event) => {
     event.preventDefault();
     revealPolicyPage("contact");
+  });
+}
+
+if (elLinkTc) {
+  elLinkTc.addEventListener("click", (event) => {
+    event.preventDefault();
+    revealPolicyPage("tc");
+  });
+}
+
+if (elLinkCookies) {
+  elLinkCookies.addEventListener("click", (event) => {
+    event.preventDefault();
+    revealPolicyPage("cookies");
   });
 }
 
@@ -439,6 +482,6 @@ setTheme(state.theme);
 setLang(state.lang);
 setStatus("Ready", false);
 
-if (["#contact", "#support", "#about"].includes(window.location.hash)) {
+if (["#tc", "#cookies", "#contact", "#support", "#about"].includes(window.location.hash)) {
   revealPolicyPage(window.location.hash.replace("#", ""));
 }
