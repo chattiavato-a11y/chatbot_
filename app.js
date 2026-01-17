@@ -43,9 +43,9 @@ const elBtnThemeLower = document.getElementById("btnThemeLower");
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
 
+const elPolicyOverlay = document.getElementById("policyOverlay");
 const elPolicyPage = document.getElementById("policyPage");
-const elAboutModal = document.getElementById("aboutModal");
-const elBtnCloseAbout = document.getElementById("btnCloseAbout");
+const elPolicyClose = document.getElementById("policyClose");
 
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
@@ -76,6 +76,8 @@ let state = {
   sideOpen: true,
   listening: false,
 };
+
+let lastFocusEl = null;
 
 // ---- Helpers ----
 function setStatus(text, busy) {
@@ -151,10 +153,21 @@ function toggleSide() {
   if (elFrame) elFrame.classList.toggle("side-collapsed", !state.sideOpen);
 }
 
-function revealPolicyPage(sectionId) {
-  if (elAboutModal) {
-    elAboutModal.classList.remove("is-hidden");
+function openPolicyModal() {
+  if (elPolicyOverlay) elPolicyOverlay.classList.remove("is-hidden");
+}
+
+function closePolicyModal() {
+  if (elPolicyOverlay) elPolicyOverlay.classList.add("is-hidden");
+  if (window.history && window.history.pushState) {
+    window.history.pushState(null, "", window.location.pathname);
+  } else {
+    window.location.hash = "";
   }
+}
+
+function revealPolicyPage(sectionId) {
+  openPolicyModal();
   if (sectionId) {
     const target = document.getElementById(sectionId);
     if (target) {
@@ -164,23 +177,34 @@ function revealPolicyPage(sectionId) {
       }
       target.focus({ preventScroll: true });
     }
-    if (window.history && window.history.pushState) {
-      window.history.pushState(null, "", `#${sectionId}`);
-    } else {
-      window.location.hash = `#${sectionId}`;
-    }
   }
 }
 
-function closePolicyPage() {
-  if (elAboutModal) {
-    elAboutModal.classList.add("is-hidden");
-  }
+function revealPolicyPage(sectionId) {
+  if (!sectionId) return;
   if (window.history && window.history.pushState) {
-    window.history.pushState(null, "", window.location.pathname);
+    window.history.pushState(null, "", `#${sectionId}`);
   } else {
-    window.location.hash = "";
+    window.location.hash = `#${sectionId}`;
   }
+}
+
+function openSupportModal() {
+  if (!elSupportModal) return;
+  lastFocusEl = document.activeElement;
+  elSupportModal.classList.remove("is-hidden");
+  document.body.classList.add("modal-open");
+  if (elSupportClose) elSupportClose.focus();
+}
+
+function closeSupportModal() {
+  if (!elSupportModal) return;
+  elSupportModal.classList.add("is-hidden");
+  document.body.classList.remove("modal-open");
+  if (lastFocusEl && typeof lastFocusEl.focus === "function") {
+    lastFocusEl.focus();
+  }
+  lastFocusEl = null;
 }
 
 function setListening(on) {
@@ -427,17 +451,47 @@ wireButtonLike(elBtnWave, () => setListening(!state.listening));
 wireButtonLike(elBtnSend, sendFromInput);
 wireButtonLike(elBtnCloseAbout, closePolicyPage);
 
+if (elPolicyClose) {
+  elPolicyClose.addEventListener("click", closePolicyModal);
+}
+
+if (elPolicyOverlay) {
+  elPolicyOverlay.addEventListener("click", (event) => {
+    if (event.target === elPolicyOverlay) closePolicyModal();
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && elPolicyOverlay && !elPolicyOverlay.classList.contains("is-hidden")) {
+    closePolicyModal();
+  }
+});
+
 if (elLinkContact) {
   elLinkContact.addEventListener("click", (event) => {
     event.preventDefault();
-    revealPolicyPage("contact");
+    setModalOpen(true, "contact");
+  });
+}
+
+if (elLinkTc) {
+  elLinkTc.addEventListener("click", (event) => {
+    event.preventDefault();
+    revealPolicyPage("tc");
+  });
+}
+
+if (elLinkCookies) {
+  elLinkCookies.addEventListener("click", (event) => {
+    event.preventDefault();
+    revealPolicyPage("cookies");
   });
 }
 
 if (elLinkSupport) {
   elLinkSupport.addEventListener("click", (event) => {
     event.preventDefault();
-    revealPolicyPage("support");
+    openSupportModal();
   });
 }
 
@@ -448,12 +502,30 @@ if (elLinkAbout) {
   });
 }
 
+if (elSupportClose) {
+  elSupportClose.addEventListener("click", () => {
+    closeSupportModal();
+  });
+}
+
+if (elSupportBackdrop) {
+  elSupportBackdrop.addEventListener("click", () => {
+    closeSupportModal();
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && elSupportModal && !elSupportModal.classList.contains("is-hidden")) {
+    closeSupportModal();
+  }
+});
+
 updateLinks();
 setTheme(state.theme);
 setLang(state.lang);
 setStatus("Ready", false);
 
-if (["#contact", "#support", "#about"].includes(window.location.hash)) {
+if (["#tc", "#cookies", "#contact", "#support", "#about"].includes(window.location.hash)) {
   revealPolicyPage(window.location.hash.replace("#", ""));
 }
 
