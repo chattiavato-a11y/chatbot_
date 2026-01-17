@@ -26,6 +26,8 @@ const elChatInput = document.getElementById("chatInput");
 
 const elBtnClear = document.getElementById("btnClear");
 
+const elEmptyState = document.getElementById("emptyState");
+
 const elBtnMenu = document.getElementById("btnMenu");
 const elBtnMiniMenu = document.getElementById("btnMiniMenu");
 const elBtnMic = document.getElementById("btnMic");
@@ -122,6 +124,8 @@ function appendLine(role, text) {
   if (elMainList) elMainList.appendChild(mainLine);
   if (elSideList) elSideList.appendChild(sideLine);
 
+  if (elEmptyState) elEmptyState.classList.add("is-hidden");
+
   // Keep scrolled
   if (elMainList && elMainList.parentElement) {
     const box = elMainList.parentElement;
@@ -136,6 +140,7 @@ function appendLine(role, text) {
 function clearTranscript() {
   if (elMainList) elMainList.innerHTML = "";
   if (elSideList) elSideList.innerHTML = "";
+  if (elEmptyState) elEmptyState.classList.remove("is-hidden");
   history = [];
   setStatus("Ready", false);
 }

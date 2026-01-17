@@ -54,7 +54,7 @@ body{
   flex-direction:column;
   justify-content:flex-start;
   align-items:center;
-  padding:24px;
+  padding:32px 24px;
   gap:16px;
 }
 
@@ -199,6 +199,22 @@ body.dark .toggle:hover{ border-color:rgba(255,255,255,.20); }
   font-size:14px;
   line-height:1.55;
 }
+.emptyEyebrow{
+  margin:0;
+  font-size:11px;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  color:var(--orange);
+  font-weight:700;
+}
+.transcriptList{
+  padding:84px 24px 24px;
+  font-size:14px;
+  line-height:1.55;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
 .line{
   padding:12px 14px;
   margin-bottom:10px;
@@ -206,6 +222,28 @@ body.dark .toggle:hover{ border-color:rgba(255,255,255,.20); }
   border-radius:14px;
   background:rgba(255,255,255,.7);
   white-space:pre-wrap;
+  max-width:72%;
+  box-shadow:0 10px 22px rgba(16,20,30,.08);
+}
+body.dark .line{
+  border-color: rgba(255,255,255,.08);
+  background:rgba(18,23,34,.9);
+}
+.line-user{
+  border-color: rgba(90,139,255,.25);
+  background:rgba(90,139,255,.08);
+  align-self:flex-end;
+}
+.line-assistant{
+  border-color: rgba(255,139,92,.22);
+  background:rgba(255,139,92,.08);
+  align-self:flex-start;
+}
+body.dark .line-user{
+  background:rgba(90,139,255,.16);
+}
+body.dark .line-assistant{
+  background:rgba(255,139,92,.14);
 }
 body.dark .line{
   border-color: rgba(255,255,255,.08);
@@ -527,6 +565,14 @@ body.dark .sideBody{
   padding:10px;
   font-size:12px;
   line-height:1.45;
+}
+.sideTranscript .line{
+  background:transparent;
+  border:0;
+  padding:6px 0;
+  margin:0;
+  box-shadow:none;
+  max-width:100%;
 }
 
 .clearBtn{
