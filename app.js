@@ -77,6 +77,8 @@ let state = {
   listening: false,
 };
 
+let lastFocusEl = null;
+
 // ---- Helpers ----
 function setStatus(text, busy) {
   if (elStatusTxt) elStatusTxt.textContent = text || "";
@@ -175,27 +177,34 @@ function revealPolicyPage(sectionId) {
       }
       target.focus({ preventScroll: true });
     }
-    if (window.history && window.history.pushState) {
-      window.history.pushState(null, "", `#${sectionId}`);
-    } else {
-      window.location.hash = `#${sectionId}`;
-    }
   }
 }
 
-function closePolicyPage() {
-  if (elPolicyPage) {
-    elPolicyPage.classList.add("is-hidden");
-  }
-  if (elPolicyModal) {
-    elPolicyModal.classList.remove("is-open");
-    elPolicyModal.setAttribute("aria-hidden", "true");
-  }
+function revealPolicyPage(sectionId) {
+  if (!sectionId) return;
   if (window.history && window.history.pushState) {
-    window.history.pushState(null, "", "#");
+    window.history.pushState(null, "", `#${sectionId}`);
   } else {
-    window.location.hash = "#";
+    window.location.hash = `#${sectionId}`;
   }
+}
+
+function openSupportModal() {
+  if (!elSupportModal) return;
+  lastFocusEl = document.activeElement;
+  elSupportModal.classList.remove("is-hidden");
+  document.body.classList.add("modal-open");
+  if (elSupportClose) elSupportClose.focus();
+}
+
+function closeSupportModal() {
+  if (!elSupportModal) return;
+  elSupportModal.classList.add("is-hidden");
+  document.body.classList.remove("modal-open");
+  if (lastFocusEl && typeof lastFocusEl.focus === "function") {
+    lastFocusEl.focus();
+  }
+  lastFocusEl = null;
 }
 
 function setListening(on) {
@@ -440,6 +449,7 @@ wireButtonLike(elBtnLangLower, toggleLang);
 wireButtonLike(elBtnMic, () => setListening(!state.listening));
 wireButtonLike(elBtnWave, () => setListening(!state.listening));
 wireButtonLike(elBtnSend, sendFromInput);
+wireButtonLike(elBtnCloseAbout, closePolicyPage);
 
 if (elPolicyClose) {
   elPolicyClose.addEventListener("click", closePolicyModal);
@@ -460,7 +470,7 @@ document.addEventListener("keydown", (event) => {
 if (elLinkContact) {
   elLinkContact.addEventListener("click", (event) => {
     event.preventDefault();
-    revealPolicyPage("contact");
+    setModalOpen(true, "contact");
   });
 }
 
@@ -481,7 +491,7 @@ if (elLinkCookies) {
 if (elLinkSupport) {
   elLinkSupport.addEventListener("click", (event) => {
     event.preventDefault();
-    revealPolicyPage("support");
+    openSupportModal();
   });
 }
 
@@ -492,12 +502,23 @@ if (elLinkAbout) {
   });
 }
 
-if (elLinkCookies) {
-  elLinkCookies.addEventListener("click", (event) => {
-    event.preventDefault();
-    revealPolicyPage("cookies");
+if (elSupportClose) {
+  elSupportClose.addEventListener("click", () => {
+    closeSupportModal();
   });
 }
+
+if (elSupportBackdrop) {
+  elSupportBackdrop.addEventListener("click", () => {
+    closeSupportModal();
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && elSupportModal && !elSupportModal.classList.contains("is-hidden")) {
+    closeSupportModal();
+  }
+});
 
 updateLinks();
 setTheme(state.theme);
@@ -507,3 +528,17 @@ setStatus("Ready", false);
 if (["#tc", "#cookies", "#contact", "#support", "#about"].includes(window.location.hash)) {
   revealPolicyPage(window.location.hash.replace("#", ""));
 }
+
+if (elAboutModal) {
+  elAboutModal.addEventListener("click", (event) => {
+    if (event.target === elAboutModal) {
+      closePolicyPage();
+    }
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closePolicyPage();
+  }
+});
