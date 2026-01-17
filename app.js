@@ -35,7 +35,6 @@ const elBtnWave = document.getElementById("btnWave");
 const elWaveSvg = document.getElementById("waveSvg");
 const elBtnSend = document.getElementById("btnSend");
 
-const elBtnLangMenu = document.getElementById("btnLangMenu");
 const elBtnThemeMenu = document.getElementById("btnThemeMenu");
 
 const elMenuOverlay = document.getElementById("menuOverlay");
@@ -78,7 +77,6 @@ let history = []; // {role:"user"|"assistant", content:string}[]
 let abortCtrl = null;
 
 let state = {
-  lang: "EN",     // EN | ES
   theme: "DARK",  // DARK | LIGHT
   sideOpen: true,
   menuOpen: false,
@@ -153,11 +151,6 @@ function setTheme(nextTheme) {
   document.body.classList.toggle("dark", dark);
 
   if (elBtnThemeMenu) elBtnThemeMenu.textContent = dark ? "Dark" : "Light";
-}
-
-function setLang(nextLang) {
-  state.lang = nextLang;
-  if (elBtnLangMenu) elBtnLangMenu.textContent = state.lang;
 }
 
 function toggleSide() {
@@ -416,10 +409,8 @@ async function sendMessage(userText) {
   };
 
   try {
-    // Let backend know current language preference (Brain can use it or ignore it)
     const payload = {
       messages: history,
-      meta: { lang: state.lang }, // EN or ES
     };
 
     await streamFromEnlace(payload, (token) => {
@@ -484,12 +475,7 @@ function toggleTheme() {
   setTheme(state.theme === "DARK" ? "LIGHT" : "DARK");
 }
 
-function toggleLang() {
-  setLang(state.lang === "EN" ? "ES" : "EN");
-}
-
 wireButtonLike(elBtnThemeMenu, toggleTheme);
-wireButtonLike(elBtnLangMenu, toggleLang);
 
 wireButtonLike(elBtnMic, () => setListening(!state.listening));
 wireButtonLike(elBtnWave, () => setListening(!state.listening));
@@ -601,7 +587,6 @@ document.addEventListener("keydown", (event) => {
 
 updateLinks();
 setTheme(state.theme);
-setLang(state.lang);
 setStatus("Ready", false);
 
 if (["#tc", "#cookies", "#contact", "#support", "#about"].includes(window.location.hash)) {
