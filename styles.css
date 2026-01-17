@@ -519,6 +519,7 @@ body.dark .sideBody{
   display:none;
 }
 .policyPage{
+  position:relative;
   width:min(1120px, 100%);
   max-height:min(84vh, 760px);
   overflow:auto;
@@ -532,6 +533,23 @@ body.dark .sideBody{
   gap:24px;
   max-height:min(85vh, 840px);
   overflow:auto;
+}
+.policyClose{
+  position:absolute;
+  right:16px;
+  top:16px;
+  border:1px solid rgba(42,121,199,.35);
+  background:var(--surface);
+  color:var(--text);
+  font-weight:700;
+  width:32px;
+  height:32px;
+  border-radius:10px;
+  cursor:pointer;
+}
+.policyClose:focus-visible{
+  outline:2px solid var(--focus);
+  outline-offset:2px;
 }
 
 .modalPanel{
