@@ -505,6 +505,19 @@ body.dark .sideBody{
 .listening .waveBars rect:nth-child(2){ animation:up 0.8s infinite ease-in-out .12s; }
 .listening .waveBars rect:nth-child(3){ animation:up 0.8s infinite ease-in-out .24s; }
 
+.policyOverlay{
+  position:fixed;
+  inset:0;
+  background:rgba(10,12,18,.68);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  z-index:20;
+}
+.policyOverlay.is-hidden{
+  display:none;
+}
 .policyPage{
   width:min(1120px, 100%);
   background:var(--panel);
@@ -515,17 +528,38 @@ body.dark .sideBody{
   display:flex;
   flex-direction:column;
   gap:24px;
+  max-height:min(85vh, 840px);
+  overflow:auto;
 }
-.supportModal{
-  position:fixed;
-  inset:0;
-  display:grid;
-  place-items:center;
-  padding:24px;
-  z-index:40;
+
+.modalPanel{
+  width:min(1180px, 100%);
+  max-height:90vh;
+  overflow:auto;
+  position:relative;
+  border-radius:24px;
+  box-shadow:0 30px 80px rgba(10,12,18,.35);
 }
-.supportModal.is-hidden{
-  display:none;
+
+.modalClose{
+  position:absolute;
+  top:18px;
+  right:18px;
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  border:0;
+  background:rgba(0,0,0,.08);
+  font-size:16px;
+  font-weight:700;
+  cursor:pointer;
+}
+body.dark .modalClose{ background:rgba(255,255,255,.15); color:var(--text); }
+.modalClose:hover{ background:rgba(0,0,0,.14); }
+body.dark .modalClose:hover{ background:rgba(255,255,255,.25); }
+.modalClose:focus-visible{
+  outline:2px solid var(--focus);
+  outline-offset:2px;
 }
 .supportModalBackdrop{
   position:absolute;
@@ -609,6 +643,21 @@ body.dark .policyCard{
   font-size:13px;
 }
 .policyCard p:last-child{ margin-bottom:0; }
+.policyClose{
+  align-self:flex-end;
+  border:0;
+  background:var(--orange);
+  color:#fff;
+  padding:10px 16px;
+  border-radius:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+.policyClose:hover{ filter:brightness(.95); }
+.policyClose:focus-visible{
+  outline:2px solid var(--focus);
+  outline-offset:2px;
+}
 @keyframes up{
   0%,100%{ transform:scaleY(0.5); opacity:.45; }
   50%{ transform:scaleY(1.2); opacity:1; }
