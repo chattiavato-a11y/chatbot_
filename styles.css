@@ -81,6 +81,7 @@ body{
   border-radius:var(--radius);
   box-shadow:var(--shadow);
   overflow:hidden;
+  min-height:min(720px, calc(100dvh - 64px));
 }
 .frame.side-collapsed{
   grid-template-columns: 1fr;
@@ -811,14 +812,30 @@ body.dark .policyCard{
 }
 
 @media (max-width: 860px){
+  body{
+    padding:20px 16px;
+  }
   .frame{
     grid-template-columns: 1fr;
+    min-height:calc(100dvh - 40px);
+    border-radius:16px;
   }
   .main{
     border-right:0;
+    min-height:auto;
   }
   .gap{ display:none; }
   .side{
     margin-top:10px;
+    min-height:auto;
+  }
+  .transcriptArea,
+  .sideBody{
+    scrollbar-width:none;
+  }
+  .transcriptArea::-webkit-scrollbar,
+  .sideBody::-webkit-scrollbar{
+    width:0;
+    height:0;
   }
 }
