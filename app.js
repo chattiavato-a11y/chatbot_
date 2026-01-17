@@ -175,11 +175,15 @@ function revealPolicyPage(sectionId) {
       }
       target.focus({ preventScroll: true });
     }
-    if (window.history && window.history.pushState) {
-      window.history.pushState(null, "", `#${sectionId}`);
-    } else {
-      window.location.hash = `#${sectionId}`;
-    }
+  }
+}
+
+function revealPolicyPage(sectionId) {
+  if (!sectionId) return;
+  if (window.history && window.history.pushState) {
+    window.history.pushState(null, "", `#${sectionId}`);
+  } else {
+    window.location.hash = `#${sectionId}`;
   }
 }
 
@@ -445,7 +449,7 @@ document.addEventListener("keydown", (event) => {
 if (elLinkContact) {
   elLinkContact.addEventListener("click", (event) => {
     event.preventDefault();
-    revealPolicyPage("contact");
+    setModalOpen(true, "contact");
   });
 }
 
