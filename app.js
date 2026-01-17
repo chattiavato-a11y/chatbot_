@@ -449,6 +449,7 @@ wireButtonLike(elBtnLangLower, toggleLang);
 wireButtonLike(elBtnMic, () => setListening(!state.listening));
 wireButtonLike(elBtnWave, () => setListening(!state.listening));
 wireButtonLike(elBtnSend, sendFromInput);
+wireButtonLike(elBtnCloseAbout, closePolicyPage);
 
 if (elPolicyClose) {
   elPolicyClose.addEventListener("click", closePolicyModal);
@@ -527,3 +528,17 @@ setStatus("Ready", false);
 if (["#tc", "#cookies", "#contact", "#support", "#about"].includes(window.location.hash)) {
   revealPolicyPage(window.location.hash.replace("#", ""));
 }
+
+if (elAboutModal) {
+  elAboutModal.addEventListener("click", (event) => {
+    if (event.target === elAboutModal) {
+      closePolicyPage();
+    }
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closePolicyPage();
+  }
+});
