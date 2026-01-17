@@ -30,6 +30,11 @@
       </div>
 
       <div class="transcriptArea" id="mainTranscript" aria-label="Transcript">
+        <div class="emptyState" id="emptyState">
+          <p class="emptyEyebrow">Welcome</p>
+          <h2>Start a conversation</h2>
+          <p>Ask a question, describe a problem, or drop a goal. You’ll get clear steps back.</p>
+        </div>
         <div class="transcriptList" id="mainList" aria-live="polite" aria-relevant="additions text"></div>
       </div>
 
@@ -90,7 +95,7 @@
       </div>
 
       <div class="supportModal is-hidden" id="supportModal" role="dialog" aria-modal="true" aria-labelledby="supportTitle">
-        <div class="supportModalBackdrop" data-support-close="true" aria-hidden="true"></div>
+        <div class="supportModalBackdrop" id="supportModalBackdrop" data-support-close="true" aria-hidden="true"></div>
         <div class="supportModalCard" role="document">
           <button class="supportClose" id="supportClose" type="button" aria-label="Close support panel">
             Close
@@ -129,11 +134,16 @@
 
       <div class="footer">
         <div class="footerLeft">
-          <a href="#tc" id="lnkTc">T&amp;C</a>
-          <a href="#cookies" id="lnkCookies">COOKIES</a>
-          <a href="#contact" id="lnkContact">CONTACT US</a>
-          <a href="#support" id="lnkSupport">SUPPORT</a>
-          <a href="#about" id="lnkAbout">ABOUT US</a>
+          <button class="footerMenuBtn" id="btnFooterMenu" type="button" aria-haspopup="true" aria-expanded="false">
+            Help &amp; Policies
+            <span aria-hidden="true">▾</span>
+          </button>
+          <div class="footerMenu is-hidden" id="footerMenu" role="menu" aria-label="Help and policies">
+            <button class="footerMenuItem" type="button" role="menuitem" data-policy="tc">T&amp;C</button>
+            <button class="footerMenuItem" type="button" role="menuitem" data-policy="contact">Contact us</button>
+            <button class="footerMenuItem" type="button" role="menuitem" data-policy="support">Support</button>
+            <button class="footerMenuItem" type="button" role="menuitem" data-policy="about">About us</button>
+          </div>
         </div>
         <div class="footerRight" aria-live="polite">
           <span class="statusdot" id="statusDot" aria-hidden="true"></span>
