@@ -505,6 +505,19 @@ body.dark .sideBody{
 .listening .waveBars rect:nth-child(2){ animation:up 0.8s infinite ease-in-out .12s; }
 .listening .waveBars rect:nth-child(3){ animation:up 0.8s infinite ease-in-out .24s; }
 
+.policyOverlay{
+  position:fixed;
+  inset:0;
+  background:rgba(10,12,18,.68);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  z-index:20;
+}
+.policyOverlay.is-hidden{
+  display:none;
+}
 .policyPage{
   width:min(1120px, 100%);
   background:var(--panel);
@@ -515,9 +528,8 @@ body.dark .sideBody{
   display:flex;
   flex-direction:column;
   gap:24px;
-}
-.policyPage.is-hidden{
-  display:none;
+  max-height:min(85vh, 840px);
+  overflow:auto;
 }
 
 .policyIntro h2{
@@ -566,6 +578,21 @@ body.dark .policyCard{
   font-size:13px;
 }
 .policyCard p:last-child{ margin-bottom:0; }
+.policyClose{
+  align-self:flex-end;
+  border:0;
+  background:var(--orange);
+  color:#fff;
+  padding:10px 16px;
+  border-radius:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+.policyClose:hover{ filter:brightness(.95); }
+.policyClose:focus-visible{
+  outline:2px solid var(--focus);
+  outline-offset:2px;
+}
 @keyframes up{
   0%,100%{ transform:scaleY(0.5); opacity:.45; }
   50%{ transform:scaleY(1.2); opacity:1; }
