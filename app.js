@@ -43,7 +43,9 @@ const elBtnThemeLower = document.getElementById("btnThemeLower");
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
 
-const elPolicyPage = document.getElementById("policyPage");
+const elSupportModal = document.getElementById("supportModal");
+const elSupportClose = document.getElementById("supportClose");
+const elSupportBackdrop = document.querySelector("[data-support-close]");
 
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
@@ -74,6 +76,8 @@ let state = {
   sideOpen: true,
   listening: false,
 };
+
+let lastFocusEl = null;
 
 // ---- Helpers ----
 function setStatus(text, busy) {
@@ -150,9 +154,7 @@ function toggleSide() {
 }
 
 function revealPolicyPage(sectionId) {
-  if (elPolicyPage) {
-    elPolicyPage.classList.remove("is-hidden");
-  }
+  if (!sectionId) return;
   if (sectionId) {
     const target = document.getElementById(sectionId);
     if (target) {
@@ -168,6 +170,24 @@ function revealPolicyPage(sectionId) {
       window.location.hash = `#${sectionId}`;
     }
   }
+}
+
+function openSupportModal() {
+  if (!elSupportModal) return;
+  lastFocusEl = document.activeElement;
+  elSupportModal.classList.remove("is-hidden");
+  document.body.classList.add("modal-open");
+  if (elSupportClose) elSupportClose.focus();
+}
+
+function closeSupportModal() {
+  if (!elSupportModal) return;
+  elSupportModal.classList.add("is-hidden");
+  document.body.classList.remove("modal-open");
+  if (lastFocusEl && typeof lastFocusEl.focus === "function") {
+    lastFocusEl.focus();
+  }
+  lastFocusEl = null;
 }
 
 function setListening(on) {
@@ -423,7 +443,7 @@ if (elLinkContact) {
 if (elLinkSupport) {
   elLinkSupport.addEventListener("click", (event) => {
     event.preventDefault();
-    revealPolicyPage("support");
+    openSupportModal();
   });
 }
 
@@ -434,11 +454,29 @@ if (elLinkAbout) {
   });
 }
 
+if (elSupportClose) {
+  elSupportClose.addEventListener("click", () => {
+    closeSupportModal();
+  });
+}
+
+if (elSupportBackdrop) {
+  elSupportBackdrop.addEventListener("click", () => {
+    closeSupportModal();
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && elSupportModal && !elSupportModal.classList.contains("is-hidden")) {
+    closeSupportModal();
+  }
+});
+
 updateLinks();
 setTheme(state.theme);
 setLang(state.lang);
 setStatus("Ready", false);
 
-if (["#contact", "#support", "#about"].includes(window.location.hash)) {
-  revealPolicyPage(window.location.hash.replace("#", ""));
+if (window.location.hash === "#support") {
+  openSupportModal();
 }
