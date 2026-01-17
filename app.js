@@ -77,6 +77,8 @@ let state = {
   listening: false,
 };
 
+let lastFocusEl = null;
+
 // ---- Helpers ----
 function setStatus(text, busy) {
   if (elStatusTxt) elStatusTxt.textContent = text || "";
@@ -185,6 +187,24 @@ function revealPolicyPage(sectionId) {
   } else {
     window.location.hash = `#${sectionId}`;
   }
+}
+
+function openSupportModal() {
+  if (!elSupportModal) return;
+  lastFocusEl = document.activeElement;
+  elSupportModal.classList.remove("is-hidden");
+  document.body.classList.add("modal-open");
+  if (elSupportClose) elSupportClose.focus();
+}
+
+function closeSupportModal() {
+  if (!elSupportModal) return;
+  elSupportModal.classList.add("is-hidden");
+  document.body.classList.remove("modal-open");
+  if (lastFocusEl && typeof lastFocusEl.focus === "function") {
+    lastFocusEl.focus();
+  }
+  lastFocusEl = null;
 }
 
 function setListening(on) {
@@ -470,7 +490,7 @@ if (elLinkCookies) {
 if (elLinkSupport) {
   elLinkSupport.addEventListener("click", (event) => {
     event.preventDefault();
-    revealPolicyPage("support");
+    openSupportModal();
   });
 }
 
@@ -480,6 +500,24 @@ if (elLinkAbout) {
     revealPolicyPage("about");
   });
 }
+
+if (elSupportClose) {
+  elSupportClose.addEventListener("click", () => {
+    closeSupportModal();
+  });
+}
+
+if (elSupportBackdrop) {
+  elSupportBackdrop.addEventListener("click", () => {
+    closeSupportModal();
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && elSupportModal && !elSupportModal.classList.contains("is-hidden")) {
+    closeSupportModal();
+  }
+});
 
 updateLinks();
 setTheme(state.theme);
