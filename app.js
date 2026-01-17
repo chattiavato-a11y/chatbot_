@@ -44,6 +44,8 @@ const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
 
 const elPolicyPage = document.getElementById("policyPage");
+const elContactModal = document.getElementById("contactModal");
+const elBtnCloseContact = document.getElementById("btnCloseContact");
 
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
@@ -149,11 +151,12 @@ function toggleSide() {
   if (elFrame) elFrame.classList.toggle("side-collapsed", !state.sideOpen);
 }
 
-function revealPolicyPage(sectionId) {
-  if (elPolicyPage) {
-    elPolicyPage.classList.remove("is-hidden");
-  }
-  if (sectionId) {
+function setModalOpen(open, sectionId) {
+  if (!elContactModal) return;
+  elContactModal.classList.toggle("is-hidden", !open);
+  document.body.style.overflow = open ? "hidden" : "";
+
+  if (open && sectionId) {
     const target = document.getElementById(sectionId);
     if (target) {
       target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -162,11 +165,15 @@ function revealPolicyPage(sectionId) {
       }
       target.focus({ preventScroll: true });
     }
-    if (window.history && window.history.pushState) {
-      window.history.pushState(null, "", `#${sectionId}`);
-    } else {
-      window.location.hash = `#${sectionId}`;
-    }
+  }
+}
+
+function revealPolicyPage(sectionId) {
+  if (!sectionId) return;
+  if (window.history && window.history.pushState) {
+    window.history.pushState(null, "", `#${sectionId}`);
+  } else {
+    window.location.hash = `#${sectionId}`;
   }
 }
 
@@ -416,9 +423,27 @@ wireButtonLike(elBtnSend, sendFromInput);
 if (elLinkContact) {
   elLinkContact.addEventListener("click", (event) => {
     event.preventDefault();
-    revealPolicyPage("contact");
+    setModalOpen(true, "contact");
   });
 }
+
+if (elBtnCloseContact) {
+  elBtnCloseContact.addEventListener("click", () => setModalOpen(false));
+}
+
+if (elContactModal) {
+  elContactModal.addEventListener("click", (event) => {
+    if (event.target === elContactModal) {
+      setModalOpen(false);
+    }
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && elContactModal && !elContactModal.classList.contains("is-hidden")) {
+    setModalOpen(false);
+  }
+});
 
 if (elLinkSupport) {
   elLinkSupport.addEventListener("click", (event) => {
@@ -439,6 +464,6 @@ setTheme(state.theme);
 setLang(state.lang);
 setStatus("Ready", false);
 
-if (["#contact", "#support", "#about"].includes(window.location.hash)) {
-  revealPolicyPage(window.location.hash.replace("#", ""));
+if (["#contact"].includes(window.location.hash)) {
+  setModalOpen(true, window.location.hash.replace("#", ""));
 }

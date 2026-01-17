@@ -122,6 +122,70 @@
     </aside>
   </div>
 
+  <div class="modalOverlay is-hidden" id="contactModal" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
+    <div class="modalPanel">
+      <button class="modalClose" id="btnCloseContact" type="button" aria-label="Close contact form">✕</button>
+      <section class="policyPage" id="policyPage">
+        <div class="policyIntro">
+          <p class="policyEyebrow">Contact</p>
+          <h2 id="contactTitle">Contact Us</h2>
+          <p class="policyLead">
+            Share your questions, feedback, or partnership ideas. Our team replies within 1–2 business days.
+          </p>
+        </div>
+
+        <div class="policyGrid">
+          <article class="policyCard contactCard" id="contact" aria-labelledby="contactHeading">
+            <h3 id="contactHeading">Send a message</h3>
+            <form class="contactForm">
+              <div class="formGrid">
+                <div class="formField">
+                  <label for="contactName">Full name</label>
+                  <input id="contactName" name="name" type="text" placeholder="Jane Doe" autocomplete="name" required />
+                </div>
+                <div class="formField">
+                  <label for="contactEmail">Work email</label>
+                  <input id="contactEmail" name="email" type="email" placeholder="jane@company.com" autocomplete="email" required />
+                </div>
+                <div class="formField">
+                  <label for="contactCompany">Company</label>
+                  <input id="contactCompany" name="company" type="text" placeholder="Company name" autocomplete="organization" />
+                </div>
+                <div class="formField">
+                  <label for="contactTopic">Topic</label>
+                  <select id="contactTopic" name="topic" required>
+                    <option value="" disabled selected>Select a topic</option>
+                    <option>Product question</option>
+                    <option>Partnership</option>
+                    <option>Security &amp; compliance</option>
+                    <option>Press</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+              </div>
+              <div class="formField">
+                <label for="contactMessage">Message</label>
+                <textarea id="contactMessage" name="message" rows="5" placeholder="Tell us how we can help." required></textarea>
+              </div>
+              <div class="formActions">
+                <button class="primaryBtn" type="submit">Submit request</button>
+                <p class="formNote">By submitting, you agree to our communication terms.</p>
+              </div>
+            </form>
+          </article>
+
+          <article class="policyCard contactCard" aria-labelledby="contactDetailsHeading">
+            <h3 id="contactDetailsHeading">Contact details</h3>
+            <p><strong>Email:</strong> hello@chattia.ai</p>
+            <p><strong>Phone:</strong> +1 (555) 013-4021</p>
+            <p><strong>Hours:</strong> Monday–Friday, 9:00–18:00 (UTC)</p>
+            <p><strong>Location:</strong> Remote-first with hubs in Austin, London, and Singapore.</p>
+          </article>
+        </div>
+      </section>
+    </div>
+  </div>
+
   <script src="app.js" defer></script>
 </body>
 </html>
