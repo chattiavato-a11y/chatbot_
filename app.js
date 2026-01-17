@@ -43,9 +43,9 @@ const elBtnThemeLower = document.getElementById("btnThemeLower");
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
 
+const elPolicyOverlay = document.getElementById("policyOverlay");
 const elPolicyPage = document.getElementById("policyPage");
-const elContactModal = document.getElementById("contactModal");
-const elBtnCloseContact = document.getElementById("btnCloseContact");
+const elPolicyClose = document.getElementById("policyClose");
 
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
@@ -151,12 +151,22 @@ function toggleSide() {
   if (elFrame) elFrame.classList.toggle("side-collapsed", !state.sideOpen);
 }
 
-function setModalOpen(open, sectionId) {
-  if (!elContactModal) return;
-  elContactModal.classList.toggle("is-hidden", !open);
-  document.body.style.overflow = open ? "hidden" : "";
+function openPolicyModal() {
+  if (elPolicyOverlay) elPolicyOverlay.classList.remove("is-hidden");
+}
 
-  if (open && sectionId) {
+function closePolicyModal() {
+  if (elPolicyOverlay) elPolicyOverlay.classList.add("is-hidden");
+  if (window.history && window.history.pushState) {
+    window.history.pushState(null, "", window.location.pathname);
+  } else {
+    window.location.hash = "";
+  }
+}
+
+function revealPolicyPage(sectionId) {
+  openPolicyModal();
+  if (sectionId) {
     const target = document.getElementById(sectionId);
     if (target) {
       target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -420,6 +430,22 @@ wireButtonLike(elBtnMic, () => setListening(!state.listening));
 wireButtonLike(elBtnWave, () => setListening(!state.listening));
 wireButtonLike(elBtnSend, sendFromInput);
 
+if (elPolicyClose) {
+  elPolicyClose.addEventListener("click", closePolicyModal);
+}
+
+if (elPolicyOverlay) {
+  elPolicyOverlay.addEventListener("click", (event) => {
+    if (event.target === elPolicyOverlay) closePolicyModal();
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && elPolicyOverlay && !elPolicyOverlay.classList.contains("is-hidden")) {
+    closePolicyModal();
+  }
+});
+
 if (elLinkContact) {
   elLinkContact.addEventListener("click", (event) => {
     event.preventDefault();
@@ -427,23 +453,19 @@ if (elLinkContact) {
   });
 }
 
-if (elBtnCloseContact) {
-  elBtnCloseContact.addEventListener("click", () => setModalOpen(false));
-}
-
-if (elContactModal) {
-  elContactModal.addEventListener("click", (event) => {
-    if (event.target === elContactModal) {
-      setModalOpen(false);
-    }
+if (elLinkTc) {
+  elLinkTc.addEventListener("click", (event) => {
+    event.preventDefault();
+    revealPolicyPage("tc");
   });
 }
 
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && elContactModal && !elContactModal.classList.contains("is-hidden")) {
-    setModalOpen(false);
-  }
-});
+if (elLinkCookies) {
+  elLinkCookies.addEventListener("click", (event) => {
+    event.preventDefault();
+    revealPolicyPage("cookies");
+  });
+}
 
 if (elLinkSupport) {
   elLinkSupport.addEventListener("click", (event) => {
@@ -464,6 +486,6 @@ setTheme(state.theme);
 setLang(state.lang);
 setStatus("Ready", false);
 
-if (["#contact"].includes(window.location.hash)) {
-  setModalOpen(true, window.location.hash.replace("#", ""));
+if (["#tc", "#cookies", "#contact", "#support", "#about"].includes(window.location.hash)) {
+  revealPolicyPage(window.location.hash.replace("#", ""));
 }
