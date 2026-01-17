@@ -44,6 +44,8 @@ const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
 
 const elPolicyPage = document.getElementById("policyPage");
+const elAboutModal = document.getElementById("aboutModal");
+const elBtnCloseAbout = document.getElementById("btnCloseAbout");
 
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
@@ -150,8 +152,8 @@ function toggleSide() {
 }
 
 function revealPolicyPage(sectionId) {
-  if (elPolicyPage) {
-    elPolicyPage.classList.remove("is-hidden");
+  if (elAboutModal) {
+    elAboutModal.classList.remove("is-hidden");
   }
   if (sectionId) {
     const target = document.getElementById(sectionId);
@@ -167,6 +169,17 @@ function revealPolicyPage(sectionId) {
     } else {
       window.location.hash = `#${sectionId}`;
     }
+  }
+}
+
+function closePolicyPage() {
+  if (elAboutModal) {
+    elAboutModal.classList.add("is-hidden");
+  }
+  if (window.history && window.history.pushState) {
+    window.history.pushState(null, "", window.location.pathname);
+  } else {
+    window.location.hash = "";
   }
 }
 
@@ -412,6 +425,7 @@ wireButtonLike(elBtnLangLower, toggleLang);
 wireButtonLike(elBtnMic, () => setListening(!state.listening));
 wireButtonLike(elBtnWave, () => setListening(!state.listening));
 wireButtonLike(elBtnSend, sendFromInput);
+wireButtonLike(elBtnCloseAbout, closePolicyPage);
 
 if (elLinkContact) {
   elLinkContact.addEventListener("click", (event) => {
@@ -442,3 +456,17 @@ setStatus("Ready", false);
 if (["#contact", "#support", "#about"].includes(window.location.hash)) {
   revealPolicyPage(window.location.hash.replace("#", ""));
 }
+
+if (elAboutModal) {
+  elAboutModal.addEventListener("click", (event) => {
+    if (event.target === elAboutModal) {
+      closePolicyPage();
+    }
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closePolicyPage();
+  }
+});

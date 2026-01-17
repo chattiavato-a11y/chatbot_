@@ -505,8 +505,24 @@ body.dark .sideBody{
 .listening .waveBars rect:nth-child(2){ animation:up 0.8s infinite ease-in-out .12s; }
 .listening .waveBars rect:nth-child(3){ animation:up 0.8s infinite ease-in-out .24s; }
 
+.modalOverlay{
+  position:fixed;
+  inset:0;
+  background:rgba(10,12,20,.6);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  z-index:30;
+  backdrop-filter: blur(6px);
+}
+.modalOverlay.is-hidden{
+  display:none;
+}
 .policyPage{
   width:min(1120px, 100%);
+  max-height:min(84vh, 760px);
+  overflow:auto;
   background:var(--panel);
   border:1px solid rgba(42,121,199,.3);
   border-radius:var(--radius);
@@ -516,8 +532,29 @@ body.dark .sideBody{
   flex-direction:column;
   gap:24px;
 }
-.policyPage.is-hidden{
-  display:none;
+
+.policyHeader{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+}
+.modalClose{
+  border:0;
+  background:rgba(42,121,199,.12);
+  color:var(--text);
+  font-weight:700;
+  border-radius:999px;
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+}
+.modalClose:hover{ background:rgba(42,121,199,.2); }
+.modalClose:focus-visible{
+  outline:2px solid var(--focus);
+  outline-offset:2px;
 }
 
 .policyIntro h2{
