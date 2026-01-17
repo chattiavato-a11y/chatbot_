@@ -28,7 +28,6 @@ const elBtnClear = document.getElementById("btnClear");
 
 const elEmptyState = document.getElementById("emptyState");
 
-const elBtnMenu = document.getElementById("btnMenu");
 const elBtnMiniMenu = document.getElementById("btnMiniMenu");
 const elBtnMic = document.getElementById("btnMic");
 const elBtnWave = document.getElementById("btnWave");
@@ -37,10 +36,6 @@ const elBtnSend = document.getElementById("btnSend");
 
 const elBtnLangMenu = document.getElementById("btnLangMenu");
 const elBtnThemeMenu = document.getElementById("btnThemeMenu");
-
-const elMenuOverlay = document.getElementById("menuOverlay");
-const elAccordionMenu = document.getElementById("accordionMenu");
-const elMenuClose = document.getElementById("menuClose");
 
 
 const elStatusDot = document.getElementById("statusDot");
@@ -81,7 +76,6 @@ let state = {
   lang: "EN",     // EN | ES
   theme: "DARK",  // DARK | LIGHT
   sideOpen: true,
-  menuOpen: false,
   listening: false,
 };
 
@@ -163,17 +157,6 @@ function setLang(nextLang) {
 function toggleSide() {
   state.sideOpen = !state.sideOpen;
   if (elFrame) elFrame.classList.toggle("side-collapsed", !state.sideOpen);
-}
-
-function setMenuOpen(isOpen) {
-  state.menuOpen = isOpen;
-  document.body.classList.toggle("menu-open", state.menuOpen);
-  if (elAccordionMenu) elAccordionMenu.setAttribute("aria-hidden", String(!state.menuOpen));
-  if (elMenuOverlay) elMenuOverlay.setAttribute("aria-hidden", String(!state.menuOpen));
-}
-
-function toggleMenu() {
-  setMenuOpen(!state.menuOpen);
 }
 
 function openPolicyModal() {
@@ -476,7 +459,6 @@ if (elChatInput) {
   });
 }
 
-wireButtonLike(elBtnMenu, toggleMenu);
 wireButtonLike(elBtnMiniMenu, toggleSide);
 wireButtonLike(elBtnClear, clearTranscript);
 
@@ -503,14 +485,6 @@ if (elPolicyOverlay) {
   elPolicyOverlay.addEventListener("click", (event) => {
     if (event.target === elPolicyOverlay) closePolicyModal();
   });
-}
-
-if (elMenuOverlay) {
-  elMenuOverlay.addEventListener("click", () => setMenuOpen(false));
-}
-
-if (elMenuClose) {
-  elMenuClose.addEventListener("click", () => setMenuOpen(false));
 }
 
 document.addEventListener("keydown", (event) => {

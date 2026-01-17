@@ -11,19 +11,18 @@
 <body class="dark">
   <div class="frame" id="app">
     <section class="main">
-      <div class="topbar">
-        <div class="topbar-left">
-          <div class="burger" id="btnMenu" title="Menu" aria-label="Menu" role="button" tabindex="0">
-            <span></span><span></span><span></span>
-          </div>
-
+        <div class="topbar">
+          <div class="topbar-left">
           <div class="brand">
             <div class="homeIcon" title="Home" aria-label="Home">⌂</div>
             <div class="brandName">Chattia</div>
           </div>
         </div>
 
-        <div class="topbar-right"></div>
+        <div class="topbar-right">
+          <button class="toggle lang" id="btnLangMenu" type="button" aria-label="Toggle language">EN</button>
+          <button class="toggle" id="btnThemeMenu" type="button" aria-label="Toggle theme">Dark</button>
+        </div>
       </div>
 
       <div class="transcriptArea" id="mainTranscript" aria-label="Transcript">
@@ -86,6 +85,10 @@
           </button>
 
         </div>
+        <p class="voiceHint">
+          Prefer the microphone for hands-free, faster input. Stick to typing when you need privacy, quiet, or more
+          control.
+        </p>
       </div>
 
       <div class="supportModal is-hidden" id="supportModal" role="dialog" aria-modal="true" aria-labelledby="supportTitle">
@@ -215,35 +218,6 @@
       <div class="powered">Powered by OPS</div>
     </aside>
   </div>
-
-  <div class="menuOverlay is-hidden" id="menuOverlay" aria-hidden="true"></div>
-  <aside class="accordionMenu" id="accordionMenu" aria-label="Accordion menu" aria-hidden="true">
-    <div class="accordionHeader">
-      <span class="accordionTitle">Menu</span>
-      <button class="menuClose" id="menuClose" type="button" aria-label="Close menu">✕</button>
-    </div>
-
-    <div class="accordionSections">
-      <details class="accordionSection" open>
-        <summary>Preferences</summary>
-        <div class="accordionPanel">
-          <button class="toggle lang" id="btnLangMenu" type="button" aria-label="Toggle language">EN</button>
-          <button class="toggle" id="btnThemeMenu" type="button" aria-label="Toggle theme">Dark</button>
-        </div>
-      </details>
-
-      <details class="accordionSection" open>
-        <summary>Quick links</summary>
-        <div class="accordionPanel links">
-          <a href="#tc" id="lnkTc">T&amp;C</a>
-          <a href="#cookies" id="lnkCookies">COOKIES</a>
-          <a href="#contact" id="lnkContact">CONTACT US</a>
-          <a href="#support" id="lnkSupport">SUPPORT</a>
-          <a href="#about" id="lnkAbout">ABOUT US</a>
-        </div>
-      </details>
-    </div>
-  </aside>
 
   <div class="modalOverlay is-hidden" id="contactModal" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
     <div class="modalPanel">
