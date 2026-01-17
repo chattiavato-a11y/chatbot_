@@ -26,6 +26,8 @@ const elChatInput = document.getElementById("chatInput");
 
 const elBtnClear = document.getElementById("btnClear");
 
+const elEmptyState = document.getElementById("emptyState");
+
 const elBtnMenu = document.getElementById("btnMenu");
 const elBtnMiniMenu = document.getElementById("btnMiniMenu");
 const elBtnMic = document.getElementById("btnMic");
@@ -48,18 +50,15 @@ const elPolicyOverlay = document.getElementById("policyOverlay");
 const elPolicyPage = document.getElementById("policyPage");
 const elPolicyClose = document.getElementById("policyClose");
 
+const elContactModal = document.getElementById("contactModal");
+const elContactClose = document.getElementById("contactClose");
+
 const elSupportModal = document.getElementById("supportModal");
 const elSupportClose = document.getElementById("supportClose");
-const elSupportBackdrop = document.querySelector(".supportModalBackdrop");
+const elSupportBackdrop = document.getElementById("supportModalBackdrop");
 
-const elBtnCloseAbout = document.getElementById("btnCloseAbout");
-const elAboutModal = document.getElementById("aboutModal");
-
-const elLinkTc = document.getElementById("lnkTc");
-const elLinkCookies = document.getElementById("lnkCookies");
-const elLinkContact = document.getElementById("lnkContact");
-const elLinkSupport = document.getElementById("lnkSupport");
-const elLinkAbout = document.getElementById("lnkAbout");
+const elFooterMenuBtn = document.getElementById("btnFooterMenu");
+const elFooterMenu = document.getElementById("footerMenu");
 
 // ---- Config (edit safely) ----
 const CONFIG = {
@@ -95,11 +94,13 @@ function setStatus(text, busy) {
 }
 
 function updateLinks() {
-  if (elLinkTc) elLinkTc.href = CONFIG.links.tc || "#";
-  if (elLinkCookies) elLinkCookies.href = CONFIG.links.cookies || "#";
-  if (elLinkContact) elLinkContact.href = CONFIG.links.contact || "#";
-  if (elLinkSupport) elLinkSupport.href = CONFIG.links.support || "#";
-  if (elLinkAbout) elLinkAbout.href = CONFIG.links.about || "#";
+  if (elFooterMenu) {
+    elFooterMenu.dataset.tc = CONFIG.links.tc || "#";
+    elFooterMenu.dataset.cookies = CONFIG.links.cookies || "#";
+    elFooterMenu.dataset.contact = CONFIG.links.contact || "#";
+    elFooterMenu.dataset.support = CONFIG.links.support || "#";
+    elFooterMenu.dataset.about = CONFIG.links.about || "#";
+  }
 }
 
 function safeTextOnly(s) {
@@ -115,6 +116,7 @@ function appendLine(role, text) {
   const safeText = text || "";
   const mainLine = document.createElement("div");
   mainLine.className = "line";
+  mainLine.classList.add(`line-${role}`);
   mainLine.textContent = safeText;
 
   const sideLine = document.createElement("div");
@@ -123,6 +125,8 @@ function appendLine(role, text) {
 
   if (elMainList) elMainList.appendChild(mainLine);
   if (elSideList) elSideList.appendChild(sideLine);
+
+  if (elEmptyState) elEmptyState.classList.add("is-hidden");
 
   // Keep scrolled
   if (elMainList && elMainList.parentElement) {
@@ -138,6 +142,7 @@ function appendLine(role, text) {
 function clearTranscript() {
   if (elMainList) elMainList.innerHTML = "";
   if (elSideList) elSideList.innerHTML = "";
+  if (elEmptyState) elEmptyState.classList.remove("is-hidden");
   history = [];
   setStatus("Ready", false);
 }
@@ -172,11 +177,20 @@ function toggleMenu() {
 }
 
 function openPolicyModal() {
-  if (elPolicyOverlay) elPolicyOverlay.classList.remove("is-hidden");
+  if (!elPolicyOverlay) return;
+  lastFocusEl = document.activeElement;
+  elPolicyOverlay.classList.remove("is-hidden");
+  document.body.classList.add("modal-open");
 }
 
 function closePolicyModal() {
-  if (elPolicyOverlay) elPolicyOverlay.classList.add("is-hidden");
+  if (!elPolicyOverlay) return;
+  elPolicyOverlay.classList.add("is-hidden");
+  document.body.classList.remove("modal-open");
+  if (lastFocusEl && typeof lastFocusEl.focus === "function") {
+    lastFocusEl.focus();
+  }
+  lastFocusEl = null;
   if (window.history && window.history.pushState) {
     window.history.pushState(null, "", window.location.pathname);
   } else {
@@ -184,30 +198,42 @@ function closePolicyModal() {
   }
 }
 
-function closePolicyPage() {
-  closePolicyModal();
+function openContactModal() {
+  if (!elContactModal) return;
+  lastFocusEl = document.activeElement;
+  elContactModal.classList.remove("is-hidden");
+  document.body.classList.add("modal-open");
+  const firstField = elContactModal.querySelector("input, select, textarea, button");
+  if (firstField && typeof firstField.focus === "function") {
+    firstField.focus();
+  }
 }
 
-function revealPolicyPage(sectionId) {
-  openPolicyModal();
-  if (sectionId) {
-    const target = document.getElementById(sectionId);
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (!target.hasAttribute("tabindex")) {
-        target.setAttribute("tabindex", "-1");
-      }
-      target.focus({ preventScroll: true });
-    }
+function closeContactModal() {
+  if (!elContactModal) return;
+  elContactModal.classList.add("is-hidden");
+  document.body.classList.remove("modal-open");
+  if (lastFocusEl && typeof lastFocusEl.focus === "function") {
+    lastFocusEl.focus();
   }
+  lastFocusEl = null;
 }
 
 function revealPolicyPage(sectionId) {
   if (!sectionId) return;
+  openPolicyModal();
   if (window.history && window.history.pushState) {
     window.history.pushState(null, "", `#${sectionId}`);
   } else {
     window.location.hash = `#${sectionId}`;
+  }
+  const target = document.getElementById(sectionId);
+  if (target) {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!target.hasAttribute("tabindex")) {
+      target.setAttribute("tabindex", "-1");
+    }
+    target.focus({ preventScroll: true });
   }
 }
 
@@ -468,7 +494,6 @@ wireButtonLike(elBtnLangMenu, toggleLang);
 wireButtonLike(elBtnMic, () => setListening(!state.listening));
 wireButtonLike(elBtnWave, () => setListening(!state.listening));
 wireButtonLike(elBtnSend, sendFromInput);
-wireButtonLike(elBtnCloseAbout, closePolicyPage);
 
 if (elPolicyClose) {
   elPolicyClose.addEventListener("click", closePolicyModal);
@@ -494,51 +519,23 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+if (elContactModal) {
+  elContactModal.addEventListener("click", (event) => {
+    if (event.target === elContactModal) closeContactModal();
+  });
+}
+
+if (elContactClose) {
+  elContactClose.addEventListener("click", () => {
+    closeContactModal();
+  });
+}
+
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && state.menuOpen) {
-    setMenuOpen(false);
+  if (event.key === "Escape" && elContactModal && !elContactModal.classList.contains("is-hidden")) {
+    closeContactModal();
   }
 });
-
-if (elLinkContact) {
-  elLinkContact.addEventListener("click", (event) => {
-    event.preventDefault();
-    setMenuOpen(false);
-    setModalOpen(true, "contact");
-  });
-}
-
-if (elLinkTc) {
-  elLinkTc.addEventListener("click", (event) => {
-    event.preventDefault();
-    setMenuOpen(false);
-    revealPolicyPage("tc");
-  });
-}
-
-if (elLinkCookies) {
-  elLinkCookies.addEventListener("click", (event) => {
-    event.preventDefault();
-    setMenuOpen(false);
-    revealPolicyPage("cookies");
-  });
-}
-
-if (elLinkSupport) {
-  elLinkSupport.addEventListener("click", (event) => {
-    event.preventDefault();
-    setMenuOpen(false);
-    openSupportModal();
-  });
-}
-
-if (elLinkAbout) {
-  elLinkAbout.addEventListener("click", (event) => {
-    event.preventDefault();
-    setMenuOpen(false);
-    revealPolicyPage("about");
-  });
-}
 
 if (elSupportClose) {
   elSupportClose.addEventListener("click", () => {
@@ -558,25 +555,62 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+function toggleFooterMenu(forceOpen) {
+  if (!elFooterMenu || !elFooterMenuBtn) return;
+  const nextOpen = typeof forceOpen === "boolean" ? forceOpen : elFooterMenu.classList.contains("is-hidden");
+  elFooterMenu.classList.toggle("is-hidden", !nextOpen);
+  elFooterMenuBtn.setAttribute("aria-expanded", String(nextOpen));
+}
+
+if (elFooterMenuBtn) {
+  elFooterMenuBtn.addEventListener("click", () => toggleFooterMenu());
+}
+
+if (elFooterMenu) {
+  elFooterMenu.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const action = target.getAttribute("data-policy");
+    if (!action) return;
+    toggleFooterMenu(false);
+    if (action === "contact") {
+      openContactModal();
+      return;
+    }
+    if (action === "support") {
+      openSupportModal();
+      return;
+    }
+    revealPolicyPage(action);
+  });
+}
+
+document.addEventListener("click", (event) => {
+  if (!elFooterMenu || !elFooterMenuBtn) return;
+  const target = event.target;
+  if (!(target instanceof Node)) return;
+  if (elFooterMenu.contains(target) || elFooterMenuBtn.contains(target)) return;
+  toggleFooterMenu(false);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    toggleFooterMenu(false);
+  }
+});
+
 updateLinks();
 setTheme(state.theme);
 setLang(state.lang);
 setStatus("Ready", false);
 
 if (["#tc", "#cookies", "#contact", "#support", "#about"].includes(window.location.hash)) {
-  revealPolicyPage(window.location.hash.replace("#", ""));
-}
-
-if (elAboutModal) {
-  elAboutModal.addEventListener("click", (event) => {
-    if (event.target === elAboutModal) {
-      closePolicyPage();
-    }
-  });
-}
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    closePolicyPage();
+  const hash = window.location.hash.replace("#", "");
+  if (hash === "contact") {
+    openContactModal();
+  } else if (hash === "support") {
+    openSupportModal();
+  } else {
+    revealPolicyPage(hash);
   }
-});
+}

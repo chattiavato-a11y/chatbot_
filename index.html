@@ -27,6 +27,11 @@
       </div>
 
       <div class="transcriptArea" id="mainTranscript" aria-label="Transcript">
+        <div class="emptyState" id="emptyState">
+          <p class="emptyEyebrow">Welcome</p>
+          <h2>Start a conversation</h2>
+          <p>Ask a question, describe a problem, or drop a goal. You’ll get clear steps back.</p>
+        </div>
         <div class="transcriptList" id="mainList" aria-live="polite" aria-relevant="additions text"></div>
       </div>
 
@@ -84,7 +89,7 @@
       </div>
 
       <div class="supportModal is-hidden" id="supportModal" role="dialog" aria-modal="true" aria-labelledby="supportTitle">
-        <div class="supportModalBackdrop" data-support-close="true" aria-hidden="true"></div>
+        <div class="supportModalBackdrop" id="supportModalBackdrop" data-support-close="true" aria-hidden="true"></div>
         <div class="supportModalCard" role="document">
           <button class="supportClose" id="supportClose" type="button" aria-label="Close support panel">
             Close
@@ -122,7 +127,18 @@
       </div>
 
       <div class="footer">
-        <div class="footerLeft"></div>
+        <div class="footerLeft">
+          <button class="footerMenuBtn" id="btnFooterMenu" type="button" aria-haspopup="true" aria-expanded="false">
+            Help &amp; Policies
+            <span aria-hidden="true">▾</span>
+          </button>
+          <div class="footerMenu is-hidden" id="footerMenu" role="menu" aria-label="Help and policies">
+            <button class="footerMenuItem" type="button" role="menuitem" data-policy="tc">T&amp;C</button>
+            <button class="footerMenuItem" type="button" role="menuitem" data-policy="contact">Contact us</button>
+            <button class="footerMenuItem" type="button" role="menuitem" data-policy="support">Support</button>
+            <button class="footerMenuItem" type="button" role="menuitem" data-policy="about">About us</button>
+          </div>
+        </div>
         <div class="footerRight" aria-live="polite">
           <span class="statusdot" id="statusDot" aria-hidden="true"></span>
           <span class="statustext" id="statusText">Ready</span>
@@ -231,14 +247,11 @@
 
   <div class="modalOverlay is-hidden" id="contactModal" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
     <div class="modalPanel">
-      <button class="modalClose" id="btnCloseContact" type="button" aria-label="Close contact form">✕</button>
+      <button class="modalClose" id="contactClose" type="button" aria-label="Close contact form">X</button>
       <section class="policyPage" id="policyPage">
         <div class="policyIntro">
           <p class="policyEyebrow">Contact</p>
           <h2 id="contactTitle">Contact Us</h2>
-          <p class="policyLead">
-            Share your questions, feedback, or partnership ideas. Our team replies within 1–2 business days.
-          </p>
         </div>
 
         <div class="policyGrid">
@@ -279,14 +292,6 @@
                 <p class="formNote">By submitting, you agree to our communication terms.</p>
               </div>
             </form>
-          </article>
-
-          <article class="policyCard contactCard" aria-labelledby="contactDetailsHeading">
-            <h3 id="contactDetailsHeading">Contact details</h3>
-            <p><strong>Email:</strong> hello@chattia.ai</p>
-            <p><strong>Phone:</strong> +1 (555) 013-4021</p>
-            <p><strong>Hours:</strong> Monday–Friday, 9:00–18:00 (UTC)</p>
-            <p><strong>Location:</strong> Remote-first with hubs in Austin, London, and Singapore.</p>
           </article>
         </div>
       </section>
