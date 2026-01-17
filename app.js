@@ -47,6 +47,9 @@ const elPolicyOverlay = document.getElementById("policyOverlay");
 const elPolicyPage = document.getElementById("policyPage");
 const elPolicyClose = document.getElementById("policyClose");
 
+const elContactModal = document.getElementById("contactModal");
+const elContactClose = document.getElementById("contactClose");
+
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
 const elLinkContact = document.getElementById("lnkContact");
@@ -164,6 +167,27 @@ function closePolicyModal() {
   } else {
     window.location.hash = "";
   }
+}
+
+function openContactModal() {
+  if (!elContactModal) return;
+  lastFocusEl = document.activeElement;
+  elContactModal.classList.remove("is-hidden");
+  document.body.classList.add("modal-open");
+  const firstField = elContactModal.querySelector("input, select, textarea, button");
+  if (firstField && typeof firstField.focus === "function") {
+    firstField.focus();
+  }
+}
+
+function closeContactModal() {
+  if (!elContactModal) return;
+  elContactModal.classList.add("is-hidden");
+  document.body.classList.remove("modal-open");
+  if (lastFocusEl && typeof lastFocusEl.focus === "function") {
+    lastFocusEl.focus();
+  }
+  lastFocusEl = null;
 }
 
 function revealPolicyPage(sectionId) {
@@ -467,10 +491,28 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+if (elContactModal) {
+  elContactModal.addEventListener("click", (event) => {
+    if (event.target === elContactModal) closeContactModal();
+  });
+}
+
+if (elContactClose) {
+  elContactClose.addEventListener("click", () => {
+    closeContactModal();
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && elContactModal && !elContactModal.classList.contains("is-hidden")) {
+    closeContactModal();
+  }
+});
+
 if (elLinkContact) {
   elLinkContact.addEventListener("click", (event) => {
     event.preventDefault();
-    setModalOpen(true, "contact");
+    openContactModal();
   });
 }
 
