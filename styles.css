@@ -652,8 +652,9 @@ body.dark .sideBody{
 }
 .policyClose{
   position:absolute;
-  right:16px;
+  left:16px;
   top:16px;
+  right:auto;
   border:1px solid rgba(42,121,199,.35);
   background:var(--surface);
   color:var(--text);
@@ -662,6 +663,7 @@ body.dark .sideBody{
   height:32px;
   border-radius:10px;
   cursor:pointer;
+  z-index:2;
 }
 .policyClose:focus-visible{
   outline:2px solid var(--focus);
