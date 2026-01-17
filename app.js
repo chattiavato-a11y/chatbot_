@@ -43,9 +43,9 @@ const elBtnThemeLower = document.getElementById("btnThemeLower");
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
 
+const elPolicyOverlay = document.getElementById("policyOverlay");
 const elPolicyPage = document.getElementById("policyPage");
-const elPolicyModal = document.getElementById("policyModal");
-const elPolicyCloseTriggers = document.querySelectorAll("[data-policy-close]");
+const elPolicyClose = document.getElementById("policyClose");
 
 const elLinkTc = document.getElementById("lnkTc");
 const elLinkCookies = document.getElementById("lnkCookies");
@@ -151,14 +151,21 @@ function toggleSide() {
   if (elFrame) elFrame.classList.toggle("side-collapsed", !state.sideOpen);
 }
 
+function openPolicyModal() {
+  if (elPolicyOverlay) elPolicyOverlay.classList.remove("is-hidden");
+}
+
+function closePolicyModal() {
+  if (elPolicyOverlay) elPolicyOverlay.classList.add("is-hidden");
+  if (window.history && window.history.pushState) {
+    window.history.pushState(null, "", window.location.pathname);
+  } else {
+    window.location.hash = "";
+  }
+}
+
 function revealPolicyPage(sectionId) {
-  if (elPolicyPage) {
-    elPolicyPage.classList.remove("is-hidden");
-  }
-  if (elPolicyModal) {
-    elPolicyModal.classList.add("is-open");
-    elPolicyModal.setAttribute("aria-hidden", "false");
-  }
+  openPolicyModal();
   if (sectionId) {
     const target = document.getElementById(sectionId);
     if (target) {
@@ -434,18 +441,19 @@ wireButtonLike(elBtnMic, () => setListening(!state.listening));
 wireButtonLike(elBtnWave, () => setListening(!state.listening));
 wireButtonLike(elBtnSend, sendFromInput);
 
-if (elPolicyCloseTriggers.length) {
-  elPolicyCloseTriggers.forEach((trigger) => {
-    trigger.addEventListener("click", (event) => {
-      event.preventDefault();
-      closePolicyPage();
-    });
+if (elPolicyClose) {
+  elPolicyClose.addEventListener("click", closePolicyModal);
+}
+
+if (elPolicyOverlay) {
+  elPolicyOverlay.addEventListener("click", (event) => {
+    if (event.target === elPolicyOverlay) closePolicyModal();
   });
 }
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && elPolicyModal?.classList.contains("is-open")) {
-    closePolicyPage();
+  if (event.key === "Escape" && elPolicyOverlay && !elPolicyOverlay.classList.contains("is-hidden")) {
+    closePolicyModal();
   }
 });
 
@@ -453,6 +461,20 @@ if (elLinkContact) {
   elLinkContact.addEventListener("click", (event) => {
     event.preventDefault();
     revealPolicyPage("contact");
+  });
+}
+
+if (elLinkTc) {
+  elLinkTc.addEventListener("click", (event) => {
+    event.preventDefault();
+    revealPolicyPage("tc");
+  });
+}
+
+if (elLinkCookies) {
+  elLinkCookies.addEventListener("click", (event) => {
+    event.preventDefault();
+    revealPolicyPage("cookies");
   });
 }
 
@@ -482,6 +504,6 @@ setTheme(state.theme);
 setLang(state.lang);
 setStatus("Ready", false);
 
-if (["#contact", "#support", "#about", "#cookies"].includes(window.location.hash)) {
+if (["#tc", "#cookies", "#contact", "#support", "#about"].includes(window.location.hash)) {
   revealPolicyPage(window.location.hash.replace("#", ""));
 }

@@ -103,54 +103,55 @@
         </div>
       </div>
 
-      <div class="policyModal" id="policyModal" aria-hidden="true" role="dialog" aria-modal="true">
-        <div class="policyBackdrop" data-policy-close></div>
-        <section class="policyPage is-hidden" id="policyPage" aria-label="Policy center">
-          <button class="policyClose" type="button" data-policy-close aria-label="Close cookies policy">
-            ✕
-          </button>
+      <div class="policyOverlay is-hidden" id="policyOverlay" role="dialog" aria-modal="true" aria-labelledby="policyTitle">
+        <section class="policyPage" id="policyPage" aria-live="polite">
           <div class="policyIntro">
             <p class="policyEyebrow">Policy Center</p>
-            <h2>Cookies</h2>
+            <h2 id="policyTitle">Terms, Privacy, and Support</h2>
             <p class="policyLead">
-              This page explains the cookies we use to keep the experience reliable, secure, and easy to
-              navigate. We only use cookies needed for core functionality, basic analytics, and your
-              preferences.
+              This page provides a plain-language overview of the terms, cookies, and support information that apply
+              to using Chattia. It is a generic template intended to be customized for your organization.
             </p>
           </div>
 
           <div class="policyGrid">
+            <article class="policyCard" id="tc">
+              <h3>Terms &amp; Conditions</h3>
+              <p>By accessing or using this service, you agree to these terms and any updates we publish.</p>
+              <p>Use the service lawfully and avoid actions that interfere with the experience of others.</p>
+              <p>Content is provided “as is” without warranties; availability and features may change.</p>
+              <p>You are responsible for safeguarding any access credentials and devices you use.</p>
+              <p>We may suspend access if we detect misuse, security risk, or policy violations.</p>
+              <p>To the fullest extent permitted by law, liability is limited to direct damages only.</p>
+            </article>
+
             <article class="policyCard" id="cookies">
-              <h3>Essential Cookies</h3>
-              <p>
-                Required for core functions like page routing, accessibility settings, and security
-                protections. These cookies cannot be disabled because the site would not operate correctly.
-              </p>
+              <h3>Cookie Notice</h3>
+              <p>We use essential cookies to keep the service secure and functional.</p>
+              <p>Optional analytics cookies may be used to improve usability and performance.</p>
+              <p>You can adjust cookie preferences in your browser settings at any time.</p>
             </article>
 
-            <article class="policyCard">
-              <h3>Preference Cookies</h3>
-              <p>
-                Remember choices such as theme or language so the interface stays consistent across sessions.
-              </p>
+            <article class="policyCard" id="contact">
+              <h3>Contact Us</h3>
+              <p>Need help or want to share feedback? Email us at support@example.com.</p>
+              <p>We aim to respond within 2 business days.</p>
             </article>
 
-            <article class="policyCard">
-              <h3>Analytics Cookies</h3>
-              <p>
-                Help us understand performance and usage trends in aggregate so we can improve speed and
-                usability. We do not store chat content in analytics cookies.
-              </p>
+            <article class="policyCard" id="support">
+              <h3>Support</h3>
+              <p>For urgent issues, include “URGENT” in your subject line and describe the impact.</p>
+              <p>We provide best-effort support during standard business hours.</p>
             </article>
 
-            <article class="policyCard">
-              <h3>Your Choices</h3>
-              <p>
-                You can manage or delete cookies in your browser settings. Blocking essential cookies may
-                limit features or prevent the app from functioning as intended.
-              </p>
+            <article class="policyCard" id="about">
+              <h3>About Us</h3>
+              <p>Chattia is a conversational interface designed to help users get answers quickly and safely.</p>
+              <p>Our mission is to deliver helpful, secure, and human-centered digital experiences.</p>
             </article>
           </div>
+
+          <button class="policyClose" id="policyClose" type="button" aria-label="Close policies">Close</button>
         </section>
       </div>
     </section>
