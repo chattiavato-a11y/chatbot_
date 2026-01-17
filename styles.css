@@ -518,6 +518,19 @@ body.dark .sideBody{
 .policyOverlay.is-hidden{
   display:none;
 }
+.modalOverlay{
+  position:fixed;
+  inset:0;
+  background:rgba(10,12,18,.68);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  z-index:25;
+}
+.modalOverlay.is-hidden{
+  display:none;
+}
 .policyPage{
   position:relative;
   width:min(1120px, 100%);
