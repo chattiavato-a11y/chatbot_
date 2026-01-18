@@ -54,10 +54,7 @@ const elStatusTxt = document.getElementById("statusText");
 const elPolicyOverlay = document.getElementById("policyOverlay");
 const elPolicyPage = document.getElementById("policyPage");
 const elPolicyClose = document.getElementById("policyClose");
-
-const elContactModal = document.getElementById("contactModal");
-const elContactClose = document.getElementById("contactClose");
-const elContactForm = elContactModal ? elContactModal.querySelector("form") : null;
+const elHoneypot = document.getElementById("hpField");
 
 const elSupportModal = document.getElementById("supportModal");
 const elSupportClose = document.getElementById("supportClose");
@@ -65,18 +62,6 @@ const elSupportBackdrop = document.getElementById("supportModalBackdrop");
 
 const elFooterMenuBtn = document.getElementById("btnFooterMenu");
 const elFooterMenu = document.getElementById("footerMenu");
-
-// ---- Config (edit safely) ----
-const CONFIG = {
-  links: {
-    tc: "#tc",
-    cookies: "#cookies",
-    contact: "#contact",
-    support: "#support",
-    about: "#about",
-  },
-  starterMessage: "Hi — I’m ready. Ask me anything (plain text).",
-};
 
 // ---- State ----
 const MAX_INPUT_CHARS = 1500;
@@ -90,6 +75,8 @@ let state = {
 };
 
 let lastFocusEl = null;
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
 
 // ---- Helpers ----
 function setStatus(text, busy) {
@@ -97,19 +84,14 @@ function setStatus(text, busy) {
   if (elStatusDot) elStatusDot.classList.toggle("busy", !!busy);
 }
 
-function updateLinks() {
-  if (elFooterMenu) {
-    elFooterMenu.dataset.tc = CONFIG.links.tc || "#";
-    elFooterMenu.dataset.cookies = CONFIG.links.cookies || "#";
-    elFooterMenu.dataset.contact = CONFIG.links.contact || "#";
-    elFooterMenu.dataset.support = CONFIG.links.support || "#";
-    elFooterMenu.dataset.about = CONFIG.links.about || "#";
-  }
-}
-
 function safeTextOnly(s) {
   if (!s) return "";
   return String(s).replace(/\u0000/g, "").trim().slice(0, MAX_INPUT_CHARS);
+}
+
+function getHoneypotValue() {
+  if (!elHoneypot) return "";
+  return String(elHoneypot.value || "").trim();
 }
 
 function getTurnstileToken() {
@@ -232,27 +214,6 @@ function closePolicyModal() {
   }
 }
 
-function openContactModal() {
-  if (!elContactModal) return;
-  lastFocusEl = document.activeElement;
-  elContactModal.classList.remove("is-hidden");
-  document.body.classList.add("modal-open");
-  const firstField = elContactModal.querySelector("input, select, textarea, button");
-  if (firstField && typeof firstField.focus === "function") {
-    firstField.focus();
-  }
-}
-
-function closeContactModal() {
-  if (!elContactModal) return;
-  elContactModal.classList.add("is-hidden");
-  document.body.classList.remove("modal-open");
-  if (lastFocusEl && typeof lastFocusEl.focus === "function") {
-    lastFocusEl.focus();
-  }
-  lastFocusEl = null;
-}
-
 function revealPolicyPage(sectionId) {
   if (!sectionId) return;
   openPolicyModal();
@@ -295,201 +256,56 @@ function setListening(on) {
   if (elWaveSvg) elWaveSvg.classList.toggle("listening", state.listening);
 }
 
-// =====================
-// VOICE INPUT (Option B)
-// MediaRecorder -> Enlace /api/transcribe -> sendMessage(text)
-// =====================
-let micStream = null;
-let recorder = null;
-let recChunks = [];
-let recording = false;
+function initSpeechRecognition() {
+  if (!SpeechRecognition) return null;
+  const rec = new SpeechRecognition();
+  rec.continuous = false;
+  rec.interimResults = true;
+  rec.lang = document.documentElement.lang || "en-US";
 
-function uiRecording(on) {
-  document.body.classList.toggle("listening", !!on);
-  setListening(on);
-  setStatus(on ? "Recording…" : "Ready", !!on);
-}
-
-function canUseMediaRecorder() {
-  return typeof MediaRecorder !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
-}
-
-async function startRecording() {
-  if (recording) return;
-
-  if (!canUseMediaRecorder()) {
-    appendLine("assistant", "Audio recording not supported in this browser.");
-    return;
-  }
-
-  micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  recChunks = [];
-
-  // Let the browser pick a supported mimeType
-  recorder = new MediaRecorder(micStream);
-  recorder.ondataavailable = (e) => {
-    if (e.data && e.data.size) recChunks.push(e.data);
+  rec.onstart = () => {
+    setListening(true);
+    setStatus("Listening…", true);
   };
 
-  recorder.onstart = () => {
-    recording = true;
-    uiRecording(true);
-  };
-
-  recorder.onstop = async () => {
-    uiRecording(false);
-    recording = false;
-
-    // stop tracks
-    try { micStream?.getTracks()?.forEach((t) => t.stop()); } catch {}
-    micStream = null;
-
-    const blob = new Blob(recChunks, { type: recorder.mimeType || "audio/webm" });
-
-    try {
-      const headers = { "content-type": blob.type || "audio/webm" };
-
-      // If you enforce asset identity on Enlace, set these in app.js and send them:
-      if (OPS_ASSET_ID) headers["x-ops-asset-id"] = OPS_ASSET_ID;
-      if (OPS_ASSET_SHA256) headers["x-ops-asset-sha256"] = OPS_ASSET_SHA256;
-
-      const resp = await fetch(ENLACE_TRANSCRIBE, {
-        method: "POST",
-        mode: "cors",
-        credentials: "omit",
-        cache: "no-store",
-        referrerPolicy: "no-referrer",
-        headers,
-        body: blob,
-      });
-
-      if (!resp.ok) throw new Error(`Transcribe HTTP ${resp.status}`);
-      const data = await resp.json().catch(() => ({}));
-      const text = String(data?.text || "").trim();
-
-      if (!text) {
-        appendLine("assistant", "No transcription returned.");
-        return;
-      }
-
-      // Now send it through your normal chat flow
-      sendMessage(text);
-    } catch (e) {
-      appendLine("assistant", `Transcription error: ${String(e?.message || e)}`);
+  rec.onresult = (event) => {
+    if (!elChatInput) return;
+    let transcript = "";
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      transcript += event.results[i][0].transcript;
+    }
+    if (transcript) {
+      elChatInput.value = `${elChatInput.value} ${transcript}`.trimStart();
     }
   };
 
-  recorder.start();
+  rec.onerror = (event) => {
+    setListening(false);
+    setStatus(`Mic error: ${event.error || "unknown"}`, false);
+  };
+
+  rec.onend = () => {
+    setListening(false);
+    setStatus("Ready", false);
+  };
+
+  return rec;
 }
 
-function stopRecording() {
-  if (!recording) return;
-  try { recorder?.stop(); } catch {}
-}
-
-// =====================
-// VOICE INPUT (Option A)
-// Browser SpeechRecognition
-// =====================
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let stt = null;
-let sttListening = false;
-
-function uiListening(on) {
-  document.body.classList.toggle("listening", !!on);
-  setListening(on);
-  setStatus(on ? "Listening…" : "Ready", !!on);
-}
-
-function currentLangCode() {
-  // You already have lang toggles; map EN/ES -> locales
-  const lang = (elBtnLangTop?.textContent || elBtnLangLower?.textContent || "EN").trim().toUpperCase();
-  return lang === "ES" ? "es-ES" : "en-US";
-}
-
-function startBrowserSTT() {
+function toggleVoiceInput() {
   if (!SpeechRecognition) {
-    appendLine("assistant", "Voice input not supported in this browser.");
+    setStatus("Voice input not supported in this browser.", false);
     return;
   }
-  if (sttListening) return;
+  if (!recognition) recognition = initSpeechRecognition();
+  if (!recognition) return;
 
-  stt = new SpeechRecognition();
-  stt.lang = currentLangCode();
-  stt.interimResults = true;
-  stt.continuous = false;
-
-  let finalText = "";
-
-  stt.onstart = () => {
-    sttListening = true;
-    uiListening(true);
-  };
-
-  stt.onresult = (e) => {
-    let interim = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const txt = e.results[i][0]?.transcript || "";
-      if (e.results[i].isFinal) finalText += txt;
-      else interim += txt;
-    }
-
-    // Show live text in the quick input box (optional)
-    if (elChatInput) elChatInput.value = (finalText + " " + interim).trim();
-  };
-
-  stt.onerror = (e) => {
-    uiListening(false);
-    sttListening = false;
-    appendLine("assistant", `Voice error: ${e?.error || "unknown"}`);
-  };
-
-  stt.onend = () => {
-    uiListening(false);
-    sttListening = false;
-
-    const text = (finalText || (elChatInput?.value || "")).trim();
-    if (text) {
-      if (elChatInput) elChatInput.value = "";
-      sendMessage(text);
-    }
-  };
-
-  stt.start();
-}
-
-function stopBrowserSTT() {
-  try { stt?.stop(); } catch {}
-}
-
-function startVoiceInput() {
-  if (VOICE_INPUT_MODE === "browser") {
-    startBrowserSTT();
+  if (state.listening) {
+    recognition.stop();
     return;
   }
-  if (VOICE_INPUT_MODE === "enlace") {
-    startRecording();
-    return;
-  }
-  if (canUseMediaRecorder()) {
-    startRecording();
-    return;
-  }
-  if (SpeechRecognition) {
-    startBrowserSTT();
-    return;
-  }
-  appendLine("assistant", "Voice input not supported in this browser.");
-}
-
-function stopVoiceInput() {
-  if (recording) {
-    stopRecording();
-    return;
-  }
-  if (sttListening) {
-    stopBrowserSTT();
-  }
+  if (elChatInput) elChatInput.focus();
+  recognition.start();
 }
 
 // ---- Token extraction (handles multiple AI response shapes) ----
@@ -629,36 +445,28 @@ async function sendMessage(userText) {
   userText = safeTextOnly(userText);
   if (!userText) return;
 
+  const honeypotValue = getHoneypotValue();
+  if (honeypotValue) {
+    setStatus("Blocked: spam detected.", false);
+    return;
+  }
+
   appendLine("user", userText);
   history.push({ role: "user", content: userText });
 
   setStatus("Thinking…", true);
 
   let botText = "";
-  let rafId = null;
-
-  const flush = () => {
-    if (rafId) return;
-    rafId = requestAnimationFrame(() => {
-      rafId = null;
-      // Show partial streaming output as a single growing line:
-      // We clear the last "assistant" line visually by re-rendering at end
-      // (simple and safe; avoids innerHTML)
-      // For 2026 UX, we keep it minimal and stable.
-    });
-  };
 
   try {
     const payload = {
       messages: history,
+      honeypot: honeypotValue,
     };
 
     await streamFromEnlace(payload, (token) => {
       botText += token;
-      flush();
     });
-
-    if (rafId) cancelAnimationFrame(rafId);
 
     if (!botText.trim()) botText = "(no output)";
     appendLine("assistant", botText);
@@ -717,14 +525,8 @@ function toggleTheme() {
 
 wireButtonLike(elBtnThemeMenu, toggleTheme);
 
-wireButtonLike(elBtnMic, () => {
-  if (recording || sttListening) stopVoiceInput();
-  else startVoiceInput();
-});
-wireButtonLike(elBtnWave, () => {
-  if (recording || sttListening) stopVoiceInput();
-  else startVoiceInput();
-});
+wireButtonLike(elBtnMic, toggleVoiceInput);
+wireButtonLike(elBtnWave, toggleVoiceInput);
 wireButtonLike(elBtnSend, sendFromInput);
 
 if (elPolicyClose) {
@@ -737,37 +539,6 @@ if (elPolicyOverlay) {
   });
 }
 
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && elPolicyOverlay && !elPolicyOverlay.classList.contains("is-hidden")) {
-    closePolicyModal();
-  }
-});
-
-if (elContactModal) {
-  elContactModal.addEventListener("click", (event) => {
-    if (event.target === elContactModal) closeContactModal();
-  });
-}
-
-if (elContactClose) {
-  elContactClose.addEventListener("click", () => {
-    closeContactModal();
-  });
-}
-
-if (elContactForm) {
-  elContactForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    setStatus("Message captured (no submission configured).", false);
-  });
-}
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && elContactModal && !elContactModal.classList.contains("is-hidden")) {
-    closeContactModal();
-  }
-});
-
 if (elSupportClose) {
   elSupportClose.addEventListener("click", () => {
     closeSupportModal();
@@ -779,12 +550,6 @@ if (elSupportBackdrop) {
     closeSupportModal();
   });
 }
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && elSupportModal && !elSupportModal.classList.contains("is-hidden")) {
-    closeSupportModal();
-  }
-});
 
 function toggleFooterMenu(forceOpen) {
   if (!elFooterMenu || !elFooterMenuBtn) return;
@@ -804,10 +569,6 @@ if (elFooterMenu) {
     const action = target.getAttribute("data-policy");
     if (!action) return;
     toggleFooterMenu(false);
-    if (action === "contact") {
-      openContactModal();
-      return;
-    }
     if (action === "support") {
       openSupportModal();
       return;
@@ -825,21 +586,23 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    toggleFooterMenu(false);
+  if (event.key !== "Escape") return;
+  if (elPolicyOverlay && !elPolicyOverlay.classList.contains("is-hidden")) {
+    closePolicyModal();
   }
+  if (elSupportModal && !elSupportModal.classList.contains("is-hidden")) {
+    closeSupportModal();
+  }
+  toggleFooterMenu(false);
 });
 
-updateLinks();
 setTheme(state.theme);
 setStatus("Ready", false);
 setSide(state.sideOpen);
 
 if (["#tc", "#cookies", "#contact", "#support", "#about"].includes(window.location.hash)) {
   const hash = window.location.hash.replace("#", "");
-  if (hash === "contact") {
-    openContactModal();
-  } else if (hash === "support") {
+  if (hash === "support") {
     openSupportModal();
   } else {
     revealPolicyPage(hash);
