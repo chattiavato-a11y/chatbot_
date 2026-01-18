@@ -47,6 +47,7 @@ const elPolicyClose = document.getElementById("policyClose");
 
 const elContactModal = document.getElementById("contactModal");
 const elContactClose = document.getElementById("contactClose");
+const elContactForm = elContactModal ? elContactModal.querySelector("form") : null;
 
 const elSupportModal = document.getElementById("supportModal");
 const elSupportClose = document.getElementById("supportClose");
@@ -149,6 +150,30 @@ function clearTranscript() {
   if (elEmptyState) elEmptyState.classList.remove("is-hidden");
   history = [];
   setStatus("Ready", false);
+}
+
+function buildTranscriptText() {
+  if (!history.length) {
+    return "No conversation yet.";
+  }
+  return history
+    .map((turn) => `${turn.role.toUpperCase()}: ${turn.content}`)
+    .join("\n\n");
+}
+
+function downloadTranscript() {
+  const text = buildTranscriptText();
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const stamp = new Date().toISOString().slice(0, 10);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `chattia-transcript-${stamp}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  setStatus("Transcript downloaded", false);
 }
 
 function setTheme(nextTheme) {
@@ -477,6 +502,7 @@ if (elChatInput) {
 
 wireButtonLike(elBtnClear, clearTranscript);
 wireButtonLike(elBtnToggleTranscript, toggleSide);
+wireButtonLike(elBtnMiniMenu, downloadTranscript);
 
 function toggleTheme() {
   setTheme(state.theme === "DARK" ? "LIGHT" : "DARK");
@@ -513,6 +539,13 @@ if (elContactModal) {
 if (elContactClose) {
   elContactClose.addEventListener("click", () => {
     closeContactModal();
+  });
+}
+
+if (elContactForm) {
+  elContactForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    setStatus("Message captured (no submission configured).", false);
   });
 }
 
