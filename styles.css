@@ -527,6 +527,7 @@ hr{
   display:flex;
   align-items:center;
   gap: 6px;
+  margin-left: 7px;
 }
 .smallLinks{
   display:flex;
