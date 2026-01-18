@@ -197,12 +197,20 @@ function openPolicyModal() {
   lastFocusEl = document.activeElement;
   elPolicyOverlay.classList.remove("is-hidden");
   document.body.classList.add("modal-open");
+  if (elFooterMenuBtn) {
+    elFooterMenuBtn.textContent = "Hide Policies";
+    elFooterMenuBtn.setAttribute("aria-expanded", "true");
+  }
 }
 
 function closePolicyModal() {
   if (!elPolicyOverlay) return;
   elPolicyOverlay.classList.add("is-hidden");
   document.body.classList.remove("modal-open");
+  if (elFooterMenuBtn) {
+    elFooterMenuBtn.textContent = "Policies";
+    elFooterMenuBtn.setAttribute("aria-expanded", "false");
+  }
   if (lastFocusEl && typeof lastFocusEl.focus === "function") {
     lastFocusEl.focus();
   }
@@ -557,6 +565,10 @@ if (elSupportBackdrop) {
 
 if (elFooterMenuBtn) {
   elFooterMenuBtn.addEventListener("click", () => {
+    if (elPolicyOverlay && !elPolicyOverlay.classList.contains("is-hidden")) {
+      closePolicyModal();
+      return;
+    }
     revealPolicyPage("tc");
   });
 }
