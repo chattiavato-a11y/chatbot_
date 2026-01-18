@@ -152,21 +152,15 @@
 
       <div class="footer">
         <div class="footerLeft">
-          <button class="footerMenuBtn" id="btnFooterMenu" type="button" aria-haspopup="true" aria-expanded="false">
-            Help &amp; Policies
-            <span aria-hidden="true">▾</span>
+          <button class="footerMenuBtn" id="btnFooterMenu" type="button">
+            Policies
           </button>
-          <div class="footerMenu is-hidden" id="footerMenu" role="menu" aria-label="Help and policies">
-            <button class="footerMenuItem" type="button" role="menuitem" data-policy="tc">T&amp;C</button>
-            <button class="footerMenuItem" type="button" role="menuitem" data-policy="contact">Contact us</button>
-            <button class="footerMenuItem" type="button" role="menuitem" data-policy="support">Support</button>
-            <button class="footerMenuItem" type="button" role="menuitem" data-policy="about">About us</button>
-          </div>
         </div>
       </div>
 
       <div class="policyOverlay is-hidden" id="policyOverlay" role="dialog" aria-modal="true" aria-labelledby="policyTitle">
         <section class="policyPage" id="policyPage" aria-live="polite">
+          <button class="policyCloseIcon" id="policyCloseIcon" type="button" aria-label="Close policies">✕</button>
           <div class="policyIntro">
             <p class="policyEyebrow">Policy Center</p>
             <h2 id="policyTitle">Terms, Privacy, and Support</h2>

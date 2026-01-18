@@ -54,6 +54,7 @@ const elStatusTxt = document.getElementById("statusText");
 const elPolicyOverlay = document.getElementById("policyOverlay");
 const elPolicyPage = document.getElementById("policyPage");
 const elPolicyClose = document.getElementById("policyClose");
+const elPolicyCloseIcon = document.getElementById("policyCloseIcon");
 const elHoneypot = document.getElementById("hpField");
 
 const elSupportModal = document.getElementById("supportModal");
@@ -61,7 +62,6 @@ const elSupportClose = document.getElementById("supportClose");
 const elSupportBackdrop = document.getElementById("supportModalBackdrop");
 
 const elFooterMenuBtn = document.getElementById("btnFooterMenu");
-const elFooterMenu = document.getElementById("footerMenu");
 
 // ---- State ----
 const MAX_INPUT_CHARS = 1500;
@@ -533,6 +533,10 @@ if (elPolicyClose) {
   elPolicyClose.addEventListener("click", closePolicyModal);
 }
 
+if (elPolicyCloseIcon) {
+  elPolicyCloseIcon.addEventListener("click", closePolicyModal);
+}
+
 if (elPolicyOverlay) {
   elPolicyOverlay.addEventListener("click", (event) => {
     if (event.target === elPolicyOverlay) closePolicyModal();
@@ -551,39 +555,11 @@ if (elSupportBackdrop) {
   });
 }
 
-function toggleFooterMenu(forceOpen) {
-  if (!elFooterMenu || !elFooterMenuBtn) return;
-  const nextOpen = typeof forceOpen === "boolean" ? forceOpen : elFooterMenu.classList.contains("is-hidden");
-  elFooterMenu.classList.toggle("is-hidden", !nextOpen);
-  elFooterMenuBtn.setAttribute("aria-expanded", String(nextOpen));
-}
-
 if (elFooterMenuBtn) {
-  elFooterMenuBtn.addEventListener("click", () => toggleFooterMenu());
-}
-
-if (elFooterMenu) {
-  elFooterMenu.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
-    const action = target.getAttribute("data-policy");
-    if (!action) return;
-    toggleFooterMenu(false);
-    if (action === "support") {
-      openSupportModal();
-      return;
-    }
-    revealPolicyPage(action);
+  elFooterMenuBtn.addEventListener("click", () => {
+    revealPolicyPage("tc");
   });
 }
-
-document.addEventListener("click", (event) => {
-  if (!elFooterMenu || !elFooterMenuBtn) return;
-  const target = event.target;
-  if (!(target instanceof Node)) return;
-  if (elFooterMenu.contains(target) || elFooterMenuBtn.contains(target)) return;
-  toggleFooterMenu(false);
-});
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
@@ -593,7 +569,6 @@ document.addEventListener("keydown", (event) => {
   if (elSupportModal && !elSupportModal.classList.contains("is-hidden")) {
     closeSupportModal();
   }
-  toggleFooterMenu(false);
 });
 
 setTheme(state.theme);
