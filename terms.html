@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>T&amp;C</title>
+  <meta name="description" content="Terms, contact, support, and about details in one portable page." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <div class="container">
+    <header class="topbar" role="banner">
+      <div class="brand" aria-label="Site brand">
+        <div class="brandMark" aria-hidden="true"></div>
+        <div class="brandText">
+          <div class="brandTitle">Your Company</div>
+          <div class="brandSub">T&amp;C • Contact • Support • About</div>
+        </div>
+      </div>
+
+      <div class="menuWrap">
+        <button id="btnMenu" class="btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="menuPopover">
+          <span class="btnIcon" aria-hidden="true"></span>
+          Menu
+        </button>
+
+        <nav id="menuPopover" class="menuPopover" aria-label="Quick links">
+          <button class="menuItem" type="button" data-open-section="terms">T&amp;C</button>
+          <button class="menuItem" type="button" data-open-section="contact">Contact us</button>
+          <button class="menuItem" type="button" data-open-section="support">Support</button>
+          <button class="menuItem" type="button" data-open-section="about">About us</button>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="card" role="main">
+      <div class="cardInner">
+        <h1>T&amp;C</h1>
+        <p class="lead">
+          Everything is consolidated into one portable page. Use the menu to open each section in a focused pop-up.
+        </p>
+
+        <div class="kv" aria-label="Quick actions">
+          <div class="kvRow">
+            <div class="kvLabel">Open the Terms</div>
+            <div class="kvValue">
+              <button class="btn" type="button" data-open-section="terms">
+                <span class="btnIcon" aria-hidden="true"></span>
+                View T&amp;C
+              </button>
+            </div>
+          </div>
+          <div class="kvRow">
+            <div class="kvLabel">Need help?</div>
+            <div class="kvValue">
+              <div class="row">
+                <button class="btn" type="button" data-open-section="contact">
+                  <span class="btnIcon" aria-hidden="true"></span>
+                  Contact
+                </button>
+                <button class="btn" type="button" data-open-section="support">
+                  <span class="btnIcon" aria-hidden="true"></span>
+                  Support
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="note">
+          This page keeps each section hidden until you open it. It’s designed to be simple, fast, and portable.
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer" role="contentinfo">
+      <div>© <span id="yr"></span> Your Company</div>
+      <div class="smallLinks">
+        <a href="#" data-open-section="terms">T&amp;C</a>
+        <a href="#" data-open-section="contact">Contact</a>
+        <a href="#" data-open-section="support">Support</a>
+        <a href="#" data-open-section="about">About</a>
+      </div>
+    </footer>
+  </div>
+
+  <div id="modalOverlay" class="modal" data-open="false" aria-hidden="true">
+    <section class="modalPanel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header class="modalHeader">
+        <div id="modalTitle" class="modalTitle">T&amp;C</div>
+        <button id="modalClose" class="btn" type="button">
+          <span class="btnIcon" aria-hidden="true"></span>
+          Close
+        </button>
+      </header>
+      <div class="modalBody">
+        <div class="section" data-section="terms" data-title="Terms &amp; Conditions" data-active="true">
+          <h1>Terms &amp; Conditions</h1>
+          <p class="lead">
+            These Terms &amp; Conditions (“Terms”) explain how you may use our website, products, and services.
+            If you do not agree, please do not use the service.
+          </p>
+
+          <div class="kv" aria-label="Key details">
+            <div class="kvRow">
+              <div class="kvLabel">Effective date</div>
+              <div class="kvValue">[Add date]</div>
+            </div>
+            <div class="kvRow">
+              <div class="kvLabel">Last updated</div>
+              <div class="kvValue">[Add date]</div>
+            </div>
+          </div>
+
+          <hr />
+
+          <h2>1) Using the service</h2>
+          <ul>
+            <li>You must use the service in a lawful manner.</li>
+            <li>You may not attempt to disrupt, damage, or gain unauthorized access to systems or data.</li>
+            <li>We may update, suspend, or discontinue parts of the service at any time.</li>
+          </ul>
+
+          <h2>2) Accounts and security</h2>
+          <ul>
+            <li>If you create an account, you’re responsible for maintaining its confidentiality.</li>
+            <li>Notify us promptly if you suspect unauthorized use.</li>
+          </ul>
+
+          <h2>3) Purchases and billing (if applicable)</h2>
+          <ul>
+            <li>Prices, taxes, and fees may be shown at checkout or in an invoice.</li>
+            <li>Refunds (if any) are handled according to the policy shown at purchase time.</li>
+          </ul>
+
+          <h2>4) Intellectual property</h2>
+          <p>
+            Our site content and branding may be protected by intellectual property laws.
+            You may not copy, reproduce, or distribute materials without permission, except where allowed by law.
+          </p>
+
+          <h2>5) Links and third-party services</h2>
+          <p>
+            We may reference third-party services. We are not responsible for their content, policies, or practices.
+            Use them at your own discretion.
+          </p>
+
+          <h2>6) Disclaimers</h2>
+          <p>
+            The service is provided “as is” and “as available”. To the fullest extent permitted by law, we disclaim
+            warranties of merchantability, fitness for a particular purpose, and non-infringement.
+          </p>
+
+          <h2>7) Limitation of liability</h2>
+          <p>
+            To the fullest extent permitted by law, we are not liable for indirect, incidental, special, consequential,
+            or punitive damages, or any loss of profits or revenues.
+          </p>
+
+          <h2>8) Changes to these terms</h2>
+          <p>
+            We may update these Terms from time to time. Continued use of the service after changes means you accept the updated Terms.
+          </p>
+
+          <h2>9) Contact</h2>
+          <p>
+            Questions about these Terms? Contact us via the details on the Contact section.
+          </p>
+
+          <div class="note">
+            This is a generic template and not legal advice. Replace bracketed placeholders to match your business and jurisdiction.
+          </div>
+        </div>
+
+        <div class="section" data-section="contact" data-title="Contact us" data-active="false">
+          <h1>Contact us</h1>
+          <p class="lead">
+            Send a message and we’ll respond as soon as possible. If your request is urgent, use the Support section.
+          </p>
+
+          <div class="row">
+            <div class="kvRow">
+              <div class="kvLabel">Email</div>
+              <div class="kvValue">support@yourcompany.com</div>
+            </div>
+            <div class="kvRow">
+              <div class="kvLabel">Response time</div>
+              <div class="kvValue">1–2 business days</div>
+            </div>
+          </div>
+
+          <hr />
+
+          <form class="form" onsubmit="return false" aria-label="Contact form">
+            <div class="row">
+              <div class="field">
+                <label for="name">Name</label>
+                <input id="name" name="name" type="text" autocomplete="name" placeholder="Your name" />
+              </div>
+              <div class="field">
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" autocomplete="email" placeholder="you@email.com" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="topic">Topic</label>
+              <select id="topic" name="topic">
+                <option>General question</option>
+                <option>Partnership / business</option>
+                <option>Billing / invoices</option>
+                <option>Privacy / security</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="msg">Message</label>
+              <textarea id="msg" name="msg" placeholder="Write your message..."></textarea>
+            </div>
+
+            <div class="row">
+              <button class="btn" type="button" onclick="openMail()">
+                <span class="btnIcon" aria-hidden="true"></span>
+                Send via email
+              </button>
+              <div class="note">
+                This page is static: the button opens your email app. If you want form submissions, connect a form endpoint later.
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="section" data-section="support" data-title="Support" data-active="false">
+          <h1>Support</h1>
+          <p class="lead">
+            Find answers quickly, or send a support request. Include as much detail as you can (what happened, when, and what you expected).
+          </p>
+
+          <h2>Quick help</h2>
+          <div class="kv">
+            <div class="kvRow">
+              <div class="kvLabel">Common fixes</div>
+              <div class="kvValue">Refresh • Sign out/in • Clear cached data • Try another browser/device</div>
+            </div>
+            <div class="kvRow">
+              <div class="kvLabel">Service status</div>
+              <div class="kvValue">[Optional: link to status page]</div>
+            </div>
+          </div>
+
+          <h2>FAQ</h2>
+          <div class="kv" role="list">
+            <div class="kvRow" role="listitem">
+              <div class="kvLabel">How do I get started?</div>
+              <div class="kvValue">Create an account (if applicable) and follow the onboarding steps shown in the app.</div>
+            </div>
+            <div class="kvRow" role="listitem">
+              <div class="kvLabel">I’m not receiving emails</div>
+              <div class="kvValue">Check spam/junk folders, verify your address, and ensure your mailbox allows our domain.</div>
+            </div>
+            <div class="kvRow" role="listitem">
+              <div class="kvLabel">Billing questions</div>
+              <div class="kvValue">Use the Contact section and select “Billing / invoices” to route your request correctly.</div>
+            </div>
+          </div>
+
+          <hr />
+
+          <h2>Submit a support request</h2>
+          <form class="form" onsubmit="return false" aria-label="Support request form">
+            <div class="row">
+              <div class="field">
+                <label for="sname">Name</label>
+                <input id="sname" name="sname" type="text" autocomplete="name" placeholder="Your name" />
+              </div>
+              <div class="field">
+                <label for="semail">Email</label>
+                <input id="semail" name="semail" type="email" autocomplete="email" placeholder="you@email.com" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <label for="priority">Priority</label>
+                <select id="priority" name="priority">
+                  <option>Normal</option>
+                  <option>High</option>
+                  <option>Urgent</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="category">Category</label>
+                <select id="category" name="category">
+                  <option>Access / login</option>
+                  <option>Bug / error</option>
+                  <option>Billing</option>
+                  <option>Security / privacy</option>
+                  <option>Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="details">What happened?</label>
+              <textarea id="details" name="details" placeholder="Steps to reproduce, error text, expected behavior, and time/date..."></textarea>
+            </div>
+
+            <div class="row">
+              <button class="btn" type="button" onclick="openSupportMail()">
+                <span class="btnIcon" aria-hidden="true"></span>
+                Send request
+              </button>
+              <div class="note">
+                Static page: this sends via your email app. Later you can connect a ticketing system or form endpoint.
+              </div>
+            </div>
+          </form>
+
+          <h2>Security note (optional)</h2>
+          <p>
+            If your issue may involve sensitive information, do not include passwords or full payment details in messages.
+          </p>
+        </div>
+
+        <div class="section" data-section="about" data-title="About us" data-active="false">
+          <h1>About us</h1>
+          <p class="lead">
+            We build simple, reliable experiences that help customers get results with less friction.
+            Our focus is clarity, trust, and steady improvements.
+          </p>
+
+          <h2>What we do</h2>
+          <ul>
+            <li>Deliver products and services designed for ease of use and long-term reliability.</li>
+            <li>Support customers with straightforward documentation and responsive assistance.</li>
+            <li>Continuously improve performance, security, and usability.</li>
+          </ul>
+
+          <h2>Our values</h2>
+          <div class="kv">
+            <div class="kvRow">
+              <div class="kvLabel">Customer-first</div>
+              <div class="kvValue">We prioritize outcomes and clear communication.</div>
+            </div>
+            <div class="kvRow">
+              <div class="kvLabel">Security &amp; privacy</div>
+              <div class="kvValue">We aim to minimize data, protect access, and reduce risk.</div>
+            </div>
+            <div class="kvRow">
+              <div class="kvLabel">Quality</div>
+              <div class="kvValue">We prefer fewer features done well over many features done poorly.</div>
+            </div>
+          </div>
+
+          <h2>Company details</h2>
+          <div class="kv">
+            <div class="kvRow">
+              <div class="kvLabel">Legal name</div>
+              <div class="kvValue">[Your legal entity]</div>
+            </div>
+            <div class="kvRow">
+              <div class="kvLabel">Location</div>
+              <div class="kvValue">[City, Country]</div>
+            </div>
+            <div class="kvRow">
+              <div class="kvLabel">Contact</div>
+              <div class="kvValue">support@yourcompany.com</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="menu.js"></script>
+</body>
+</html>
