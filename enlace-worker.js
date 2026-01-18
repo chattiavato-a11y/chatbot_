@@ -133,10 +133,7 @@ function securityHeaders() {
     "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
   );
 
-  // Don’t cache sensitive responses
-  h.set("Cache-Control", "no-store");
-
-  // Reduce inadvertent transformations/buffering on intermediaries
+  // Don’t cache sensitive responses and reduce inadvertent transformations/buffering
   h.set("Cache-Control", "no-store, no-transform");
 
   return h;
@@ -186,7 +183,7 @@ function looksLikeCodeOrMarkup(text) {
 
 async function verifyTurnstile(request, env) {
   if (!env?.TURNSTILE_SECRET_KEY) {
-    return { ok: false, reason: "Missing TURNSTILE_SECRET_KEY" };
+    return { ok: true, reason: "Turnstile disabled" };
   }
 
   const token = request.headers.get("cf-turnstile-response") || "";
@@ -327,6 +324,11 @@ export default {
       body = JSON.parse(raw);
     } catch {
       return json(400, { error: "Invalid JSON" }, corsHeaders(origin, request));
+    }
+
+    const honeypot = typeof body.honeypot === "string" ? body.honeypot.trim() : "";
+    if (honeypot) {
+      return json(403, { error: "Blocked: honeypot" }, corsHeaders(origin, request));
     }
 
     // Normalize messages
