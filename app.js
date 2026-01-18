@@ -38,7 +38,6 @@ const elEmptyState = document.getElementById("emptyState");
 
 const elBtnMiniMenu = document.getElementById("btnMiniMenu");
 const elBtnToggleTranscript = document.getElementById("btnToggleTranscript");
-const elBtnMic = document.getElementById("btnMic");
 const elBtnWave = document.getElementById("btnWave");
 const elWaveSvg = document.getElementById("waveSvg");
 const elBtnSend = document.getElementById("btnSend");
@@ -172,6 +171,7 @@ function setTheme(nextTheme) {
   state.theme = nextTheme;
   const dark = state.theme === "DARK";
   document.body.classList.toggle("dark", dark);
+  document.body.classList.toggle("light", !dark);
 
   if (elBtnThemeMenu) elBtnThemeMenu.textContent = dark ? "Dark" : "Light";
 }
@@ -262,6 +262,10 @@ function setListening(on) {
   state.listening = !!on;
   // CSS listens on a "listening" class (we attach to the svg parent)
   if (elWaveSvg) elWaveSvg.classList.toggle("listening", state.listening);
+  if (elBtnWave) {
+    elBtnWave.classList.toggle("is-listening", state.listening);
+    elBtnWave.setAttribute("aria-pressed", String(state.listening));
+  }
 }
 
 function initSpeechRecognition() {
@@ -533,7 +537,6 @@ function toggleTheme() {
 
 wireButtonLike(elBtnThemeMenu, toggleTheme);
 
-wireButtonLike(elBtnMic, toggleVoiceInput);
 wireButtonLike(elBtnWave, toggleVoiceInput);
 wireButtonLike(elBtnSend, sendFromInput);
 
