@@ -648,16 +648,14 @@ body.dark .sideBody{
 }
 .policyClose{
   position:absolute;
-  left:16px;
   top:16px;
-  right:auto;
-  border:1px solid rgba(42,121,199,.35);
-  background:var(--surface);
-  color:var(--text);
+  right:16px;
+  border:0;
+  background:var(--orange);
+  color:#fff;
+  padding:10px 16px;
+  border-radius:12px;
   font-weight:700;
-  width:32px;
-  height:32px;
-  border-radius:10px;
   cursor:pointer;
   z-index:2;
 }
@@ -789,21 +787,7 @@ body.dark .policyCard{
   font-size:13px;
 }
 .policyCard p:last-child{ margin-bottom:0; }
-.policyClose{
-  align-self:flex-end;
-  border:0;
-  background:var(--orange);
-  color:#fff;
-  padding:10px 16px;
-  border-radius:12px;
-  font-weight:700;
-  cursor:pointer;
-}
 .policyClose:hover{ filter:brightness(.95); }
-.policyClose:focus-visible{
-  outline:2px solid var(--focus);
-  outline-offset:2px;
-}
 @keyframes up{
   0%,100%{ transform:scaleY(0.5); opacity:.45; }
   50%{ transform:scaleY(1.2); opacity:1; }
