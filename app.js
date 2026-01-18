@@ -17,6 +17,14 @@ const ENLACE_API = "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat
 const OPS_ASSET_ID = "";      // e.g. "CHATTIA_WEB_01"
 const OPS_ASSET_SHA256 = "";  // e.g. "abcdef1234... (hex sha256)"
 
+// 3) OPTIONAL: Enlace Transcribe endpoint (for voice input Option B)
+// NOTE: the transcribe worker must allowlist your origin and allow these headers:
+// "content-type", "x-ops-asset-id", "x-ops-asset-sha256"
+const ENLACE_TRANSCRIBE = "https://enlace.grabem-holdem-nuts-right.workers.dev/api/transcribe";
+
+// Voice input mode: "auto" (default) | "enlace" | "browser"
+const VOICE_INPUT_MODE = "auto";
+
 // ---- DOM ----
 const elFrame = document.getElementById("app");
 const elMainList = document.getElementById("mainList");
@@ -34,6 +42,8 @@ const elBtnMic = document.getElementById("btnMic");
 const elBtnWave = document.getElementById("btnWave");
 const elWaveSvg = document.getElementById("waveSvg");
 const elBtnSend = document.getElementById("btnSend");
+const elBtnLangTop = document.getElementById("btnLangTop");
+const elBtnLangLower = document.getElementById("btnLangLower");
 
 const elBtnThemeMenu = document.getElementById("btnThemeMenu");
 
