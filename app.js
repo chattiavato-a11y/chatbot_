@@ -29,6 +29,7 @@ const elBtnClear = document.getElementById("btnClear");
 const elEmptyState = document.getElementById("emptyState");
 
 const elBtnMiniMenu = document.getElementById("btnMiniMenu");
+const elBtnToggleTranscript = document.getElementById("btnToggleTranscript");
 const elBtnMic = document.getElementById("btnMic");
 const elBtnWave = document.getElementById("btnWave");
 const elWaveSvg = document.getElementById("waveSvg");
@@ -73,7 +74,7 @@ let abortCtrl = null;
 
 let state = {
   theme: "DARK",  // DARK | LIGHT
-  sideOpen: true,
+  sideOpen: false,
   listening: false,
 };
 
@@ -147,9 +148,20 @@ function setTheme(nextTheme) {
   if (elBtnThemeMenu) elBtnThemeMenu.textContent = dark ? "Dark" : "Light";
 }
 
-function toggleSide() {
-  state.sideOpen = !state.sideOpen;
+function setSide(open) {
+  state.sideOpen = !!open;
   if (elFrame) elFrame.classList.toggle("side-collapsed", !state.sideOpen);
+  if (elBtnToggleTranscript) {
+    elBtnToggleTranscript.setAttribute("aria-expanded", String(state.sideOpen));
+    elBtnToggleTranscript.setAttribute(
+      "aria-label",
+      state.sideOpen ? "Hide transcript panel" : "Show transcript panel"
+    );
+  }
+}
+
+function toggleSide() {
+  setSide(!state.sideOpen);
 }
 
 function openPolicyModal() {
@@ -450,8 +462,8 @@ if (elChatInput) {
   });
 }
 
-wireButtonLike(elBtnMiniMenu, toggleSide);
 wireButtonLike(elBtnClear, clearTranscript);
+wireButtonLike(elBtnToggleTranscript, toggleSide);
 
 function toggleTheme() {
   setTheme(state.theme === "DARK" ? "LIGHT" : "DARK");
@@ -562,6 +574,7 @@ document.addEventListener("keydown", (event) => {
 updateLinks();
 setTheme(state.theme);
 setStatus("Ready", false);
+setSide(state.sideOpen);
 
 if (["#tc", "#cookies", "#contact", "#support", "#about"].includes(window.location.hash)) {
   const hash = window.location.hash.replace("#", "");

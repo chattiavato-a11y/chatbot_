@@ -495,10 +495,13 @@ input.chatInput::placeholder{ color:var(--muted); }
 
 .gap{
   position:relative;
+  border:0;
+  padding:0;
   background:transparent;
   display:flex;
   align-items:center;
   justify-content:center;
+  cursor:pointer;
 }
 .arrow{
   width:0;height:0;
