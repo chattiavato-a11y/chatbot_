@@ -17,6 +17,14 @@ const ENLACE_API = "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat
 const OPS_ASSET_ID = "";      // e.g. "CHATTIA_WEB_01"
 const OPS_ASSET_SHA256 = "";  // e.g. "abcdef1234... (hex sha256)"
 
+// 3) OPTIONAL: Enlace Transcribe endpoint (for voice input Option B)
+// NOTE: the transcribe worker must allowlist your origin and allow these headers:
+// "content-type", "x-ops-asset-id", "x-ops-asset-sha256"
+const ENLACE_TRANSCRIBE = "https://enlace.grabem-holdem-nuts-right.workers.dev/api/transcribe";
+
+// Voice input mode: "auto" (default) | "enlace" | "browser"
+const VOICE_INPUT_MODE = "auto";
+
 // ---- DOM ----
 const elFrame = document.getElementById("app");
 const elMainList = document.getElementById("mainList");
@@ -34,6 +42,8 @@ const elBtnMic = document.getElementById("btnMic");
 const elBtnWave = document.getElementById("btnWave");
 const elWaveSvg = document.getElementById("waveSvg");
 const elBtnSend = document.getElementById("btnSend");
+const elBtnLangTop = document.getElementById("btnLangTop");
+const elBtnLangLower = document.getElementById("btnLangLower");
 
 const elBtnThemeMenu = document.getElementById("btnThemeMenu");
 
@@ -285,6 +295,203 @@ function setListening(on) {
   if (elWaveSvg) elWaveSvg.classList.toggle("listening", state.listening);
 }
 
+// =====================
+// VOICE INPUT (Option B)
+// MediaRecorder -> Enlace /api/transcribe -> sendMessage(text)
+// =====================
+let micStream = null;
+let recorder = null;
+let recChunks = [];
+let recording = false;
+
+function uiRecording(on) {
+  document.body.classList.toggle("listening", !!on);
+  setListening(on);
+  setStatus(on ? "Recording…" : "Ready", !!on);
+}
+
+function canUseMediaRecorder() {
+  return typeof MediaRecorder !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+}
+
+async function startRecording() {
+  if (recording) return;
+
+  if (!canUseMediaRecorder()) {
+    appendLine("assistant", "Audio recording not supported in this browser.");
+    return;
+  }
+
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  recChunks = [];
+
+  // Let the browser pick a supported mimeType
+  recorder = new MediaRecorder(micStream);
+  recorder.ondataavailable = (e) => {
+    if (e.data && e.data.size) recChunks.push(e.data);
+  };
+
+  recorder.onstart = () => {
+    recording = true;
+    uiRecording(true);
+  };
+
+  recorder.onstop = async () => {
+    uiRecording(false);
+    recording = false;
+
+    // stop tracks
+    try { micStream?.getTracks()?.forEach((t) => t.stop()); } catch {}
+    micStream = null;
+
+    const blob = new Blob(recChunks, { type: recorder.mimeType || "audio/webm" });
+
+    try {
+      const headers = { "content-type": blob.type || "audio/webm" };
+
+      // If you enforce asset identity on Enlace, set these in app.js and send them:
+      if (OPS_ASSET_ID) headers["x-ops-asset-id"] = OPS_ASSET_ID;
+      if (OPS_ASSET_SHA256) headers["x-ops-asset-sha256"] = OPS_ASSET_SHA256;
+
+      const resp = await fetch(ENLACE_TRANSCRIBE, {
+        method: "POST",
+        mode: "cors",
+        credentials: "omit",
+        cache: "no-store",
+        referrerPolicy: "no-referrer",
+        headers,
+        body: blob,
+      });
+
+      if (!resp.ok) throw new Error(`Transcribe HTTP ${resp.status}`);
+      const data = await resp.json().catch(() => ({}));
+      const text = String(data?.text || "").trim();
+
+      if (!text) {
+        appendLine("assistant", "No transcription returned.");
+        return;
+      }
+
+      // Now send it through your normal chat flow
+      sendMessage(text);
+    } catch (e) {
+      appendLine("assistant", `Transcription error: ${String(e?.message || e)}`);
+    }
+  };
+
+  recorder.start();
+}
+
+function stopRecording() {
+  if (!recording) return;
+  try { recorder?.stop(); } catch {}
+}
+
+// =====================
+// VOICE INPUT (Option A)
+// Browser SpeechRecognition
+// =====================
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let stt = null;
+let sttListening = false;
+
+function uiListening(on) {
+  document.body.classList.toggle("listening", !!on);
+  setListening(on);
+  setStatus(on ? "Listening…" : "Ready", !!on);
+}
+
+function currentLangCode() {
+  // You already have lang toggles; map EN/ES -> locales
+  const lang = (elBtnLangTop?.textContent || elBtnLangLower?.textContent || "EN").trim().toUpperCase();
+  return lang === "ES" ? "es-ES" : "en-US";
+}
+
+function startBrowserSTT() {
+  if (!SpeechRecognition) {
+    appendLine("assistant", "Voice input not supported in this browser.");
+    return;
+  }
+  if (sttListening) return;
+
+  stt = new SpeechRecognition();
+  stt.lang = currentLangCode();
+  stt.interimResults = true;
+  stt.continuous = false;
+
+  let finalText = "";
+
+  stt.onstart = () => {
+    sttListening = true;
+    uiListening(true);
+  };
+
+  stt.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const txt = e.results[i][0]?.transcript || "";
+      if (e.results[i].isFinal) finalText += txt;
+      else interim += txt;
+    }
+
+    // Show live text in the quick input box (optional)
+    if (elChatInput) elChatInput.value = (finalText + " " + interim).trim();
+  };
+
+  stt.onerror = (e) => {
+    uiListening(false);
+    sttListening = false;
+    appendLine("assistant", `Voice error: ${e?.error || "unknown"}`);
+  };
+
+  stt.onend = () => {
+    uiListening(false);
+    sttListening = false;
+
+    const text = (finalText || (elChatInput?.value || "")).trim();
+    if (text) {
+      if (elChatInput) elChatInput.value = "";
+      sendMessage(text);
+    }
+  };
+
+  stt.start();
+}
+
+function stopBrowserSTT() {
+  try { stt?.stop(); } catch {}
+}
+
+function startVoiceInput() {
+  if (VOICE_INPUT_MODE === "browser") {
+    startBrowserSTT();
+    return;
+  }
+  if (VOICE_INPUT_MODE === "enlace") {
+    startRecording();
+    return;
+  }
+  if (canUseMediaRecorder()) {
+    startRecording();
+    return;
+  }
+  if (SpeechRecognition) {
+    startBrowserSTT();
+    return;
+  }
+  appendLine("assistant", "Voice input not supported in this browser.");
+}
+
+function stopVoiceInput() {
+  if (recording) {
+    stopRecording();
+    return;
+  }
+  if (sttListening) {
+    stopBrowserSTT();
+  }
+}
+
 // ---- Token extraction (handles multiple AI response shapes) ----
 function extractTokenFromAnyShape(obj) {
   if (!obj) return "";
@@ -510,8 +717,14 @@ function toggleTheme() {
 
 wireButtonLike(elBtnThemeMenu, toggleTheme);
 
-wireButtonLike(elBtnMic, () => setListening(!state.listening));
-wireButtonLike(elBtnWave, () => setListening(!state.listening));
+wireButtonLike(elBtnMic, () => {
+  if (recording || sttListening) stopVoiceInput();
+  else startVoiceInput();
+});
+wireButtonLike(elBtnWave, () => {
+  if (recording || sttListening) stopVoiceInput();
+  else startVoiceInput();
+});
 wireButtonLike(elBtnSend, sendFromInput);
 
 if (elPolicyClose) {
