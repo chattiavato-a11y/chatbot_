@@ -29,7 +29,7 @@
         <div class="emptyState" id="emptyState">
           <p class="emptyEyebrow">Welcome</p>
           <h2>Start a conversation</h2>
-          <p>Ask a question, describe a problem, or drop a goal. You’ll get clear steps back.</p>
+          <p>Ask a question, in most popular languages; describe a problem or drop a goal. You’ll get clear steps back.</p>
         </div>
         <div class="transcriptList" id="mainList" aria-live="polite" aria-relevant="additions text"></div>
       </div>
@@ -62,14 +62,7 @@
               autocomplete="off"
             />
             <div class="chatInputActions" aria-label="Voice controls">
-              <div class="iconBtn" id="btnMic" title="Voice (optional)" aria-label="Voice input" role="button" tabindex="0">
-                <svg viewBox="0 0 24 24" fill="none">
-                  <path class="purpleStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                    d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3Zm6-3a6 6 0 0 1-12 0m6 6v3m-4 0h8" />
-                </svg>
-              </div>
-
-              <div class="iconBtn" id="btnWave" title="Listening indicator" aria-label="Listening indicator" role="button" tabindex="0">
+              <div class="iconBtn" id="btnWave" title="Voice" aria-label="Activate voice" role="button" tabindex="0" aria-pressed="false">
                 <svg viewBox="0 0 24 24" fill="none" id="waveSvg">
                   <g class="waveBars" transform="translate(5,6)">
                     <rect class="purpleFill" x="0" y="6" width="2" height="6" rx="1"></rect>
@@ -89,10 +82,6 @@
           </button>
 
         </div>
-        <p class="voiceHint">
-          Prefer the microphone for hands-free, faster input. Stick to typing when you need privacy, quiet, or more
-          control.
-        </p>
         <input
           class="honeypot"
           id="hpField"
@@ -103,7 +92,21 @@
           aria-hidden="true"
         />
         <div class="turnstileWrap" aria-label="Security check">
-          <p class="turnstileLabel">Security check</p>
+          <div class="turnstileHeader">
+            <div class="securityBadge" aria-hidden="true">
+              <svg viewBox="0 0 32 32" fill="none">
+                <path class="securityStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  d="M8 13v-3a8 8 0 0 1 16 0v3" />
+                <rect class="securityStroke" x="6.5" y="13" width="19" height="14" rx="4" />
+                <path class="securityStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  d="M12.5 20l3 3 4.5-5" />
+              </svg>
+            </div>
+            <span class="sr-only">Security check</span>
+            <button class="footerMenuBtn" id="btnFooterMenu" type="button" aria-expanded="false" aria-controls="policyOverlay">
+              Policies
+            </button>
+          </div>
           <div
             class="cf-turnstile"
             data-sitekey="YOUR_TURNSTILE_SITE_KEY"
@@ -151,10 +154,8 @@
       </div>
 
       <div class="footer">
-        <div class="footerLeft">
-          <button class="footerMenuBtn" id="btnFooterMenu" type="button" aria-expanded="false" aria-controls="policyOverlay">
-            Policies
-          </button>
+        <div class="footerRight">
+          <div class="powered">Powered by OPS</div>
         </div>
       </div>
 
@@ -226,7 +227,6 @@
       </div>
 
       <button class="clearBtn" id="btnClear" type="button">Clear Transcript</button>
-      <div class="powered">Powered by OPS</div>
     </aside>
   </div>
 
