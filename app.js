@@ -100,6 +100,17 @@ function safeTextOnly(s) {
   return String(s).replace(/\u0000/g, "").trim().slice(0, MAX_INPUT_CHARS);
 }
 
+function getTurnstileToken() {
+  try {
+    if (window.turnstile && typeof window.turnstile.getResponse === "function") {
+      return window.turnstile.getResponse();
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
 function timeStamp() {
   return new Date().toLocaleString();
 }
@@ -294,6 +305,8 @@ async function streamFromEnlace(payload, onToken) {
 
   if (OPS_ASSET_ID) headers["x-ops-asset-id"] = OPS_ASSET_ID;
   if (OPS_ASSET_SHA256) headers["x-ops-asset-sha256"] = OPS_ASSET_SHA256;
+  const ts = getTurnstileToken();
+  if (ts) headers["cf-turnstile-response"] = ts;
 
   const resp = await fetch(ENLACE_API, {
     method: "POST",
