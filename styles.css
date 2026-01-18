@@ -208,8 +208,13 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
 .lowerHeader{
   display:flex;
   align-items:center;
-  justify-content:flex-end;
-  gap: 10px;
+  justify-content:space-between;
+  gap: 16px;
+}
+.lowerControls{
+  display:flex;
+  align-items:center;
+  gap: 12px;
 }
 .miniAction{
   appearance:none;
