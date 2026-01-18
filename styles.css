@@ -656,3 +656,30 @@ body.dark .policyCard{
   box-shadow: 0 0 0 1px rgba(120,140,255,.05) inset;
   padding: 22px 18px;
 }
+
+.honeypot{
+  position:absolute;
+  left:-9999px;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none;
+}
+
+.turnstileWrap{
+  display:flex;
+  flex-direction:column;
+  gap: 8px;
+  border:1px dashed var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(12,16,30,.5);
+}
+
+.turnstileLabel{
+  margin:0;
+  font-size: 12px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
