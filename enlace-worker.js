@@ -25,6 +25,7 @@ const BASE_ALLOWED_HEADERS = new Set([
   "content-type",
   "x-ops-asset-id",
   "x-ops-asset-sha256",
+  "cf-turnstile-response",
 ]);
 
 function parseAllowlist(raw) {
@@ -104,6 +105,7 @@ function corsHeaders(origin, request) {
   safe.push("content-type");
   safe.push("x-ops-asset-id");
   safe.push("x-ops-asset-sha256");
+  safe.push("cf-turnstile-response");
 
   // De-dupe
   const unique = Array.from(new Set(safe));
@@ -180,6 +182,33 @@ function looksLikeCodeOrMarkup(text) {
     /\beval\s*\(/i,
   ];
   return patterns.some((re) => re.test(text));
+}
+
+async function verifyTurnstile(request, env) {
+  if (!env?.TURNSTILE_SECRET_KEY) {
+    return { ok: false, reason: "Missing TURNSTILE_SECRET_KEY" };
+  }
+
+  const token = request.headers.get("cf-turnstile-response") || "";
+  if (!token) return { ok: false, reason: "Missing Turnstile token" };
+
+  const ip = request.headers.get("CF-Connecting-IP") || "";
+  const form = new FormData();
+  form.append("secret", env.TURNSTILE_SECRET_KEY);
+  form.append("response", token);
+  if (ip) form.append("remoteip", ip);
+
+  const resp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    body: form,
+  });
+
+  const data = await resp.json().catch(() => null);
+  if (!data || data.success !== true) {
+    return { ok: false, reason: "Turnstile failed" };
+  }
+
+  return { ok: true };
 }
 
 function normalizeMessages(input) {
@@ -268,6 +297,11 @@ export default {
     const assetCheck = enforceAssetIdentity(request, env);
     if (!assetCheck.ok) {
       return json(403, { error: "Blocked: asset identity", detail: assetCheck.reason }, corsHeaders(origin, request));
+    }
+
+    const ts = await verifyTurnstile(request, env);
+    if (!ts.ok) {
+      return json(403, { error: "Blocked: turnstile", detail: ts.reason }, corsHeaders(origin, request));
     }
 
     // Content-Type strict
