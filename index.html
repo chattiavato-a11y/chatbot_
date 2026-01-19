@@ -11,15 +11,18 @@
 <body class="light">
   <div class="frame" id="app">
     <section class="main">
-        <div class="topbar">
-          <div class="topbar-left">
-          <div class="brand">
-            <div class="homeIcon" title="Menu" aria-label="Menu">≡</div>
-            <div class="brandName">Chattia</div>
-          </div>
+      <div class="topbar">
+        <div class="topbar-left">
+          <div class="homeIcon" title="Menu" aria-label="Menu">≡</div>
         </div>
-
-        <div class="topbar-right"></div>
+        <div class="topbar-center">
+          <div class="brandName">Chattia</div>
+        </div>
+        <div class="topbar-right">
+          <button class="toggle themeToggle" id="btnThemeMenu" type="button" aria-label="Toggle theme">
+            Dark
+          </button>
+        </div>
       </div>
 
       <div class="transcriptArea" id="mainTranscript" aria-label="Transcript">
@@ -50,7 +53,7 @@
             <input
               class="chatInput"
               id="chatInput"
-              placeholder="Type your text here"
+              placeholder="Type Your Message"
               aria-label="Quick chat message (Enter to send)"
               autocomplete="off"
             />
@@ -74,6 +77,9 @@
             </svg>
           </button>
 
+        </div>
+        <div class="poweredRow">
+          <span class="poweredInline">Powered by ARS</span>
         </div>
         <div class="lowerFooter">
           <button class="helpBtn" type="button">
