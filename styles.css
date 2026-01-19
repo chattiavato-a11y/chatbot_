@@ -11,6 +11,13 @@
   --glow:rgba(120,140,255,.12);
   --orange:#ff8c47;
   --purple:#8c8eff;
+  --control-bg: rgba(20,26,46,.55);
+  --control-bg-hover: rgba(22,30,56,.75);
+  --panel-bg: rgba(9,12,22,.55);
+  --panel-border: rgba(120,140,255,.06);
+  --input-bg: rgba(10,14,26,.62);
+  --message-bg: rgba(12,16,30,.6);
+  --message-user-bg: rgba(20,26,46,.8);
 
   --radius:18px;
   --radius-sm:14px;
@@ -31,6 +38,13 @@ body.light{
   --purple:#5b63ff;
   --shadow: 0 14px 32px rgba(16,20,38,.18);
   --frame-border:#2f6aa8;
+  --control-bg: rgba(238,242,255,.92);
+  --control-bg-hover: rgba(228,234,255,.95);
+  --panel-bg: rgba(248,250,255,.96);
+  --panel-border: rgba(16,20,38,.05);
+  --input-bg: rgba(238,242,255,.95);
+  --message-bg: rgba(242,245,255,.96);
+  --message-user-bg: rgba(224,232,255,.95);
 }
 
 *{box-sizing:border-box}
@@ -64,13 +78,6 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   display:flex;
   flex-direction:column;
   gap: 0;
-}
-body.light .main{
-  border: 2px solid var(--frame-border);
-  border-radius: 6px;
-  padding: 10px 12px 14px;
-  background: #ffffff;
-  min-height: 420px;
 }
 
 .container{
@@ -119,19 +126,12 @@ body.light .brandName{
 .toggle{
   appearance:none;
   border:1px solid var(--line);
-  background: rgba(20,26,46,.55);
+  background: var(--control-bg);
   color: var(--text);
   padding: 8px 12px;
   border-radius: 10px;
   font-weight: 600;
   cursor:pointer;
-}
-body.light .toggle{
-  background: transparent;
-  border: 0;
-  padding: 0;
-  font-weight: 700;
-  color: #e26a1a;
 }
 .themeToggle{
   font-size: 13px;
@@ -164,7 +164,7 @@ body.light .toggle{
 .btn{
   appearance:none;
   border:1px solid var(--line);
-  background: rgba(20,26,46,.55);
+  background: var(--control-bg);
   color: var(--text);
   padding: 10px 12px;
   border-radius: 12px;
@@ -174,11 +174,8 @@ body.light .toggle{
   gap:10px;
   transition: transform .06s ease, background .18s ease, border-color .18s ease;
 }
-body.light .btn{
-  background: rgba(235,240,255,.9);
-}
 .btn:hover{
-  background: rgba(22,30,56,.75);
+  background: var(--control-bg-hover);
   border-color: rgba(160,180,255,.22);
 }
 .btn:active{ transform: translateY(1px); }
@@ -192,21 +189,14 @@ body.light .btn{
   min-height: 340px;
   border:1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(9,12,22,.55);
-  box-shadow: 0 0 0 1px rgba(120,140,255,.06) inset;
+  background: var(--panel-bg);
+  box-shadow: 0 0 0 1px var(--panel-border) inset;
   padding: 20px 18px;
   display:flex;
   flex-direction:column;
   border-bottom: 0;
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
-}
-body.light .transcriptArea{
-  background: #ffffff;
-  border: 0;
-  box-shadow: none;
-  padding: 8px 6px 0;
-  flex: 1 1 auto;
 }
 .emptyState{
   display:flex;
@@ -225,20 +215,6 @@ body.light .transcriptArea{
   letter-spacing: .22em;
   font-size: 11px;
 }
-body.light .emptyState{
-  color: #5b667a;
-}
-body.light .emptyState{
-  display: none;
-}
-body.light .emptyState h2{
-  color: #111827;
-  font-size: 21px;
-}
-body.light .emptyEyebrow{
-  color: #ff8c47;
-  font-weight: 700;
-}
 .transcriptList{
   display:flex;
   flex-direction:column;
@@ -248,29 +224,23 @@ body.light .emptyEyebrow{
   padding: 12px 14px;
   border-radius: 14px;
   border:1px solid var(--line);
-  background: rgba(12,16,30,.6);
+  background: var(--message-bg);
   line-height: 1.55;
   white-space: pre-wrap;
 }
 .line-user{
   align-self:flex-end;
-  background: rgba(20,26,46,.8);
+  background: var(--message-user-bg);
 }
 .line-assistant{
   align-self:flex-start;
-}
-body.light .line{
-  background: rgba(242,245,255,.96);
-}
-body.light .line-user{
-  background: rgba(224,232,255,.95);
 }
 
 .lower{
   border:1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(9,12,22,.55);
-  box-shadow: 0 0 0 1px rgba(120,140,255,.06) inset;
+  background: var(--panel-bg);
+  box-shadow: 0 0 0 1px var(--panel-border) inset;
   padding: 12px 16px 14px;
   display:flex;
   flex-direction:column;
@@ -278,13 +248,6 @@ body.light .line-user{
   border-top: 0;
   border-top-left-radius: 0;
   border-top-right-radius: 0;
-}
-body.light .lower{
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  padding: 0 4px 4px;
-  gap: 8px;
 }
 .lowerHeader{
   display:flex;
@@ -297,10 +260,17 @@ body.light .lower{
   align-items:center;
   gap: 12px;
 }
+.lowerNote{
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: right;
+  max-width: 240px;
+}
 .miniAction{
   appearance:none;
   border:1px solid var(--line);
-  background: rgba(20,26,46,.55);
+  background: var(--control-bg);
   color: var(--text);
   border-radius: 12px;
   width: 36px;
@@ -310,10 +280,6 @@ body.light .lower{
   justify-content:center;
   cursor:pointer;
 }
-body.light .miniAction{
-  background: #ffffff;
-  border-color: var(--frame-border);
-}
 .accentStroke{
   stroke: var(--text);
 }
@@ -322,23 +288,18 @@ body.light .miniAction{
   align-items:center;
   gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
 }
 .poweredRow{
   display:flex;
   align-items:center;
   gap: 8px;
   margin-left: 0;
-}
-body.light .poweredRow{
-  margin-left: 0;
+  padding-left: 12px;
 }
 .poweredInline{
   color: var(--muted);
   font-size: 12px;
-}
-body.light .poweredInline{
-  color: #111827;
-  font-size: 11px;
 }
 .trustRow{
   display:flex;
@@ -369,14 +330,11 @@ body.light .poweredInline{
   border:1px solid var(--line);
   border-radius: 14px;
   padding: 24px 12px 8px;
-  background: rgba(10,14,26,.62);
+  background: var(--input-bg);
   position: relative;
   min-width: 0;
-}
-body.light .chatInputWrap{
-  background: #ffffff;
-  border-color: var(--frame-border);
-  border-radius: 4px;
+  width: 100%;
+  max-width: 100%;
 }
 .chatInput{
   flex: 1 1 auto;
@@ -391,12 +349,6 @@ body.light .chatInputWrap{
 .chatInput::placeholder{
   color: var(--muted);
 }
-body.light .chatInput{
-  color: #111827;
-}
-body.light .chatInput::placeholder{
-  color: #9aa3b6;
-}
 .chatInputActions{
   display:flex;
   gap: 8px;
@@ -410,12 +362,8 @@ body.light .chatInput::placeholder{
   height: 34px;
   border-radius: 10px;
   border:1px solid var(--line);
-  background: rgba(20,26,46,.55);
+  background: var(--control-bg);
   cursor:pointer;
-}
-body.light .iconBtn{
-  background: #ffffff;
-  border-color: #c8d3e6;
 }
 .iconBtn.is-listening,
 .iconBtn.is-active{
@@ -426,11 +374,6 @@ body.light .iconBtn{
   width: 44px;
   height: 44px;
   flex-shrink: 0;
-}
-body.light .sendBtn{
-  background: #4caf50;
-  border-color: #4caf50;
-  border-radius: 6px;
 }
 .sendBtn .purpleStroke{
   stroke: #ffffff;
@@ -603,9 +546,6 @@ body.light .note{
   align-items:center;
   justify-content:flex-end;
   gap: 12px;
-}
-body.light .lowerFooter{
-  display: none;
 }
 
 @media (max-width: 520px){
