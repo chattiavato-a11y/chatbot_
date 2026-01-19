@@ -26,16 +26,13 @@ const ENLACE_TRANSCRIBE = "https://enlace.grabem-holdem-nuts-right.workers.dev/a
 const VOICE_INPUT_MODE = "auto";
 
 // ---- DOM ----
-const elFrame = document.getElementById("app");
 const elMainList = document.getElementById("mainList");
-const elSideList = document.getElementById("sideList");
 
 const elChatInput = document.getElementById("chatInput");
 
 const elEmptyState = document.getElementById("emptyState");
 
 const elBtnMiniMenu = document.getElementById("btnMiniMenu");
-const elBtnToggleTranscript = document.getElementById("btnToggleTranscript");
 const elBtnWave = document.getElementById("btnWave");
 const elWaveSvg = document.getElementById("waveSvg");
 const elBtnSend = document.getElementById("btnSend");
@@ -61,7 +58,6 @@ let abortCtrl = null;
 
 let state = {
   theme: "DARK",  // DARK | LIGHT
-  sideOpen: false,
   listening: false,
   voiceMode: false,
 };
@@ -100,10 +96,6 @@ function getTurnstileToken() {
   return "";
 }
 
-function timeStamp() {
-  return new Date().toLocaleString();
-}
-
 function appendLine(role, text) {
   const safeText = text || "";
   const mainLine = document.createElement("div");
@@ -111,12 +103,7 @@ function appendLine(role, text) {
   mainLine.classList.add(`line-${role}`);
   mainLine.textContent = safeText;
 
-  const sideLine = document.createElement("div");
-  sideLine.className = "line";
-  sideLine.textContent = `${role.toUpperCase()} • ${timeStamp()}\n${safeText}`;
-
   if (elMainList) elMainList.appendChild(mainLine);
-  if (elSideList) elSideList.appendChild(sideLine);
 
   if (elEmptyState) elEmptyState.classList.add("is-hidden");
 
@@ -124,10 +111,6 @@ function appendLine(role, text) {
   if (elMainList && elMainList.parentElement) {
     const box = elMainList.parentElement;
     box.scrollTop = box.scrollHeight;
-  }
-  if (elSideList && elSideList.parentElement) {
-    const box2 = elSideList.parentElement;
-    box2.scrollTop = box2.scrollHeight;
   }
 }
 
@@ -162,22 +145,6 @@ function setTheme(nextTheme) {
   document.body.classList.toggle("light", !dark);
 
   if (elBtnThemeMenu) elBtnThemeMenu.textContent = dark ? "Dark" : "Light";
-}
-
-function setSide(open) {
-  state.sideOpen = !!open;
-  if (elFrame) elFrame.classList.toggle("side-collapsed", !state.sideOpen);
-  if (elBtnToggleTranscript) {
-    elBtnToggleTranscript.setAttribute("aria-expanded", String(state.sideOpen));
-    elBtnToggleTranscript.setAttribute(
-      "aria-label",
-      state.sideOpen ? "Hide transcript panel" : "Show transcript panel"
-    );
-  }
-}
-
-function toggleSide() {
-  setSide(!state.sideOpen);
 }
 
 function openSupportModal() {
@@ -529,7 +496,6 @@ if (elChatInput) {
   });
 }
 
-wireButtonLike(elBtnToggleTranscript, toggleSide);
 wireButtonLike(elBtnMiniMenu, downloadTranscript);
 
 function toggleTheme() {
@@ -562,4 +528,3 @@ document.addEventListener("keydown", (event) => {
 
 setTheme(state.theme);
 setStatus("Ready", false);
-setSide(state.sideOpen);
