@@ -149,7 +149,7 @@ function setTheme(nextTheme) {
   document.body.classList.toggle("dark", dark);
   document.body.classList.toggle("light", !dark);
 
-  if (elBtnThemeMenu) elBtnThemeMenu.textContent = dark ? "Dark" : "Light";
+  if (elBtnThemeMenu) elBtnThemeMenu.textContent = dark ? "Light" : "Dark";
 }
 
 function openSupportModal() {
