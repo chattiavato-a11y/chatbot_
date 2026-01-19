@@ -50,17 +50,11 @@ const elBtnThemeMenu = document.getElementById("btnThemeMenu");
 const elStatusDot = document.getElementById("statusDot");
 const elStatusTxt = document.getElementById("statusText");
 
-const elPolicyOverlay = document.getElementById("policyOverlay");
-const elPolicyPage = document.getElementById("policyPage");
-const elPolicyClose = document.getElementById("policyClose");
-const elPolicyCloseIcon = document.getElementById("policyCloseIcon");
 const elHoneypot = document.getElementById("hpField");
 
 const elSupportModal = document.getElementById("supportModal");
 const elSupportClose = document.getElementById("supportClose");
 const elSupportBackdrop = document.getElementById("supportModalBackdrop");
-
-const elFooterMenuBtn = document.getElementById("btnFooterMenu");
 
 // ---- State ----
 const MAX_INPUT_CHARS = 1500;
@@ -190,54 +184,6 @@ function setSide(open) {
 
 function toggleSide() {
   setSide(!state.sideOpen);
-}
-
-function openPolicyModal() {
-  if (!elPolicyOverlay) return;
-  lastFocusEl = document.activeElement;
-  elPolicyOverlay.classList.remove("is-hidden");
-  document.body.classList.add("modal-open");
-  if (elFooterMenuBtn) {
-    elFooterMenuBtn.textContent = "Hide Policies";
-    elFooterMenuBtn.setAttribute("aria-expanded", "true");
-  }
-}
-
-function closePolicyModal() {
-  if (!elPolicyOverlay) return;
-  elPolicyOverlay.classList.add("is-hidden");
-  document.body.classList.remove("modal-open");
-  if (elFooterMenuBtn) {
-    elFooterMenuBtn.textContent = "Policies";
-    elFooterMenuBtn.setAttribute("aria-expanded", "false");
-  }
-  if (lastFocusEl && typeof lastFocusEl.focus === "function") {
-    lastFocusEl.focus();
-  }
-  lastFocusEl = null;
-  if (window.history && window.history.pushState) {
-    window.history.pushState(null, "", window.location.pathname);
-  } else {
-    window.location.hash = "";
-  }
-}
-
-function revealPolicyPage(sectionId) {
-  if (!sectionId) return;
-  openPolicyModal();
-  if (window.history && window.history.pushState) {
-    window.history.pushState(null, "", `#${sectionId}`);
-  } else {
-    window.location.hash = `#${sectionId}`;
-  }
-  const target = document.getElementById(sectionId);
-  if (target) {
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (!target.hasAttribute("tabindex")) {
-      target.setAttribute("tabindex", "-1");
-    }
-    target.focus({ preventScroll: true });
-  }
 }
 
 function openSupportModal() {
@@ -385,7 +331,6 @@ async function streamFromEnlace(payload, onToken) {
     mode: "cors",
     credentials: "omit",
     cache: "no-store",
-    referrerPolicy: "no-referrer",
     headers,
     body: JSON.stringify(payload),
     signal: abortCtrl.signal,
@@ -540,20 +485,6 @@ wireButtonLike(elBtnThemeMenu, toggleTheme);
 wireButtonLike(elBtnWave, toggleVoiceInput);
 wireButtonLike(elBtnSend, sendFromInput);
 
-if (elPolicyClose) {
-  elPolicyClose.addEventListener("click", closePolicyModal);
-}
-
-if (elPolicyCloseIcon) {
-  elPolicyCloseIcon.addEventListener("click", closePolicyModal);
-}
-
-if (elPolicyOverlay) {
-  elPolicyOverlay.addEventListener("click", (event) => {
-    if (event.target === elPolicyOverlay) closePolicyModal();
-  });
-}
-
 if (elSupportClose) {
   elSupportClose.addEventListener("click", () => {
     closeSupportModal();
@@ -566,21 +497,8 @@ if (elSupportBackdrop) {
   });
 }
 
-if (elFooterMenuBtn) {
-  elFooterMenuBtn.addEventListener("click", () => {
-    if (elPolicyOverlay && !elPolicyOverlay.classList.contains("is-hidden")) {
-      closePolicyModal();
-      return;
-    }
-    revealPolicyPage("tc");
-  });
-}
-
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
-  if (elPolicyOverlay && !elPolicyOverlay.classList.contains("is-hidden")) {
-    closePolicyModal();
-  }
   if (elSupportModal && !elSupportModal.classList.contains("is-hidden")) {
     closeSupportModal();
   }
@@ -589,12 +507,3 @@ document.addEventListener("keydown", (event) => {
 setTheme(state.theme);
 setStatus("Ready", false);
 setSide(state.sideOpen);
-
-if (["#tc", "#cookies", "#contact", "#support", "#about"].includes(window.location.hash)) {
-  const hash = window.location.hash.replace("#", "");
-  if (hash === "support") {
-    openSupportModal();
-  } else {
-    revealPolicyPage(hash);
-  }
-}

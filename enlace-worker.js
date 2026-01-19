@@ -121,17 +121,8 @@ function securityHeaders() {
   // Anti-sniff / framing / leakage
   h.set("X-Content-Type-Options", "nosniff");
   h.set("X-Frame-Options", "DENY");
-  h.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  h.set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()");
-
   // HSTS (API side; Cloudflare already terminates TLS, still safe to set)
   h.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-
-  // Conservative CSP for an API response (helps scanners; does not break fetch)
-  h.set(
-    "Content-Security-Policy",
-    "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
-  );
 
   // Don’t cache sensitive responses and reduce inadvertent transformations/buffering
   h.set("Cache-Control", "no-store, no-transform");
