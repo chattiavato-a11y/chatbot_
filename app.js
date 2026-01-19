@@ -526,7 +526,3 @@ document.addEventListener("keydown", (event) => {
 setTheme(state.theme);
 setStatus("Ready", false);
 setSide(state.sideOpen);
-
-if (window.location.hash === "#support") {
-  openSupportModal();
-}
