@@ -197,6 +197,9 @@ body.light .btn{
   padding: 20px 18px;
   display:flex;
   flex-direction:column;
+  border-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 body.light .transcriptArea{
   background: #ffffff;
@@ -272,6 +275,9 @@ body.light .line-user{
   display:flex;
   flex-direction:column;
   gap: 12px;
+  border-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 body.light .lower{
   background: transparent;
