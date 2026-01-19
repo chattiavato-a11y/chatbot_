@@ -327,7 +327,7 @@ body.light .miniAction{
   display:flex;
   align-items:center;
   gap: 8px;
-  margin-left: 72px;
+  margin-left: 0;
 }
 body.light .poweredRow{
   margin-left: 0;
@@ -360,15 +360,6 @@ body.light .poweredInline{
 }
 .securityStroke{
   stroke: var(--muted);
-}
-.chatLabel{
-  min-width: 60px;
-  font-weight: 600;
-  color: #4b5565;
-}
-body.light .chatLabel{
-  color: #111827;
-  font-weight: 500;
 }
 .chatInputWrap{
   flex: 1 1 420px;

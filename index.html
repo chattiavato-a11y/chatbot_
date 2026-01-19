@@ -46,8 +46,6 @@
         </div>
 
         <div class="chatRow">
-          <div class="chatLabel">Chat</div>
-
           <div class="chatInputWrap">
             <input
               class="chatInput"
@@ -56,6 +54,12 @@
               aria-label="Quick chat message (Enter to send)"
               autocomplete="off"
             />
+            <button class="iconBtn sendBtn" id="btnSend" type="button" aria-label="Send message">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path class="purpleStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  d="M5 12h13m0 0-4-4m4 4-4 4" />
+              </svg>
+            </button>
             <div class="chatInputActions" aria-label="Voice controls">
               <div class="iconBtn" id="btnWave" title="Voice" aria-label="Activate voice" role="button" tabindex="0" aria-pressed="false">
                 <svg viewBox="0 0 24 24" fill="none" id="waveSvg">
@@ -68,13 +72,6 @@
               </div>
             </div>
           </div>
-
-          <button class="iconBtn sendBtn" id="btnSend" type="button" aria-label="Send message">
-            <svg viewBox="0 0 24 24" fill="none">
-              <path class="purpleStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                d="M5 12h13m0 0-4-4m4 4-4 4" />
-            </svg>
-          </button>
 
         </div>
         <div class="poweredRow">
