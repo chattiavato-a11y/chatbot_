@@ -71,6 +71,9 @@ let state = {
 let lastFocusEl = null;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
+let voiceInputBase = "";
+let voiceInputText = "";
+let voiceEndTimeout = null;
 
 // ---- Helpers ----
 function setStatus(text, busy) {
@@ -248,6 +251,12 @@ function initSpeechRecognition() {
   rec.lang = document.documentElement.lang || "en-US";
 
   rec.onstart = () => {
+    if (voiceEndTimeout) {
+      clearTimeout(voiceEndTimeout);
+      voiceEndTimeout = null;
+    }
+    voiceInputBase = elChatInput ? (elChatInput.value || "").trim() : "";
+    voiceInputText = "";
     setVoiceMode(true);
     setListening(true);
     setStatus("Listening…", true);
@@ -255,12 +264,23 @@ function initSpeechRecognition() {
 
   rec.onresult = (event) => {
     if (!elChatInput) return;
-    let transcript = "";
-    for (let i = event.resultIndex; i < event.results.length; i += 1) {
-      transcript += event.results[i][0].transcript;
+    let finalTranscript = "";
+    let interimTranscript = "";
+    for (let i = 0; i < event.results.length; i += 1) {
+      const result = event.results[i];
+      const text = result[0] ? result[0].transcript : "";
+      if (result.isFinal) {
+        finalTranscript += text;
+      } else {
+        interimTranscript += text;
+      }
     }
-    if (transcript) {
-      elChatInput.value = `${elChatInput.value} ${transcript}`.trimStart();
+    voiceInputText = `${finalTranscript}${interimTranscript}`.trim();
+    if (voiceInputText) {
+      const separator = voiceInputBase ? " " : "";
+      elChatInput.value = `${voiceInputBase}${separator}${voiceInputText}`;
+    } else {
+      elChatInput.value = voiceInputBase;
     }
   };
 
@@ -271,9 +291,18 @@ function initSpeechRecognition() {
   };
 
   rec.onend = () => {
+    const shouldAutoSend = elChatInput && elChatInput.value.trim().length > 0;
+    if (shouldAutoSend) {
+      sendFromInput();
+    }
     setListening(false);
-    setVoiceMode(false);
     setStatus("Ready", false);
+    voiceInputBase = "";
+    voiceInputText = "";
+    voiceEndTimeout = window.setTimeout(() => {
+      setVoiceMode(false);
+      voiceEndTimeout = null;
+    }, 30000);
   };
 
   return rec;
@@ -290,6 +319,10 @@ function toggleVoiceInput() {
   if (state.voiceMode) {
     setVoiceMode(false);
     if (state.listening) recognition.stop();
+    if (voiceEndTimeout) {
+      clearTimeout(voiceEndTimeout);
+      voiceEndTimeout = null;
+    }
     setStatus("Voice off", false);
     return;
   }
