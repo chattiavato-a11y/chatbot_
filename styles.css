@@ -253,6 +253,11 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   gap: 12px;
   flex-wrap: wrap;
 }
+.poweredInline{
+  margin-left: 72px;
+  color: var(--muted);
+  font-size: 12px;
+}
 .chatLabel{
   min-width: 60px;
   font-weight: 600;

@@ -32,8 +32,6 @@ const elSideList = document.getElementById("sideList");
 
 const elChatInput = document.getElementById("chatInput");
 
-const elBtnClear = document.getElementById("btnClear");
-
 const elEmptyState = document.getElementById("emptyState");
 
 const elBtnMiniMenu = document.getElementById("btnMiniMenu");
@@ -131,14 +129,6 @@ function appendLine(role, text) {
     const box2 = elSideList.parentElement;
     box2.scrollTop = box2.scrollHeight;
   }
-}
-
-function clearTranscript() {
-  if (elMainList) elMainList.innerHTML = "";
-  if (elSideList) elSideList.innerHTML = "";
-  if (elEmptyState) elEmptyState.classList.remove("is-hidden");
-  history = [];
-  setStatus("Ready", false);
 }
 
 function buildTranscriptText() {
@@ -539,7 +529,6 @@ if (elChatInput) {
   });
 }
 
-wireButtonLike(elBtnClear, clearTranscript);
 wireButtonLike(elBtnToggleTranscript, toggleSide);
 wireButtonLike(elBtnMiniMenu, downloadTranscript);
 
