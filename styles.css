@@ -496,57 +496,6 @@ hr{
   margin-top: 10px;
 }
 
-.footer{
-  margin-top: 18px;
-  color: var(--muted);
-  font-size: 12.5px;
-  display:flex;
-  justify-content:space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.footerLeft{
-  display:flex;
-  align-items:center;
-  gap: 12px;
-}
-.footerRight{
-  margin-left:auto;
-}
-.frame .footer{
-  border:1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 12px 16px;
-  background: rgba(9,12,22,.55);
-}
-.footerMenu{
-  position:absolute;
-  margin-top: 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,.10);
-  background: rgba(10,14,26,.88);
-  padding: 8px;
-  box-shadow: var(--shadow);
-  display:flex;
-  flex-direction:column;
-  gap: 6px;
-  z-index: 50;
-}
-.footerMenu.is-hidden{
-  display:none;
-}
-.footerMenuItem{
-  border:0;
-  text-align:left;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(16,22,40,.75);
-  color: var(--text);
-  cursor:pointer;
-}
-.footerMenuItem:hover{
-  background: rgba(22,30,56,.85);
-}
 .statusdot{
   display:inline-block;
   width: 8px;
@@ -694,51 +643,6 @@ body.dark .supportCard{
   pointer-events:none;
 }
 
-.trustRow{
-  display:flex;
-  align-items:center;
-  gap: 10px;
-  border:1px solid var(--line);
-  border-radius: 999px;
-  padding: 6px 10px;
-  background: rgba(12,16,30,.45);
-}
-.trustBadge{
-  width: 30px;
-  height: 30px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  border-radius: 12px;
-  border:1px solid var(--line);
-  background: rgba(16,22,40,.6);
-}
-.trustBadge svg{
-  width: 20px;
-  height: 20px;
-}
-.policyLink{
-  appearance:none;
-  border:1px solid var(--line);
-  background: rgba(20,26,46,.55);
-  color: var(--text);
-  padding: 8px 12px;
-  border-radius: 999px;
-  font-weight: 600;
-  font-size: 12.5px;
-  cursor:pointer;
-  display:inline-flex;
-  align-items:center;
-  gap: 6px;
-}
-.policyLink span{
-  color: var(--muted);
-  font-weight: 500;
-  font-size: 12px;
-}
-.securityStroke{
-  stroke: var(--text);
-}
 .listening .waveBars rect{
   animation: up .9s ease-in-out infinite;
   transform-origin: bottom;
