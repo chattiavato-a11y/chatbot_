@@ -55,6 +55,11 @@ const elSupportBackdrop = document.getElementById("supportModalBackdrop");
 const MAX_INPUT_CHARS = 1500;
 let history = []; // {role:"user"|"assistant", content:string}[]
 let abortCtrl = null;
+const SYSTEM_MESSAGE = {
+  role: "system",
+  content:
+    "You are Chattia, the assistant for this chat. Identify yourself as Chattia when asked or introducing yourself.",
+};
 
 let state = {
   theme: "DARK",  // DARK | LIGHT
@@ -440,7 +445,7 @@ async function sendMessage(userText) {
 
   try {
     const payload = {
-      messages: history,
+      messages: [SYSTEM_MESSAGE, ...history],
       honeypot: honeypotValue,
     };
 
