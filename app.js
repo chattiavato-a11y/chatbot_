@@ -62,7 +62,7 @@ const SYSTEM_MESSAGE = {
 };
 
 let state = {
-  theme: "DARK",  // DARK | LIGHT
+  theme: "LIGHT",  // DARK | LIGHT
   listening: false,
   voiceMode: false,
 };
