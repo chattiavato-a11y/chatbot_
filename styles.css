@@ -368,8 +368,10 @@ body.light .poweredInline{
   gap: 10px;
   border:1px solid var(--line);
   border-radius: 14px;
-  padding: 6px 10px;
+  padding: 24px 12px 8px;
   background: rgba(10,14,26,.62);
+  position: relative;
+  min-width: 0;
 }
 body.light .chatInputWrap{
   background: #ffffff;
@@ -378,6 +380,7 @@ body.light .chatInputWrap{
 }
 .chatInput{
   flex: 1 1 auto;
+  min-width: 0;
   border:0;
   background: transparent;
   color: var(--text);
@@ -397,6 +400,7 @@ body.light .chatInput::placeholder{
 .chatInputActions{
   display:flex;
   gap: 8px;
+  flex-shrink: 0;
 }
 .iconBtn{
   display:inline-flex;
@@ -421,6 +425,7 @@ body.light .iconBtn{
 .sendBtn{
   width: 44px;
   height: 44px;
+  flex-shrink: 0;
 }
 body.light .sendBtn{
   background: #4caf50;
@@ -582,6 +587,17 @@ body.light .note{
   color: #647084;
   font-size: 12px;
 }
+.statusInline--input{
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  margin-left: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.statusInline--input .statusdot{
+  margin-right: 4px;
+}
 .lowerFooter{
   display:flex;
   align-items:center;
@@ -590,6 +606,34 @@ body.light .note{
 }
 body.light .lowerFooter{
   display: none;
+}
+
+@media (max-width: 520px){
+  .frame{
+    width: 90%;
+    padding: 14px 10px 26px;
+  }
+  .chatRow{
+    flex-wrap: nowrap;
+  }
+  .chatInputWrap{
+    padding: 22px 10px 8px;
+    gap: 6px;
+  }
+  .chatInput{
+    font-size: 13px;
+  }
+  .sendBtn{
+    width: 38px;
+    height: 38px;
+  }
+  .iconBtn{
+    width: 30px;
+    height: 30px;
+  }
+  .statusInline--input{
+    right: 10px;
+  }
 }
 .smallLinks{
   display:flex;

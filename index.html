@@ -47,6 +47,10 @@
 
         <div class="chatRow">
           <div class="chatInputWrap">
+            <div class="statusInline statusInline--input" aria-live="polite">
+              <span class="statusdot" id="statusDot" aria-hidden="true"></span>
+              <span class="statustext" id="statusText">Ready</span>
+            </div>
             <input
               class="chatInput"
               id="chatInput"
@@ -76,12 +80,6 @@
         </div>
         <div class="poweredRow">
           <span class="poweredInline">Powered by OPS</span>
-        </div>
-        <div class="lowerFooter">
-          <div class="statusInline" aria-live="polite">
-            <span class="statusdot" id="statusDot" aria-hidden="true"></span>
-            <span class="statustext" id="statusText">Ready</span>
-          </div>
         </div>
         <input
           class="honeypot"
