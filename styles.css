@@ -294,7 +294,8 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   background: rgba(20,26,46,.55);
   cursor:pointer;
 }
-.iconBtn.is-listening{
+.iconBtn.is-listening,
+.iconBtn.is-active{
   border-color: rgba(140,170,255,.55);
   box-shadow: 0 0 0 2px rgba(140,170,255,.18) inset;
 }
@@ -499,6 +500,11 @@ hr{
   gap: 10px;
   flex-wrap: wrap;
 }
+.footerLeft{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+}
 .footerRight{
   margin-left:auto;
 }
@@ -683,35 +689,47 @@ body.dark .supportCard{
   pointer-events:none;
 }
 
-.turnstileWrap{
-  display:flex;
-  flex-direction:column;
-  gap: 8px;
-  border:1px dashed var(--line);
-  border-radius: 12px;
-  padding: 12px;
-  background: rgba(12,16,30,.5);
-}
-
-.turnstileHeader{
+.trustRow{
   display:flex;
   align-items:center;
-  justify-content:space-between;
-  gap: 12px;
+  gap: 10px;
+  border:1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(12,16,30,.45);
 }
-.securityBadge{
-  width: 28px;
-  height: 28px;
+.trustBadge{
+  width: 30px;
+  height: 30px;
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  border-radius: 10px;
+  border-radius: 12px;
   border:1px solid var(--line);
   background: rgba(16,22,40,.6);
 }
-.securityBadge svg{
+.trustBadge svg{
   width: 20px;
   height: 20px;
+}
+.policyLink{
+  appearance:none;
+  border:1px solid var(--line);
+  background: rgba(20,26,46,.55);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  gap: 6px;
+}
+.policyLink span{
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 12px;
 }
 .securityStroke{
   stroke: var(--text);
