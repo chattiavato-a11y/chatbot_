@@ -59,7 +59,7 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
 .main{
   display:flex;
   flex-direction:column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .container{
@@ -253,10 +253,36 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   gap: 12px;
   flex-wrap: wrap;
 }
-.poweredInline{
+.poweredRow{
+  display:flex;
+  align-items:center;
+  gap: 8px;
   margin-left: 72px;
+}
+.poweredInline{
   color: var(--muted);
   font-size: 12px;
+}
+.trustRow{
+  display:flex;
+  align-items:center;
+}
+.trustBadge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width: 26px;
+  height: 26px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(20,26,46,.55);
+}
+.trustBadge svg{
+  width: 16px;
+  height: 16px;
+}
+.securityStroke{
+  stroke: var(--muted);
 }
 .chatLabel{
   min-width: 60px;
