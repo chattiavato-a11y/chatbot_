@@ -81,6 +81,10 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   box-shadow: 0 0 0 1px rgba(120,140,255,.06) inset;
   backdrop-filter: blur(10px);
 }
+body.light .topbar{
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 0 0 1px rgba(16,20,38,.06) inset;
+}
 
 .brand{
   display:flex;
@@ -99,6 +103,9 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   background: rgba(18,24,44,.65);
   font-size: 14px;
 }
+body.light .homeIcon{
+  background: rgba(232,238,255,.9);
+}
 .brandName{
   font-weight: 700;
   letter-spacing: .2px;
@@ -113,6 +120,9 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   border-radius: 10px;
   font-weight: 600;
   cursor:pointer;
+}
+body.light .toggle{
+  background: rgba(232,236,255,.9);
 }
 .brandMark{
   width: 12px;
@@ -151,6 +161,9 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   gap:10px;
   transition: transform .06s ease, background .18s ease, border-color .18s ease;
 }
+body.light .btn{
+  background: rgba(235,240,255,.9);
+}
 .btn:hover{
   background: rgba(22,30,56,.75);
   border-color: rgba(160,180,255,.22);
@@ -171,6 +184,10 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   padding: 18px;
   display:flex;
   flex-direction:column;
+}
+body.light .transcriptArea{
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 0 0 1px rgba(16,20,38,.06) inset;
 }
 .emptyState{
   display:flex;
@@ -209,6 +226,12 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
 .line-assistant{
   align-self:flex-start;
 }
+body.light .line{
+  background: rgba(242,245,255,.96);
+}
+body.light .line-user{
+  background: rgba(224,232,255,.95);
+}
 
 .lower{
   border:1px solid var(--line);
@@ -219,6 +242,10 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   display:flex;
   flex-direction:column;
   gap: 12px;
+}
+body.light .lower{
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 0 0 1px rgba(16,20,38,.06) inset;
 }
 .lowerHeader{
   display:flex;
@@ -243,6 +270,9 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   align-items:center;
   justify-content:center;
   cursor:pointer;
+}
+body.light .miniAction{
+  background: rgba(235,240,255,.9);
 }
 .accentStroke{
   stroke: var(--text);
@@ -272,6 +302,9 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   padding: 6px 10px;
   background: rgba(10,14,26,.62);
 }
+body.light .chatInputWrap{
+  background: rgba(238,242,255,.92);
+}
 .chatInput{
   flex: 1 1 auto;
   border:0;
@@ -282,7 +315,7 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   outline: none;
 }
 .chatInput::placeholder{
-  color: rgba(169,180,208,.7);
+  color: var(--muted);
 }
 .chatInputActions{
   display:flex;
@@ -298,6 +331,9 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   border:1px solid var(--line);
   background: rgba(20,26,46,.55);
   cursor:pointer;
+}
+body.light .iconBtn{
+  background: rgba(235,240,255,.9);
 }
 .iconBtn.is-listening,
 .iconBtn.is-active{
@@ -385,6 +421,11 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   display:none;
   z-index: 50;
 }
+body.light .menuPopover{
+  border-color: rgba(16,20,38,.12);
+  background: rgba(255,255,255,.96);
+  box-shadow: var(--shadow), 0 0 0 1px rgba(16,20,38,.06) inset;
+}
 .menuPopover[data-open="true"]{ display:block; }
 
 .menuItem{
@@ -403,6 +444,12 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
 }
 .menuItem:hover{ background: rgba(22,30,56,.85); }
 .menuItem:active{ transform: translateY(1px); }
+body.light .menuItem{
+  background: rgba(235,240,255,.9);
+}
+body.light .menuItem:hover{
+  background: rgba(220,228,255,.95);
+}
 
 /* Page card */
 .card{
@@ -413,6 +460,10 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   box-shadow: 0 0 0 1px rgba(120,140,255,.05) inset;
   backdrop-filter: blur(10px);
   overflow:hidden;
+}
+body.light .card{
+  background: rgba(255,255,255,.94);
+  box-shadow: 0 0 0 1px rgba(16,20,38,.05) inset;
 }
 .cardInner{
   padding: 22px 18px;
@@ -434,7 +485,7 @@ h2{
   letter-spacing: .2px;
 }
 p,li{
-  color: rgba(233,238,252,.92);
+  color: var(--text);
   line-height: 1.65;
 }
 hr{
@@ -454,6 +505,9 @@ hr{
   border: 1px solid var(--line);
   border-radius: 14px;
   background: rgba(10,14,26,.55);
+}
+body.light .kvRow{
+  background: rgba(238,242,255,.92);
 }
 .kvLabel{ color: var(--muted); font-size: 12px; margin-bottom: 3px; }
 .kvValue{ font-weight: 650; }
@@ -478,6 +532,12 @@ hr{
   color: var(--text);
   outline:none;
 }
+body.light .field input,
+body.light .field textarea,
+body.light .field select{
+  border-color: rgba(16,20,38,.18);
+  background: rgba(238,242,255,.95);
+}
 .field textarea{ min-height: 120px; resize: vertical; }
 
 .row{
@@ -494,6 +554,10 @@ hr{
   background: rgba(12,16,30,.38);
   color: var(--muted);
   margin-top: 10px;
+}
+body.light .note{
+  border-color: rgba(16,20,38,.22);
+  background: rgba(238,242,255,.85);
 }
 
 .statusdot{
@@ -538,6 +602,9 @@ hr{
   border-radius: 12px;
   border: 1px solid var(--line);
 }
+body.light .skip:focus{
+  background: rgba(255,255,255,.96);
+}
 
 .modal{
   position:fixed;
@@ -580,6 +647,10 @@ hr{
   box-shadow: var(--shadow), 0 0 0 1px rgba(120,140,255,.05) inset;
   overflow:hidden;
 }
+body.light .modalPanel{
+  background: rgba(255,255,255,.96);
+  box-shadow: var(--shadow), 0 0 0 1px rgba(16,20,38,.05) inset;
+}
 .modalHeader{
   display:flex;
   align-items:center;
@@ -588,6 +659,9 @@ hr{
   padding: 16px 18px;
   border-bottom:1px solid var(--line);
   background: rgba(9,12,22,.7);
+}
+body.light .modalHeader{
+  background: rgba(238,242,255,.92);
 }
 .modalTitle{
   font-weight: 700;
@@ -632,6 +706,10 @@ body.dark .supportCard{
   background: rgba(12,16,30,.58);
   box-shadow: 0 0 0 1px rgba(120,140,255,.05) inset;
   padding: 22px 18px;
+}
+body.light .redirectCard{
+  background: rgba(255,255,255,.94);
+  box-shadow: 0 0 0 1px rgba(16,20,38,.05) inset;
 }
 
 .honeypot{
