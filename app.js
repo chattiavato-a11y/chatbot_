@@ -47,9 +47,6 @@ const elStatusTxt = document.getElementById("statusText");
 
 const elHoneypot = document.getElementById("hpField");
 
-const elSupportModal = document.getElementById("supportModal");
-const elSupportClose = document.getElementById("supportClose");
-const elSupportBackdrop = document.getElementById("supportModalBackdrop");
 
 // ---- State ----
 const MAX_INPUT_CHARS = 1500;
@@ -67,7 +64,6 @@ let state = {
   voiceMode: false,
 };
 
-let lastFocusEl = null;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let voiceInputBase = "";
@@ -150,24 +146,6 @@ function setTheme(nextTheme) {
   document.body.classList.toggle("light", !dark);
 
   if (elBtnThemeMenu) elBtnThemeMenu.textContent = dark ? "Light" : "Dark";
-}
-
-function openSupportModal() {
-  if (!elSupportModal) return;
-  lastFocusEl = document.activeElement;
-  elSupportModal.classList.remove("is-hidden");
-  document.body.classList.add("modal-open");
-  if (elSupportClose) elSupportClose.focus();
-}
-
-function closeSupportModal() {
-  if (!elSupportModal) return;
-  elSupportModal.classList.add("is-hidden");
-  document.body.classList.remove("modal-open");
-  if (lastFocusEl && typeof lastFocusEl.focus === "function") {
-    lastFocusEl.focus();
-  }
-  lastFocusEl = null;
 }
 
 function setListening(on) {
@@ -511,25 +489,6 @@ wireButtonLike(elBtnThemeMenu, toggleTheme);
 
 wireButtonLike(elBtnWave, toggleVoiceInput);
 wireButtonLike(elBtnSend, sendFromInput);
-
-if (elSupportClose) {
-  elSupportClose.addEventListener("click", () => {
-    closeSupportModal();
-  });
-}
-
-if (elSupportBackdrop) {
-  elSupportBackdrop.addEventListener("click", () => {
-    closeSupportModal();
-  });
-}
-
-document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape") return;
-  if (elSupportModal && !elSupportModal.classList.contains("is-hidden")) {
-    closeSupportModal();
-  }
-});
 
 setTheme(state.theme);
 setStatus("Ready", false);
