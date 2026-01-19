@@ -338,19 +338,6 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   padding:24px;
   z-index: 30;
 }
-.policyOverlay.is-hidden{
-  display:none;
-}
-.policyOverlay{
-  position: fixed;
-  inset: 0;
-  background: rgba(6,10,18,.72);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:24px;
-  z-index: 30;
-}
 .supportModalCard{
   width: min(1100px, 100%);
   background: var(--panel);
@@ -371,58 +358,6 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
   border-radius:12px;
   font-weight:700;
   cursor:pointer;
-}
-
-/* Popover menu (matches your screenshot feel) */
-.menuWrap{
-  position:relative;
-  display:inline-flex;
-}
-.menuPopover{
-  position:absolute;
-  right:0;
-  top: calc(100% + 10px);
-  width: 230px;
-  border-radius: 18px;
-  border: 1px solid rgba(255,255,255,.10);
-  background: rgba(10,14,26,.88);
-  box-shadow: var(--shadow), 0 0 0 1px rgba(120,140,255,.08) inset;
-  backdrop-filter: blur(12px);
-  padding: 10px;
-  display:none;
-  z-index: 50;
-}
-.menuPopover[data-open="true"]{ display:block; }
-
-.menuItem{
-  display:block;
-  width:100%;
-  border:0;
-  text-align:left;
-  padding: 12px 12px;
-  margin: 8px 0;
-  border-radius: 14px;
-  background: rgba(16,22,40,.75);
-  color: var(--text);
-  font-weight: 650;
-  cursor:pointer;
-  transition: background .18s ease, transform .06s ease;
-}
-.menuItem:hover{ background: rgba(22,30,56,.85); }
-.menuItem:active{ transform: translateY(1px); }
-
-/* Page card */
-.card{
-  margin-top: 18px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(12,16,30,.58);
-  box-shadow: 0 0 0 1px rgba(120,140,255,.05) inset;
-  backdrop-filter: blur(10px);
-  overflow:hidden;
-}
-.cardInner{
-  padding: 22px 18px;
 }
 
 h1{
@@ -601,20 +536,7 @@ hr{
   border: 1px solid var(--line);
 }
 
-.modal{
-  position:fixed;
-  inset:0;
-  background: rgba(6,10,18,.72);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:24px;
-  z-index:25;
-}
-.modalOverlay.is-hidden{
-  display:none;
-}
-.policyPage{
+.supportPage{
   position:relative;
   width:min(1120px, 100%);
   max-height:min(84vh, 760px);
@@ -630,88 +552,49 @@ hr{
   max-height:min(85vh, 840px);
   overflow:auto;
 }
-.policyClose{
-  align-self:flex-end;
-  border:0;
-  background:var(--orange);
-  color:#fff;
-  padding:10px 16px;
-  border-radius:12px;
-  font-weight:700;
-  cursor:pointer;
-}
-.policyCloseIcon{
-  position:absolute;
-  top:16px;
-  right:16px;
-  border:1px solid rgba(120,140,255,.3);
-  background:rgba(12,16,30,.8);
-  color:#fff;
-  width:36px;
-  height:36px;
-  border-radius:10px;
-  font-size:18px;
-  font-weight:700;
-  cursor:pointer;
+.supportIntro{
   display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:2;
-}
-.modal[data-open="true"]{
-  opacity:1;
-  pointer-events:auto;
-}
-.modalPanel{
-  width:min(960px, 100%);
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: rgba(12,16,30,.96);
-  box-shadow: var(--shadow), 0 0 0 1px rgba(120,140,255,.05) inset;
-  overflow:hidden;
-}
-.modalHeader{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
+  flex-direction:column;
   gap: 10px;
-  padding: 16px 18px;
-  border-bottom:1px solid var(--line);
-  background: rgba(9,12,22,.7);
 }
-.modalTitle{
-  font-weight: 700;
-  letter-spacing: .2px;
+.supportEyebrow{
+  margin:0;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: .24em;
+  text-transform: uppercase;
 }
-.modalBody{
-  padding: 18px;
-  max-height: calc(100dvh - 180px);
-  overflow:auto;
+.supportLead{
+  margin:0;
+  color: var(--muted);
+  line-height: 1.6;
 }
-
-.policyCard{
+.supportGrid{
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.supportCard{
   border:1px solid rgba(87, 115, 188, .2);
   background:var(--surface);
   border-radius:16px;
   padding:18px 18px 20px;
   box-shadow:0 12px 26px rgba(15,17,22,.08);
 }
-body.dark .policyCard{
+body.dark .supportCard{
   border-color:rgba(79,140,255,.25);
 }
-.policyCard h3{
+.supportCard h3{
   margin:0 0 8px;
   font-size:16px;
 }
-.policyCard p{
+.supportCard p{
   margin:0 0 10px;
   color:var(--text);
   line-height:1.55;
   font-size:13px;
 }
-.policyCard p:last-child{ margin-bottom:0; }
-.policyClose:hover,
-.policyCloseIcon:hover{ filter:brightness(.95); }
+.supportCard p:last-child{ margin-bottom:0; }
 @keyframes up{
   0%,100%{ transform:scaleY(0.5); opacity:.45; }
   50%{ transform:scaleY(1.2); opacity:1; }

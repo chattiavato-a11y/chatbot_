@@ -103,8 +103,8 @@
               </svg>
             </div>
             <span class="sr-only">Security check</span>
-            <button class="footerMenuBtn" id="btnFooterMenu" type="button" aria-expanded="false" aria-controls="policyOverlay">
-              Policies
+            <button class="footerMenuBtn" id="btnSupport" type="button" aria-expanded="false" aria-controls="supportModal">
+              Support
             </button>
           </div>
           <div
@@ -121,30 +121,30 @@
           <button class="supportClose" id="supportClose" type="button" aria-label="Close support panel">
             Close
           </button>
-          <section class="policyPage" aria-live="polite">
-            <div class="policyIntro">
-              <p class="policyEyebrow">Support</p>
+          <section class="supportPage" aria-live="polite">
+            <div class="supportIntro">
+              <p class="supportEyebrow">Support</p>
               <h2 id="supportTitle">We’re here to help</h2>
-              <p class="policyLead">
+              <p class="supportLead">
                 Reach out any time you need guidance, troubleshooting, or product answers. Our team responds with
                 clear, actionable steps so you can get back to work quickly.
               </p>
             </div>
 
-            <div class="policyGrid" id="supportPanel">
-              <article class="policyCard">
+            <div class="supportGrid" id="supportPanel">
+              <article class="supportCard">
                 <h3>Get started</h3>
                 <p>Share your question, goal, or error message in one sentence. We’ll reply with the next best step.</p>
               </article>
-              <article class="policyCard">
+              <article class="supportCard">
                 <h3>Response time</h3>
                 <p>Typical replies arrive within one business day. Priority requests are handled in order of impact.</p>
               </article>
-              <article class="policyCard">
+              <article class="supportCard">
                 <h3>Best ways to reach us</h3>
                 <p>Email support, chat in-product, or provide a ticket ID if you have an active request.</p>
               </article>
-              <article class="policyCard">
+              <article class="supportCard">
                 <h3>What to include</h3>
                 <p>Add screenshots, timestamps, and steps to reproduce so we can resolve the issue faster.</p>
               </article>
@@ -159,58 +159,6 @@
         </div>
       </div>
 
-      <div class="policyOverlay is-hidden" id="policyOverlay" role="dialog" aria-modal="true" aria-labelledby="policyTitle">
-        <section class="policyPage" id="policyPage" aria-live="polite">
-          <button class="policyCloseIcon" id="policyCloseIcon" type="button" aria-label="Close policies">✕</button>
-          <div class="policyIntro">
-            <p class="policyEyebrow">Policy Center</p>
-            <h2 id="policyTitle">Terms, Privacy, and Support</h2>
-            <p class="policyLead">
-              This page provides a plain-language overview of the terms, cookies, and support information that apply to
-              using Chattia. It is a generic template intended to be customized for your organization.
-            </p>
-          </div>
-
-          <div class="policyGrid">
-            <article class="policyCard" id="tc">
-              <h3>Terms &amp; Conditions</h3>
-              <p>By accessing or using this service, you agree to these terms and any updates we publish.</p>
-              <p>Use the service lawfully and avoid actions that interfere with the experience of others.</p>
-              <p>Content is provided “as is” without warranties; availability and features may change.</p>
-              <p>You are responsible for safeguarding any access credentials and devices you use.</p>
-              <p>We may suspend access if we detect misuse, security risk, or policy violations.</p>
-              <p>To the fullest extent permitted by law, liability is limited to direct damages only.</p>
-            </article>
-
-            <article class="policyCard" id="cookies">
-              <h3>Cookie Notice</h3>
-              <p>We use essential cookies to keep the service secure and functional.</p>
-              <p>Optional analytics cookies may be used to improve usability and performance.</p>
-              <p>You can adjust cookie preferences in your browser settings at any time.</p>
-            </article>
-
-            <article class="policyCard" id="contact">
-              <h3>Contact Us</h3>
-              <p>Need help or want to share feedback? Email us at support@example.com.</p>
-              <p>We aim to respond within 2 business days.</p>
-            </article>
-
-            <article class="policyCard" id="support">
-              <h3>Support</h3>
-              <p>For urgent issues, include “URGENT” in your subject line and describe the impact.</p>
-              <p>We provide best-effort support during standard business hours.</p>
-            </article>
-
-            <article class="policyCard" id="about">
-              <h3>About Us</h3>
-              <p>Chattia is a conversational interface designed to help users get answers quickly and safely.</p>
-              <p>Our mission is to deliver helpful, secure, and human-centered digital experiences.</p>
-            </article>
-          </div>
-
-          <button class="policyClose" id="policyClose" type="button" aria-label="Close policies">Close</button>
-        </section>
-      </div>
     </section>
 
     <button class="gap" id="btnToggleTranscript" type="button" aria-label="Show transcript panel" aria-expanded="false">
