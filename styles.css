@@ -63,7 +63,7 @@ a:focus{outline:2px solid rgba(140,170,255,.55); outline-offset:3px; border-radi
 .main{
   display:flex;
   flex-direction:column;
-  gap: 10px;
+  gap: 0;
 }
 body.light .main{
   border: 2px solid var(--frame-border);
@@ -202,7 +202,7 @@ body.light .transcriptArea{
   background: #ffffff;
   border: 0;
   box-shadow: none;
-  padding: 8px 6px 16px;
+  padding: 8px 6px 0;
   flex: 1 1 auto;
 }
 .emptyState{
@@ -277,7 +277,7 @@ body.light .lower{
   background: transparent;
   border: 0;
   box-shadow: none;
-  padding: 6px 4px 4px;
+  padding: 0 4px 4px;
   gap: 8px;
 }
 .lowerHeader{
