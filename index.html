@@ -8,20 +8,18 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 
-<body class="dark">
+<body class="light">
   <div class="frame" id="app">
     <section class="main">
         <div class="topbar">
           <div class="topbar-left">
           <div class="brand">
-            <div class="homeIcon" title="Home" aria-label="Home">⌂</div>
+            <div class="homeIcon" title="Menu" aria-label="Menu">≡</div>
             <div class="brandName">Chattia</div>
           </div>
         </div>
 
-        <div class="topbar-right">
-          <button class="toggle" id="btnThemeMenu" type="button" aria-label="Toggle theme">Dark</button>
-        </div>
+        <div class="topbar-right"></div>
       </div>
 
       <div class="transcriptArea" id="mainTranscript" aria-label="Transcript">
@@ -42,10 +40,6 @@
                   d="M12 3v11m0 0-4-4m4 4 4-4M5 19h14" />
               </svg>
             </button>
-          </div>
-          <div class="statusInline" aria-live="polite">
-            <span class="statusdot" id="statusDot" aria-hidden="true"></span>
-            <span class="statustext" id="statusText">Ready</span>
           </div>
         </div>
 
@@ -81,18 +75,14 @@
           </button>
 
         </div>
-        <div class="poweredRow">
-          <div class="poweredInline">Powered by OPS</div>
-          <div class="trustRow" aria-label="Security verified">
-            <div class="trustBadge" aria-hidden="true">
-              <svg viewBox="0 0 32 32" fill="none">
-                <path class="securityStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                  d="M8 13v-3a8 8 0 0 1 16 0v3" />
-                <rect class="securityStroke" x="6.5" y="13" width="19" height="14" rx="4" />
-                <path class="securityStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                  d="M12.5 20l3 3 4.5-5" />
-              </svg>
-            </div>
+        <div class="lowerFooter">
+          <button class="helpBtn" type="button">
+            Help &amp; Policies
+            <span class="caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="statusInline" aria-live="polite">
+            <span class="statusdot" id="statusDot" aria-hidden="true"></span>
+            <span class="statustext" id="statusText">Ready</span>
           </div>
         </div>
         <input
