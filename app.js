@@ -65,6 +65,7 @@ let state = {
   theme: "DARK",  // DARK | LIGHT
   sideOpen: false,
   listening: false,
+  voiceMode: false,
 };
 
 let lastFocusEl = null;
@@ -214,6 +215,31 @@ function setListening(on) {
   }
 }
 
+function setVoiceMode(on) {
+  state.voiceMode = !!on;
+  if (elBtnWave) {
+    elBtnWave.classList.toggle("is-active", state.voiceMode);
+    elBtnWave.setAttribute(
+      "aria-label",
+      state.voiceMode ? "Voice activated" : "Activate voice"
+    );
+    elBtnWave.title = state.voiceMode ? "Voice activated" : "Activate voice";
+  }
+  if (!state.voiceMode && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+function speakReply(text) {
+  if (!state.voiceMode || !window.speechSynthesis) return;
+  const cleaned = safeTextOnly(text);
+  if (!cleaned) return;
+  const utterance = new SpeechSynthesisUtterance(cleaned);
+  utterance.lang = document.documentElement.lang || "en-US";
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
+
 function initSpeechRecognition() {
   if (!SpeechRecognition) return null;
   const rec = new SpeechRecognition();
@@ -222,6 +248,7 @@ function initSpeechRecognition() {
   rec.lang = document.documentElement.lang || "en-US";
 
   rec.onstart = () => {
+    setVoiceMode(true);
     setListening(true);
     setStatus("Listening…", true);
   };
@@ -239,11 +266,13 @@ function initSpeechRecognition() {
 
   rec.onerror = (event) => {
     setListening(false);
+    setVoiceMode(false);
     setStatus(`Mic error: ${event.error || "unknown"}`, false);
   };
 
   rec.onend = () => {
     setListening(false);
+    setVoiceMode(false);
     setStatus("Ready", false);
   };
 
@@ -258,10 +287,14 @@ function toggleVoiceInput() {
   if (!recognition) recognition = initSpeechRecognition();
   if (!recognition) return;
 
-  if (state.listening) {
-    recognition.stop();
+  if (state.voiceMode) {
+    setVoiceMode(false);
+    if (state.listening) recognition.stop();
+    setStatus("Voice off", false);
     return;
   }
+
+  setVoiceMode(true);
   if (elChatInput) elChatInput.focus();
   recognition.start();
 }
@@ -428,6 +461,7 @@ async function sendMessage(userText) {
     if (!botText.trim()) botText = "(no output)";
     appendLine("assistant", botText);
     history.push({ role: "assistant", content: botText });
+    speakReply(botText);
 
     setStatus("Ready", false);
   } catch (err) {

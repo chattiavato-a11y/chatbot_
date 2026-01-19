@@ -90,25 +90,6 @@
           autocomplete="off"
           aria-hidden="true"
         />
-        <div class="turnstileWrap" aria-label="Security check">
-          <div class="turnstileHeader">
-            <div class="securityBadge" aria-hidden="true">
-              <svg viewBox="0 0 32 32" fill="none">
-                <path class="securityStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                  d="M8 13v-3a8 8 0 0 1 16 0v3" />
-                <rect class="securityStroke" x="6.5" y="13" width="19" height="14" rx="4" />
-                <path class="securityStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                  d="M12.5 20l3 3 4.5-5" />
-              </svg>
-            </div>
-            <span class="sr-only">Security check</span>
-          </div>
-          <div
-            class="cf-turnstile"
-            data-sitekey="YOUR_TURNSTILE_SITE_KEY"
-            data-theme="dark"
-          ></div>
-        </div>
       </div>
 
       <div class="supportModal is-hidden" id="supportModal" role="dialog" aria-modal="true" aria-labelledby="supportTitle">
@@ -150,6 +131,23 @@
       </div>
 
       <div class="footer">
+        <div class="footerLeft">
+          <div class="trustRow" aria-label="Security verified">
+            <div class="trustBadge" aria-hidden="true">
+              <svg viewBox="0 0 32 32" fill="none">
+                <path class="securityStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  d="M8 13v-3a8 8 0 0 1 16 0v3" />
+                <rect class="securityStroke" x="6.5" y="13" width="19" height="14" rx="4" />
+                <path class="securityStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  d="M12.5 20l3 3 4.5-5" />
+              </svg>
+            </div>
+            <span class="sr-only">Security verified</span>
+            <button class="policyLink" type="button" aria-label="Policies">
+              Policies <span aria-hidden="true">Next</span>
+            </button>
+          </div>
+        </div>
         <div class="footerRight">
           <div class="powered">Powered by OPS</div>
         </div>
@@ -174,7 +172,6 @@
     </aside>
   </div>
 
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>
