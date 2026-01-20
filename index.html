@@ -6,6 +6,7 @@
   <title>Chattia • Chat</title>
   <meta name="description" content="Chattia AI — simple chatbot UI (UI → Enlace)." />
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
   <!-- Optional: app.js can read this to avoid hardcoding ENLACE URLs -->
   <!-- <meta name="chattia-enlace-base" content="https://enlace.grabem-holdem-nuts-right.workers.dev" /> -->
@@ -134,6 +135,15 @@
 
         <div class="poweredRow">
           <span class="poweredInline">Powered by OPS</span>
+        </div>
+
+        <div class="turnstileRow" aria-label="Security check">
+          <div
+            class="cf-turnstile"
+            id="turnstileWidget"
+            data-sitekey="0x4AAAAAACLhJwKO0VjYvzOR"
+            data-theme="auto"
+          ></div>
         </div>
 
         <input

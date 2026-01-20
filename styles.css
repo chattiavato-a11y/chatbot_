@@ -313,6 +313,16 @@ body.light .emptyEyebrow{
   margin-left: 0;
   padding-left: 0;
 }
+.turnstileRow{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  min-height: 64px;
+}
+.turnstileRow .cf-turnstile{
+  transform: scale(0.9);
+  transform-origin: left center;
+}
 .poweredInline{
   color: var(--muted);
   font-size: 12px;
