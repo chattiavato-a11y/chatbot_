@@ -24,8 +24,10 @@ const ENLACE_CHAT = `${ENLACE_BASE}/api/chat`;
 const ENLACE_VOICE = `${ENLACE_BASE}/api/voice`;
 
 // OPTIONAL: asset identity headers (only if Enlace OPS_ASSET_ALLOWLIST is enabled)
-const OPS_ASSET_ID = "";      // e.g. "CHATTIA_WEB_01"
-const OPS_ASSET_SHA256 = "";  // e.g. "abcdef1234... (hex sha256)"
+const OPS_ASSET_ID = "https://github.com/chattiavato-a11y/chatbot_";
+const OPS_ASSET_SHA256 = "A43194265A4D9D670083B2C19675C6D1F10E000EEE3300B79704C59BF9CF26F1";
+// OPTIONAL: private key (JWK string) used to sign requests for replay protection
+const OPS_ASSET_ID_PRIV_KEY = "";
 
 // OPTIONAL: Turnstile header (only if your Enlace allows this header in CORS)
 const SEND_TURNSTILE_HEADER = true;
@@ -122,6 +124,70 @@ function getTurnstileToken() {
     return "";
   }
   return "";
+}
+
+function base64UrlEncodeBytes(bytes) {
+  let binary = "";
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function sha256Hex(input) {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  const bytes = new Uint8Array(hash);
+  let out = "";
+  for (const b of bytes) out += b.toString(16).padStart(2, "0");
+  return out;
+}
+
+function normalizeJwkForSigning(raw) {
+  const jwk = { ...raw };
+  jwk.alg = "RS256";
+  jwk.key_ops = ["sign"];
+  return jwk;
+}
+
+async function signAssetPayload(payload) {
+  if (!OPS_ASSET_ID_PRIV_KEY || !crypto?.subtle) return null;
+  let jwk;
+  try {
+    jwk = normalizeJwkForSigning(JSON.parse(OPS_ASSET_ID_PRIV_KEY));
+  } catch {
+    return null;
+  }
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(payload)
+  );
+  return base64UrlEncodeBytes(new Uint8Array(signature));
+}
+
+async function buildAssetSignatureHeaders(bodyText) {
+  if (!OPS_ASSET_ID_PRIV_KEY || !OPS_ASSET_ID || !bodyText) return {};
+  const timestamp = Date.now().toString();
+  const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
+  const nonce = base64UrlEncodeBytes(nonceBytes);
+  const bodyHash = await sha256Hex(bodyText);
+  const payload = `${OPS_ASSET_ID}.${timestamp}.${nonce}.${bodyHash}`;
+  const signature = await signAssetPayload(payload);
+  if (!signature) return {};
+  return {
+    "x-ops-asset-timestamp": timestamp,
+    "x-ops-asset-nonce": nonce,
+    "x-ops-asset-signature": signature,
+  };
 }
 
 function detectIso2FastENES(text) {
@@ -380,7 +446,7 @@ function processSseEventData(data, onToken) {
   return { done: false };
 }
 
-function buildCommonHeaders(acceptValue) {
+async function buildCommonHeaders(acceptValue, bodyText) {
   const headers = {
     "content-type": "application/json",
     "accept": acceptValue || "text/event-stream",
@@ -388,6 +454,9 @@ function buildCommonHeaders(acceptValue) {
 
   if (OPS_ASSET_ID) headers["x-ops-asset-id"] = OPS_ASSET_ID;
   if (OPS_ASSET_SHA256) headers["x-ops-asset-sha256"] = OPS_ASSET_SHA256;
+
+  const assetSigHeaders = await buildAssetSignatureHeaders(bodyText);
+  Object.assign(headers, assetSigHeaders);
 
   const ts = getTurnstileToken();
   if (ts) headers["cf-turnstile-response"] = ts;
@@ -398,7 +467,8 @@ function buildCommonHeaders(acceptValue) {
 async function streamChatSse(payload, onToken, onHeaders) {
   abortCtrl = new AbortController();
 
-  const headers = buildCommonHeaders("text/event-stream");
+  const bodyText = JSON.stringify(payload);
+  const headers = await buildCommonHeaders("text/event-stream", bodyText);
 
   const resp = await fetch(ENLACE_CHAT, {
     method: "POST",
@@ -406,7 +476,7 @@ async function streamChatSse(payload, onToken, onHeaders) {
     credentials: "omit",
     cache: "no-store",
     headers,
-    body: JSON.stringify(payload),
+    body: bodyText,
     signal: abortCtrl.signal,
   });
 

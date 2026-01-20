@@ -13,18 +13,29 @@ const ALLOWED_ORIGINS = new Set([
   "https://chattia.io",
 ]);
 
+const DEFAULT_ASSET_ALLOWLIST = [
+  "https://github.com/chattiavato-a11y/chatbot_",
+  "https://www.chattia.io/",
+  "www.chattia.io/",
+  "www.chattia.io",
+].join(",");
+
 const GUARD_MODEL_ID = "@cf/meta/llama-guard-3-8b";
 
 // Limits (keep stable)
 const MAX_BODY_CHARS = 24_000;
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 2_000;
+const MAX_SIG_SKEW_MS = 5 * 60 * 1000;
 
 // ---- Header allowlist for CORS ----
 const BASE_ALLOWED_HEADERS = new Set([
   "content-type",
   "x-ops-asset-id",
   "x-ops-asset-sha256",
+  "x-ops-asset-signature",
+  "x-ops-asset-timestamp",
+  "x-ops-asset-nonce",
   "cf-turnstile-response",
 ]);
 
@@ -51,7 +62,7 @@ function parseAllowlist(raw) {
 }
 
 function enforceAssetIdentity(request, env) {
-  const allowlist = parseAllowlist(env?.OPS_ASSET_ALLOWLIST);
+  const allowlist = parseAllowlist(env?.OPS_ASSET_ALLOWLIST || DEFAULT_ASSET_ALLOWLIST);
   if (!allowlist.size) {
     return { ok: true, reason: "Allowlist disabled" };
   }
@@ -80,6 +91,83 @@ function enforceAssetIdentity(request, env) {
   return { ok: true, reason: "Asset verified" };
 }
 
+function base64UrlToBytes(input) {
+  const normalized = String(input || "").replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "===".slice((normalized.length + 3) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function sha256Hex(input) {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  const bytes = new Uint8Array(hash);
+  let out = "";
+  for (const b of bytes) out += b.toString(16).padStart(2, "0");
+  return out;
+}
+
+function normalizeJwkForVerify(raw) {
+  const jwk = { ...raw };
+  jwk.alg = "RS256";
+  jwk.key_ops = ["verify"];
+  return jwk;
+}
+
+async function verifyAssetSignature(request, env, bodyText) {
+  if (!env?.OPS_ASSET_ID_PUBLIC_KEY) {
+    return { ok: true, reason: "Signature disabled" };
+  }
+
+  let jwk;
+  try {
+    jwk = normalizeJwkForVerify(JSON.parse(env.OPS_ASSET_ID_PUBLIC_KEY));
+  } catch {
+    return { ok: false, reason: "Invalid OPS_ASSET_ID_PUBLIC_KEY" };
+  }
+
+  const signatureB64 = (request.headers.get("x-ops-asset-signature") || "").trim();
+  const timestamp = (request.headers.get("x-ops-asset-timestamp") || "").trim();
+  const nonce = (request.headers.get("x-ops-asset-nonce") || "").trim();
+  const assetId = (request.headers.get("x-ops-asset-id") || "").trim();
+
+  if (!signatureB64 || !timestamp || !nonce || !assetId) {
+    return { ok: false, reason: "Missing asset signature headers" };
+  }
+
+  const tsNum = Number(timestamp);
+  if (!Number.isFinite(tsNum)) {
+    return { ok: false, reason: "Invalid signature timestamp" };
+  }
+  const skew = Math.abs(Date.now() - tsNum);
+  if (skew > MAX_SIG_SKEW_MS) {
+    return { ok: false, reason: "Signature timestamp expired" };
+  }
+
+  const bodyHash = await sha256Hex(bodyText);
+  const payload = `${assetId}.${timestamp}.${nonce}.${bodyHash}`;
+
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+
+  const signatureBytes = base64UrlToBytes(signatureB64);
+  const ok = await crypto.subtle.verify(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    signatureBytes,
+    new TextEncoder().encode(payload)
+  );
+
+  return ok ? { ok: true } : { ok: false, reason: "Invalid asset signature" };
+}
+
 function corsHeaders(origin, request) {
   const h = new Headers();
 
@@ -105,6 +193,9 @@ function corsHeaders(origin, request) {
   safe.push("content-type");
   safe.push("x-ops-asset-id");
   safe.push("x-ops-asset-sha256");
+  safe.push("x-ops-asset-signature");
+  safe.push("x-ops-asset-timestamp");
+  safe.push("x-ops-asset-nonce");
   safe.push("cf-turnstile-response");
 
   // De-dupe
@@ -307,6 +398,11 @@ export default {
     }
     if (!raw || raw.length > MAX_BODY_CHARS) {
       return json(413, { error: "Request too large" }, corsHeaders(origin, request));
+    }
+
+    const sigCheck = await verifyAssetSignature(request, env, raw);
+    if (!sigCheck.ok) {
+      return json(403, { error: "Blocked: asset signature", detail: sigCheck.reason }, corsHeaders(origin, request));
     }
 
     // Parse JSON
