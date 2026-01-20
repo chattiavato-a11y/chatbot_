@@ -7,22 +7,37 @@
   <meta name="description" content="Chattia AI — simple chatbot UI (UI → Enlace)." />
   <link rel="stylesheet" href="styles.css" />
 
-  <!-- REPO (UI) CONFIG: set your Cloudflare Enlace Worker base URL here -->
-  <meta name="chattia-enlace" content="https://YOUR-ENLACE-WORKER.workers.dev" />
-
-  <!-- Optional: helps browsers render light/dark controls nicely -->
-  <meta name="color-scheme" content="light dark" />
+  <!-- Optional: app.js can read this to avoid hardcoding ENLACE URLs -->
+  <!-- <meta name="chattia-enlace-base" content="https://enlace.grabem-holdem-nuts-right.workers.dev" /> -->
 </head>
 
 <body class="light">
+  <noscript>
+    <div style="padding:12px;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif">
+      This page requires JavaScript to run the chatbot.
+    </div>
+  </noscript>
+
   <div class="frame" id="app">
     <section class="main">
       <div class="topbar">
         <div class="topbar-left">
+          <!-- Language toggle (top) — app.js expects this ID -->
+          <button
+            class="toggle langToggle"
+            id="btnLangTop"
+            type="button"
+            aria-label="Toggle language"
+            title="Toggle language"
+          >
+            EN
+          </button>
         </div>
+
         <div class="topbar-center">
           <div class="brandName">Chattia</div>
         </div>
+
         <div class="topbar-right">
           <button class="toggle themeToggle" id="btnThemeMenu" type="button" aria-label="Toggle theme">
             Dark
@@ -36,20 +51,36 @@
           <h2>Start a conversation</h2>
           <p>Ask a question, in most popular languages; describe a problem or drop a goal. You’ll get clear steps back.</p>
         </div>
+
+        <!-- Optional language badge (app.js will update when it knows STT/text lang) -->
+        <div class="langBadge" id="langBadge" aria-live="polite" aria-atomic="true" style="display:none"></div>
+
         <div class="transcriptList" id="mainList" aria-live="polite" aria-relevant="additions text"></div>
       </div>
 
       <div class="lower">
         <div class="lowerHeader">
           <div class="lowerControls">
-            <!-- Changed: Download -> Copy (no downloading) -->
-            <button class="miniAction" id="btnMiniMenu" type="button" title="Copy chat" aria-label="Copy chat">
+            <!-- Transcript action: we will make app.js copy-to-clipboard (not download) -->
+            <button class="miniAction" id="btnMiniMenu" type="button" title="Transcript" aria-label="Transcript">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path class="accentStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                   d="M12 3v11m0 0-4-4m4 4 4-4M5 19h14" />
               </svg>
             </button>
+
+            <!-- Language toggle (lower) — app.js expects this ID -->
+            <button
+              class="miniAction"
+              id="btnLangLower"
+              type="button"
+              title="Toggle language"
+              aria-label="Toggle language"
+            >
+              EN
+            </button>
           </div>
+
           <span class="lowerNote">Chattia may make mistakes, so double-check outputs.</span>
         </div>
 
@@ -59,6 +90,7 @@
               <span class="statusdot" id="statusDot" aria-hidden="true"></span>
               <span class="statustext" id="statusText">Ready</span>
             </div>
+
             <input
               class="chatInput"
               id="chatInput"
@@ -66,15 +98,25 @@
               aria-label="Quick chat message (Enter to send)"
               autocomplete="off"
             />
+
             <button class="iconBtn sendBtn" id="btnSend" type="button" aria-label="Send message">
               <svg viewBox="0 0 24 24" fill="none">
                 <path class="purpleStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                   d="M5 12h13m0 0-4-4m4 4-4 4" />
               </svg>
             </button>
+
             <div class="chatInputActions" aria-label="Voice controls">
-              <!-- Updated label: this will become hold-to-talk in app.js -->
-              <div class="iconBtn" id="btnWave" title="Hold to talk" aria-label="Hold to talk" role="button" tabindex="0" aria-pressed="false">
+              <!-- Voice button: app.js will switch to hold-to-talk recorder + /api/voice -->
+              <div
+                class="iconBtn"
+                id="btnWave"
+                title="Hold to talk"
+                aria-label="Hold to talk"
+                role="button"
+                tabindex="0"
+                aria-pressed="false"
+              >
                 <svg viewBox="0 0 24 24" fill="none" id="waveSvg">
                   <g class="waveBars" transform="translate(5,6)">
                     <rect class="purpleFill" x="0" y="6" width="2" height="6" rx="1"></rect>
@@ -83,13 +125,17 @@
                   </g>
                 </svg>
               </div>
+
+              <!-- Voice hint hook -->
+              <span id="voiceHint" style="display:none">Hold to record</span>
             </div>
           </div>
-
         </div>
+
         <div class="poweredRow">
           <span class="poweredInline">Powered by OPS</span>
         </div>
+
         <input
           class="honeypot"
           id="hpField"
@@ -100,9 +146,7 @@
           aria-hidden="true"
         />
       </div>
-
     </section>
-
   </div>
 
   <script src="app.js" defer></script>
