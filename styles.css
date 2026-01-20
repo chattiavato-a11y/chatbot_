@@ -392,7 +392,7 @@ body.light .emptyEyebrow{
   flex-shrink: 0;
 }
 .sendBtn .purpleStroke{
-  stroke: var(--purple);
+  stroke: var(--text);
 }
 .purpleStroke{
   stroke: var(--purple);
