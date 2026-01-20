@@ -24,8 +24,8 @@ const ENLACE_CHAT = `${ENLACE_BASE}/api/chat`;
 const ENLACE_VOICE = `${ENLACE_BASE}/api/voice`;
 
 // OPTIONAL: asset identity headers (only if Enlace OPS_ASSET_ALLOWLIST is enabled)
-const OPS_ASSET_ID = "";      // e.g. "CHATTIA_WEB_01"
-const OPS_ASSET_SHA256 = "";  // e.g. "abcdef1234... (hex sha256)"
+const OPS_ASSET_ID = "https://github.com/chattiavato-a11y/chatbot_";
+const OPS_ASSET_SHA256 = "A43194265A4D9D670083B2C19675C6D1F10E000EEE3300B79704C59BF9CF26F1";
 
 // OPTIONAL: Turnstile header (only if your Enlace allows this header in CORS)
 const SEND_TURNSTILE_HEADER = true;

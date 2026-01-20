@@ -1,0 +1,23 @@
+{
+  "TURNSTILE_SECRET_KEY": "0x4AAAAAACLhJwKO0VjYvzOR",
+  "OPS_ASSET_SHA256": {
+    "ASSET_ID_SHA256": "A43194265A4D9D670083B2C19675C6D1F10E000EEE3300B79704C59BF9CF26F1",
+    "NET_ID_SHA512": "915AB2DD06BF4B26161663F85B5ABF4B9D843B79160448A0A063939BE2FDE11CCD6EA3CCB44BA7F0CE2DAB72CC3FDF31B157BEA18232CE079017F41768944709"
+  },
+  "OPS_ASSET_ID_PUBLIC_KEY": {
+    "alg": "RSA-OAEP-256",
+    "e": "AQAB",
+    "ext": true,
+    "key_ops": [
+      "encrypt"
+    ],
+    "kty": "RSA",
+    "n": "21EOeLierHTNqTtRU6d_f18jloMlS63_lU5tK9tFv1oS2TkARkjeUiTJXi4cslKCGCGkV_xVPzqfTTC1hQ1naK5WHNCsA7ViPsYYM3Hkdvib28--IlSG-FW_fNkWN8Ff8PephvaJqtK5IOSYis6G2omMG4cFnj5a0IDenH3285P_xP3zoZw5XvGJr2wTTaLyOsXestMgDTo5pOPBmeJ4n9gH2SYrhRlWYToPitgpK4hghUXW0HiXeckuJ94lG9y8saiXndhsgKwqlkLsp3R76zmLzRKavJpnAhWeKNk7-coChr9bU-xuwTpSlnKPS1UqXRifLaQ3QFTP7uu1RO8ViQ"
+  },
+  "OPS_ASSET_ALLOWLIST": [
+    "https://github.com/chattiavato-a11y/chatbot_",
+    "https://www.chattia.io/",
+    "www.chattia.io/",
+    "www.chattia.io"
+  ]
+}

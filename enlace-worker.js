@@ -13,6 +13,13 @@ const ALLOWED_ORIGINS = new Set([
   "https://chattia.io",
 ]);
 
+const DEFAULT_ASSET_ALLOWLIST = [
+  "https://github.com/chattiavato-a11y/chatbot_",
+  "https://www.chattia.io/",
+  "www.chattia.io/",
+  "www.chattia.io",
+].join(",");
+
 const GUARD_MODEL_ID = "@cf/meta/llama-guard-3-8b";
 
 // Limits (keep stable)
@@ -51,7 +58,7 @@ function parseAllowlist(raw) {
 }
 
 function enforceAssetIdentity(request, env) {
-  const allowlist = parseAllowlist(env?.OPS_ASSET_ALLOWLIST);
+  const allowlist = parseAllowlist(env?.OPS_ASSET_ALLOWLIST || DEFAULT_ASSET_ALLOWLIST);
   if (!allowlist.size) {
     return { ok: true, reason: "Allowlist disabled" };
   }
