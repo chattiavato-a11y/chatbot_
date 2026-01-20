@@ -6,6 +6,12 @@
   <title>Chattia • Chat</title>
   <meta name="description" content="Chattia AI — simple chatbot UI (UI → Enlace)." />
   <link rel="stylesheet" href="styles.css" />
+
+  <!-- REPO (UI) CONFIG: set your Cloudflare Enlace Worker base URL here -->
+  <meta name="chattia-enlace" content="https://YOUR-ENLACE-WORKER.workers.dev" />
+
+  <!-- Optional: helps browsers render light/dark controls nicely -->
+  <meta name="color-scheme" content="light dark" />
 </head>
 
 <body class="light">
@@ -36,7 +42,8 @@
       <div class="lower">
         <div class="lowerHeader">
           <div class="lowerControls">
-            <button class="miniAction" id="btnMiniMenu" type="button" title="Download chat" aria-label="Download chat">
+            <!-- Changed: Download -> Copy (no downloading) -->
+            <button class="miniAction" id="btnMiniMenu" type="button" title="Copy chat" aria-label="Copy chat">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path class="accentStroke" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                   d="M12 3v11m0 0-4-4m4 4 4-4M5 19h14" />
@@ -66,7 +73,8 @@
               </svg>
             </button>
             <div class="chatInputActions" aria-label="Voice controls">
-              <div class="iconBtn" id="btnWave" title="Voice" aria-label="Activate voice" role="button" tabindex="0" aria-pressed="false">
+              <!-- Updated label: this will become hold-to-talk in app.js -->
+              <div class="iconBtn" id="btnWave" title="Hold to talk" aria-label="Hold to talk" role="button" tabindex="0" aria-pressed="false">
                 <svg viewBox="0 0 24 24" fill="none" id="waveSvg">
                   <g class="waveBars" transform="translate(5,6)">
                     <rect class="purpleFill" x="0" y="6" width="2" height="6" rx="1"></rect>
