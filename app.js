@@ -25,7 +25,7 @@ const ENLACE_VOICE = `${ENLACE_BASE}/api/voice`;
 
 // OPTIONAL: asset identity headers (only if Enlace OPS_ASSET_ALLOWLIST is enabled)
 const OPS_ASSET_ID = "";      // e.g. "CHATTIA_WEB_01"
-const OPS_ASSET_SHA256 = "";  // e.g. "abcdef1234... (hex sha256)"
+const OPS_ASSET_SHA256 = "d032bd800c7f042443e3a0151c2357aebb8d39993ce2bb4b996e1adb09204ee35ec5b0a527753a0d31cfa3d3eea6b592cb8b3b08a2cc9c9b9b63a8e2811556a1";  // e.g. "abcdef1234... (hex sha256)"
 
 // OPTIONAL: Turnstile header (only if your Enlace allows this header in CORS)
 const SEND_TURNSTILE_HEADER = true;
