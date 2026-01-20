@@ -1,0 +1,6 @@
+name = "enlace"
+main = "enlace-worker.js"
+compatibility_date = "2024-12-01"
+
+[vars]
+TURNSTILE_SECRET_KEY = "0x4AAAAAACLhJwKO0VjYvzOR"
