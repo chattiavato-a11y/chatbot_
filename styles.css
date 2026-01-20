@@ -205,6 +205,9 @@ body.light .brandName{
   padding: 6px 10px;
   color: var(--muted);
 }
+.emptyState.is-hidden{
+  display:none;
+}
 .emptyState h2{
   margin: 4px 0 0;
   font-size: 20px;
@@ -214,6 +217,19 @@ body.light .brandName{
   text-transform: uppercase;
   letter-spacing: .22em;
   font-size: 11px;
+}
+body.light .transcriptArea{
+  color: #0e1426;
+}
+body.light .emptyState{
+  color: #4f5a74;
+}
+body.light .emptyState h2,
+body.light .emptyState p{
+  color: #0e1426;
+}
+body.light .emptyEyebrow{
+  color: #4f5a74;
 }
 .transcriptList{
   display:flex;
