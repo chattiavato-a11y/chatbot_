@@ -25,7 +25,7 @@ const ENLACE_VOICE = `${ENLACE_BASE}/api/voice`;
 
 // OPTIONAL: asset identity headers (only if Enlace OPS_ASSET_ALLOWLIST is enabled)
 const OPS_ASSET_ID = "https://github.com/chattiavato-a11y/chatbot_";
-const OPS_ASSET_SHA256 = "A43194265A4D9D670083B2C19675C6D1F10E000EEE3300B79704C59BF9CF26F1";
+const OPS_ASSET_SHA256 = "F2829D0DECBDBD30EAC98EAECEA687DC9BF52FF3F9A074DE5E0B7E154A007A49";
 // OPTIONAL: private key (JWK string) used to sign requests for replay protection
 const OPS_ASSET_ID_PRIV_KEY = "";
 
