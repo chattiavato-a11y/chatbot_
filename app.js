@@ -1,8 +1,15 @@
 /**
- * app.js — REPO UI (GitHub Pages)
+ * app.js — REPO UI (GitHub Pages) (v0.2 FIXED)
  * UI -> Enlace (/api/chat) with SSE streaming + Voice (mic -> /api/voice?mode=stt)
  *
  * Repo file (NOT a CF Worker).
+ *
+ * Fixes:
+ * - Removed browser-side signing (private keys cannot live in a public repo).
+ * - Sends ONLY headers that your Enlace already expects:
+ *   x-ops-asset-id, x-ops-asset-sha256, cf-turnstile-response
+ * - Sends meta.lang + meta.lang_iso2 + meta.lang_bcp47 (aligned with nettunian-io v0.6 FINAL).
+ * - Aborts any active SSE stream before starting a new one (prevents overlap).
  */
 
 // -------------------------
@@ -23,13 +30,11 @@ const ENLACE_BASE = readEnlaceBaseFromMeta() || "https://enlace.grabem-holdem-nu
 const ENLACE_CHAT = `${ENLACE_BASE}/api/chat`;
 const ENLACE_VOICE = `${ENLACE_BASE}/api/voice`;
 
-// OPTIONAL: asset identity headers (only if Enlace OPS_ASSET_ALLOWLIST is enabled)
+// UI identity headers (only meaningful if Enlace OPS_ASSET_ALLOWLIST is enabled)
 const OPS_ASSET_ID = "https://github.com/chattiavato-a11y/chatbot_";
-const OPS_ASSET_SHA256 = "F2829D0DECBDBD30EAC98EAECEA687DC9BF52FF3F9A074DE5E0B7E154A007A49";
-// OPTIONAL: private key (JWK string) used to sign requests for replay protection
-const OPS_ASSET_ID_PRIV_KEY = "";
+const ASSET_ID_SHA256 = "F2829D0DECBDBD30EAC98EAECEA687DC9BF52FF3F9A074DE5E0B7E154A007A49";
 
-// OPTIONAL: Turnstile header (only if your Enlace allows this header in CORS)
+// Turnstile header (only if Turnstile is enabled on Enlace AND your UI actually renders Turnstile)
 const SEND_TURNSTILE_HEADER = true;
 
 // -------------------------
@@ -126,68 +131,9 @@ function getTurnstileToken() {
   return "";
 }
 
-function base64UrlEncodeBytes(bytes) {
-  let binary = "";
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-async function sha256Hex(input) {
-  const data = new TextEncoder().encode(input);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  const bytes = new Uint8Array(hash);
-  let out = "";
-  for (const b of bytes) out += b.toString(16).padStart(2, "0");
-  return out;
-}
-
-function normalizeJwkForSigning(raw) {
-  const jwk = { ...raw };
-  jwk.alg = "RS256";
-  jwk.key_ops = ["sign"];
-  return jwk;
-}
-
-async function signAssetPayload(payload) {
-  if (!OPS_ASSET_ID_PRIV_KEY || !crypto?.subtle) return null;
-  let jwk;
-  try {
-    jwk = normalizeJwkForSigning(JSON.parse(OPS_ASSET_ID_PRIV_KEY));
-  } catch {
-    return null;
-  }
-  const key = await crypto.subtle.importKey(
-    "jwk",
-    jwk,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    new TextEncoder().encode(payload)
-  );
-  return base64UrlEncodeBytes(new Uint8Array(signature));
-}
-
-async function buildAssetSignatureHeaders(bodyText) {
-  if (!OPS_ASSET_ID_PRIV_KEY || !OPS_ASSET_ID || !bodyText) return {};
-  const timestamp = Date.now().toString();
-  const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
-  const nonce = base64UrlEncodeBytes(nonceBytes);
-  const bodyHash = await sha256Hex(bodyText);
-  const payload = `${OPS_ASSET_ID}.${timestamp}.${nonce}.${bodyHash}`;
-  const signature = await signAssetPayload(payload);
-  if (!signature) return {};
-  return {
-    "x-ops-asset-timestamp": timestamp,
-    "x-ops-asset-nonce": nonce,
-    "x-ops-asset-signature": signature,
-  };
+function abortActiveStream() {
+  try { if (abortCtrl) abortCtrl.abort(); } catch {}
+  abortCtrl = null;
 }
 
 function detectIso2FastENES(text) {
@@ -236,12 +182,10 @@ function showLangBadge(label) {
 function applyLangMode(mode) {
   langMode = mode;
 
-  // button text
   const label = (mode === "AUTO") ? "AUTO" : mode;
   if (elBtnLangTop) elBtnLangTop.textContent = label;
   if (elBtnLangLower) elBtnLangLower.textContent = label;
 
-  // sessionIso2 for forced modes
   if (mode === "EN") sessionIso2 = "en";
   if (mode === "ES") sessionIso2 = "es";
 
@@ -250,7 +194,6 @@ function applyLangMode(mode) {
 }
 
 function nextLangMode(current) {
-  // cycle: AUTO -> EN -> ES -> AUTO
   if (current === "AUTO") return "EN";
   if (current === "EN") return "ES";
   return "AUTO";
@@ -266,7 +209,6 @@ function appendLine(role, text) {
   if (elMainList) elMainList.appendChild(mainLine);
   if (elEmptyState) elEmptyState.classList.add("is-hidden");
 
-  // Keep scrolled
   if (elMainList && elMainList.parentElement) {
     const box = elMainList.parentElement;
     box.scrollTop = box.scrollHeight;
@@ -289,9 +231,7 @@ async function copyTranscript() {
       setStatus("Copied chat", false);
       return;
     }
-  } catch {
-    // fallback below
-  }
+  } catch {}
 
   const ta = document.createElement("textarea");
   ta.value = text;
@@ -338,8 +278,7 @@ function stopTracks() {
 
 function stopAll() {
   // stop streaming
-  try { if (abortCtrl) abortCtrl.abort(); } catch {}
-  abortCtrl = null;
+  abortActiveStream();
 
   // stop recording
   try {
@@ -357,7 +296,7 @@ function stopAll() {
 }
 
 // -------------------------
-// 4) TTS voice selection (fix Spanish accent)
+// 4) TTS voice selection
 // -------------------------
 function pickVoiceForBcp47(langTag) {
   const tag = String(langTag || "").toLowerCase();
@@ -365,15 +304,12 @@ function pickVoiceForBcp47(langTag) {
 
   const prefix = tag.split("-")[0];
 
-  // 1) prefix match "es-" / "en-"
   let v = ttsVoices.find((x) => String(x.lang || "").toLowerCase().startsWith(prefix + "-"));
   if (v) return v;
 
-  // 2) exact tag
   v = ttsVoices.find((x) => String(x.lang || "").toLowerCase() === tag);
   if (v) return v;
 
-  // 3) contains prefix
   v = ttsVoices.find((x) => String(x.lang || "").toLowerCase().includes(prefix));
   if (v) return v;
 
@@ -446,17 +382,14 @@ function processSseEventData(data, onToken) {
   return { done: false };
 }
 
-async function buildCommonHeaders(acceptValue, bodyText) {
+async function buildCommonHeaders(acceptValue) {
   const headers = {
     "content-type": "application/json",
     "accept": acceptValue || "text/event-stream",
   };
 
   if (OPS_ASSET_ID) headers["x-ops-asset-id"] = OPS_ASSET_ID;
-  if (OPS_ASSET_SHA256) headers["x-ops-asset-sha256"] = OPS_ASSET_SHA256;
-
-  const assetSigHeaders = await buildAssetSignatureHeaders(bodyText);
-  Object.assign(headers, assetSigHeaders);
+  if (ASSET_ID_SHA256) headers["x-ops-asset-sha256"] = ASSET_ID_SHA256;
 
   const ts = getTurnstileToken();
   if (ts) headers["cf-turnstile-response"] = ts;
@@ -465,10 +398,12 @@ async function buildCommonHeaders(acceptValue, bodyText) {
 }
 
 async function streamChatSse(payload, onToken, onHeaders) {
+  // Abort any prior stream before starting a new one
+  abortActiveStream();
   abortCtrl = new AbortController();
 
   const bodyText = JSON.stringify(payload);
-  const headers = await buildCommonHeaders("text/event-stream", bodyText);
+  const headers = await buildCommonHeaders("text/event-stream");
 
   const resp = await fetch(ENLACE_CHAT, {
     method: "POST",
@@ -485,12 +420,10 @@ async function streamChatSse(payload, onToken, onHeaders) {
     throw new Error(`HTTP ${resp.status} ${resp.statusText}\n${text}`);
   }
 
-  // Let caller read language headers BEFORE consuming stream
   if (typeof onHeaders === "function") onHeaders(resp.headers);
 
   const ct = (resp.headers.get("content-type") || "").toLowerCase();
 
-  // If it returns JSON for any reason (non-stream), handle once.
   if (ct.includes("application/json")) {
     const obj = await resp.json().catch(() => null);
     const token = extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
@@ -548,8 +481,6 @@ async function streamChatSse(payload, onToken, onHeaders) {
 function decideIso2ForUserText(userText) {
   if (langMode === "EN") return "en";
   if (langMode === "ES") return "es";
-
-  // AUTO: use text signals; if empty, keep session
   const guess = detectIso2FastENES(userText);
   return guess || sessionIso2 || "en";
 }
@@ -564,7 +495,6 @@ async function sendMessage(userText) {
     return;
   }
 
-  // Update session language (AUTO)
   sessionIso2 = decideIso2ForUserText(userText);
   setDocLangFromIso2(sessionIso2);
 
@@ -573,16 +503,18 @@ async function sendMessage(userText) {
 
   setStatus("Thinking…", true);
 
-  // Create assistant line NOW and stream into it
   const assistantEl = appendLine("assistant", "");
   let botText = "";
 
   try {
     const payload = {
-      // IMPORTANT: Enlace/Brain normalizeMessages usually ignore "system"
       messages: history,
       honeypot: honeypotValue,
-      meta: { lang: iso2ToMetaLang(sessionIso2) }, // "EN"/"ES" (or iso2)
+      meta: {
+        lang: iso2ToMetaLang(sessionIso2),       // "EN"/"ES" (legacy preferred)
+        lang_iso2: sessionIso2,                  // "en"/"es"
+        lang_bcp47: iso2ToBcp47(sessionIso2),    // "en-US"/"es-ES"
+      },
     };
 
     await streamChatSse(
@@ -596,10 +528,8 @@ async function sendMessage(userText) {
         }
       },
       (hdrs) => {
-        // Prefer Enlace headers (best signal)
         const iso2 = String(hdrs.get("x-chattia-text-iso2") || "").trim().toLowerCase();
         if (iso2) {
-          // if forced EN/ES, do not override
           if (langMode === "AUTO") sessionIso2 = iso2;
           setDocLangFromIso2(sessionIso2);
           showLangBadge(`Lang: ${langMode} • ${iso2ToBcp47(sessionIso2)}`);
@@ -612,7 +542,6 @@ async function sendMessage(userText) {
 
     history.push({ role: "assistant", content: botText });
 
-    // Speak in the session language
     speakReply(botText, sessionIso2);
 
     setStatus("Ready", false);
@@ -655,10 +584,8 @@ async function startRecording() {
 
   recChunks = [];
   try {
-    // Try default
     mediaRecorder = new MediaRecorder(mediaStream);
   } catch {
-    // Common fallback
     try {
       mediaRecorder = new MediaRecorder(mediaStream, { mimeType: "audio/webm;codecs=opus" });
     } catch {
@@ -690,7 +617,7 @@ async function startRecording() {
   };
 
   state.recording = true;
-  setVoiceMode(true); // auto-speak replies after voice
+  setVoiceMode(true);
   setListening(true);
   setStatus("Listening… (release to send)", true);
 
@@ -721,9 +648,8 @@ function headersForVoiceBlob(blob) {
     "accept": "application/json",
   };
 
-  // Only add if your Enlace CORS allows them for /api/voice
   if (OPS_ASSET_ID) headers["x-ops-asset-id"] = OPS_ASSET_ID;
-  if (OPS_ASSET_SHA256) headers["x-ops-asset-sha256"] = OPS_ASSET_SHA256;
+  if (ASSET_ID_SHA256) headers["x-ops-asset-sha256"] = ASSET_ID_SHA256;
 
   const ts = getTurnstileToken();
   if (ts) headers["cf-turnstile-response"] = ts;
@@ -734,7 +660,6 @@ function headersForVoiceBlob(blob) {
 }
 
 function iso2FromVoiceResponse(respHeaders, bodyObj, transcriptFallback) {
-  // Prefer headers (what we asked Enlace to expose)
   const hIso2 = String(respHeaders.get("x-chattia-stt-iso2") || "").trim().toLowerCase();
   if (hIso2) return hIso2;
 
@@ -742,7 +667,6 @@ function iso2FromVoiceResponse(respHeaders, bodyObj, transcriptFallback) {
   if (hLegacy === "ES") return "es";
   if (hLegacy === "EN") return "en";
 
-  // Body shapes Enlace may return
   const bIso2 = String((bodyObj && (bodyObj.lang_iso2 || bodyObj.langIso2)) || "").trim().toLowerCase();
   if (bIso2) return bIso2;
 
@@ -750,7 +674,6 @@ function iso2FromVoiceResponse(respHeaders, bodyObj, transcriptFallback) {
   if (bLegacy === "ES") return "es";
   if (bLegacy === "EN") return "en";
 
-  // fallback: quick guess from transcript
   return detectIso2FastENES(transcriptFallback || "");
 }
 
@@ -791,10 +714,8 @@ async function handleVoiceBlob(blob) {
       return;
     }
 
-    // Update language from STT
     lastSttIso2 = iso2;
 
-    // If forced EN/ES, keep forced; otherwise follow STT
     if (langMode === "AUTO") sessionIso2 = iso2;
     if (langMode === "EN") sessionIso2 = "en";
     if (langMode === "ES") sessionIso2 = "es";
@@ -802,7 +723,6 @@ async function handleVoiceBlob(blob) {
     setDocLangFromIso2(sessionIso2);
     showLangBadge(`Lang: ${langMode} • ${iso2ToBcp47(sessionIso2)}`);
 
-    // Show transcript as user's message, then auto-send
     if (elChatInput) elChatInput.value = transcript;
 
     setStatus("Sending…", true);
@@ -852,13 +772,9 @@ if (elChatInput) {
   });
 }
 
-// Transcript: COPY (no download)
 wireButtonLike(elBtnMiniMenu, copyTranscript);
-
-// Theme
 wireButtonLike(elBtnThemeMenu, () => setTheme(state.theme === "DARK" ? "LIGHT" : "DARK"));
 
-// Lang toggle (AUTO/EN/ES)
 function toggleLangMode() {
   const next = nextLangMode(langMode);
   applyLangMode(next);
@@ -866,10 +782,8 @@ function toggleLangMode() {
 wireButtonLike(elBtnLangTop, toggleLangMode);
 wireButtonLike(elBtnLangLower, toggleLangMode);
 
-// Send
 wireButtonLike(elBtnSend, sendFromInput);
 
-// Voice: HOLD TO TALK (pointer + keyboard)
 if (elBtnWave) {
   elBtnWave.addEventListener("pointerdown", (e) => {
     e.preventDefault();
@@ -902,7 +816,6 @@ if (elBtnWave) {
   });
 }
 
-// ESC stops everything (streaming, mic, TTS)
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") stopAll();
 });
@@ -913,7 +826,6 @@ document.addEventListener("keydown", (e) => {
 setTheme(state.theme);
 setStatus("Ready", false);
 
-// default: AUTO language; voiceMode off until you use voice
 applyLangMode("AUTO");
 setVoiceMode(false);
 setDocLangFromIso2(sessionIso2);
