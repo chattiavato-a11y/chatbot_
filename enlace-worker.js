@@ -1,643 +1,509 @@
 /**
- * Cloudflare Worker: enlace (v1)
- * UI -> Enlace -> (Service Binding: brain) -> SSE stream back to UI
+ * enlace-worker.js — REPO “MIDDLEMAN” (GitHub Pages) (v0.2 ENLACE_REPO)
+ * UI -> EnlaceRepo (this file) -> Cloudflare Enlace Worker
  *
- * Required bindings:
- * - env.AI     (Workers AI) for Llama Guard + Whisper
- * - env.brain  (Service Binding) -> nettunian-io
+ * THIS IS NOT A CLOUDFARE WORKER.
+ * This runs in the browser and provides:
+ * - Loads repo config + public identity (ops-keys.json)
+ * - Builds only the allowed headers
+ * - Light client-side scanning/sanitizing (blocks obvious code/markup)
+ * - Chat SSE streaming helper + Voice STT helper
  *
- * Identity / gates (your current env set):
- * - TURNSTILE_SECRET_KEY   (Secret) optional gate
- * - OPS_ASSET_ALLOWLIST    (Variable) array or comma string
- * - ASSET_ID_SHA256        (Variable) expected sha256 for x-ops-asset-sha256
+ * Usage (index.html order):
+ *   <script src="enlace-worker.js" defer></script>
+ *   <script src="app.js" defer></script>
  *
- * Enlace -> Brain identity forwarding:
- * - NET_ID, NET_ID_SHA512
- * - HANDSHAKE_ID (Secret)  used to sign a small request proof (optional)
- * - ENLACE_BRAIN_Public_JWK / BRAIN_ENLACE_Public_JWK (if present)
+ * app.js calls:
+ *   await EnlaceRepo.ready()
+ *   await EnlaceRepo.chatSSE(payload, { signal, onToken, onHeaders })
+ *   const r = await EnlaceRepo.voiceSTT(blob)
  */
 
-const ALLOWED_ORIGINS = new Set([
-  "https://chattiavato-a11y.github.io",
-  "https://www.chattia.io",
-  "https://chattia.io",
-]);
+(() => {
+  "use strict";
 
-const GUARD_MODEL_ID = "@cf/meta/llama-guard-3-8b";
-const STT_MODEL_ID = "@cf/openai/whisper-large-v3-turbo";
-
-// Limits (keep stable)
-const MAX_JSON_BODY_CHARS = 24_000;
-const MAX_MESSAGES = 20;
-const MAX_MESSAGE_CHARS = 2_000;
-const MAX_AUDIO_BYTES = 12_000_000; // ~12MB cap
-
-// ---- CORS header allowlist ----
-const BASE_ALLOWED_HEADERS = new Set([
-  "content-type",
-  "x-ops-asset-id",
-  "x-ops-asset-sha256",
-  "cf-turnstile-response",
-]);
-
-const EXPOSE_HEADERS = [
-  "x-chattia-text-iso2",
-  "x-chattia-text-bcp47",
-  "x-chattia-stt-iso2",
-  "x-chattia-stt-bcp47",
-  "x-chattia-voice-timeout-sec",
-  "x-chattia-stt-lang", // legacy EN|ES convenience
-].join(", ");
-
-function securityHeaders() {
-  const h = new Headers();
-  h.set("X-Content-Type-Options", "nosniff");
-  h.set("X-Frame-Options", "DENY");
-  h.set("Referrer-Policy", "no-referrer");
-  h.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-  h.set("Cache-Control", "no-store, no-transform");
-  return h;
-}
-
-function corsHeaders(origin, request) {
-  const h = new Headers();
-
-  if (origin && ALLOWED_ORIGINS.has(origin)) {
-    h.set("Access-Control-Allow-Origin", origin);
-    h.set("Vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
+  // -------------------------
+  // 0) Repo config (meta tags + defaults)
+  // -------------------------
+  function readEnlaceBaseFromMeta() {
+    // supports either:
+    // <meta name="chattia-enlace-base" content="https://...workers.dev">
+    // or legacy:
+    // <meta name="chattia-enlace" content="https://...workers.dev">
+    const m1 = document.querySelector('meta[name="chattia-enlace-base"]');
+    const m2 = document.querySelector('meta[name="chattia-enlace"]');
+    const raw = (m1 && m1.content ? String(m1.content) : (m2 && m2.content ? String(m2.content) : "")).trim();
+    return raw.replace(/\/+$/, "");
   }
 
-  h.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  const DEFAULTS = Object.freeze({
+    ENLACE_BASE_FALLBACK: "https://enlace.grabem-holdem-nuts-right.workers.dev",
+    OPS_KEYS_URL: "ops-keys.json",
 
-  const reqHdrs = (request?.headers?.get("Access-Control-Request-Headers") || "")
-    .split(",")
-    .map((x) => x.trim().toLowerCase())
-    .filter(Boolean);
+    // Only send Turnstile header if you truly render Turnstile in the page AND Enlace enforces it.
+    SEND_TURNSTILE_HEADER: true,
 
-  const safe = [];
-  for (const name of reqHdrs) {
-    if (BASE_ALLOWED_HEADERS.has(name)) safe.push(name);
-  }
+    // Client-side input gates (helpful, not security)
+    CLIENT_BLOCK_CODE_OR_MARKUP: true,
+    CLIENT_MAX_JSON_BODY_CHARS: 24_000,
+    CLIENT_MAX_MESSAGES: 20,
+    CLIENT_MAX_MESSAGE_CHARS: 2_000,
 
-  // Always include the base set
-  for (const x of BASE_ALLOWED_HEADERS) safe.push(x);
+    // Voice caps (mirror your worker limits)
+    CLIENT_MAX_AUDIO_BYTES: 12_000_000,
 
-  h.set("Access-Control-Allow-Headers", Array.from(new Set(safe)).join(", "));
-  h.set("Access-Control-Max-Age", "86400");
-
-  // Let UI read our custom response headers
-  h.set("Access-Control-Expose-Headers", EXPOSE_HEADERS);
-
-  return h;
-}
-
-function withBaseHeaders(origin, request, extra) {
-  const h = corsHeaders(origin, request);
-  securityHeaders().forEach((v, k) => h.set(k, v));
-  if (extra) {
-    for (const [k, v] of Object.entries(extra)) h.set(k, v);
-  }
-  return h;
-}
-
-function json(origin, request, status, obj, extra) {
-  const h = withBaseHeaders(origin, request, extra);
-  h.set("content-type", "application/json; charset=utf-8");
-  return new Response(JSON.stringify(obj), { status, headers: h });
-}
-
-function parseOpsAssetAllowlist(raw) {
-  // Accepts:
-  // - JSON array (string) like '["a","b"]'
-  // - actual array (if Workers ever passes it as array)
-  // - comma string: "a,b,c"
-  const set = new Set();
-
-  if (Array.isArray(raw)) {
-    for (const v of raw) {
-      const s = String(v || "").trim();
-      if (s) set.add(s);
-    }
-    return set;
-  }
-
-  const s = String(raw || "").trim();
-  if (!s) return set;
-
-  // Try JSON array
-  if (s.startsWith("[")) {
-    try {
-      const arr = JSON.parse(s);
-      if (Array.isArray(arr)) {
-        for (const v of arr) {
-          const t = String(v || "").trim();
-          if (t) set.add(t);
-        }
-        return set;
-      }
-    } catch {
-      // fall through
-    }
-  }
-
-  // Comma-separated
-  for (const part of s.split(",")) {
-    const t = part.trim();
-    if (t) set.add(t);
-  }
-  return set;
-}
-
-function enforceAssetIdentity(request, env) {
-  const allow = parseOpsAssetAllowlist(env?.OPS_ASSET_ALLOWLIST);
-  if (!allow.size) {
-    // If you want this ALWAYS enforced, keep OPS_ASSET_ALLOWLIST non-empty.
-    return { ok: true, reason: "Allowlist disabled" };
-  }
-
-  const assetId = (request.headers.get("x-ops-asset-id") || "").trim();
-  const assetSha = (request.headers.get("x-ops-asset-sha256") || "").trim();
-
-  if (!assetId) return { ok: false, reason: "Missing x-ops-asset-id" };
-  if (!allow.has(assetId)) return { ok: false, reason: "Asset ID not allowlisted" };
-
-  const expectedSha = String(env?.ASSET_ID_SHA256 || "").trim();
-  if (expectedSha) {
-    if (!assetSha) return { ok: false, reason: "Missing x-ops-asset-sha256" };
-    if (assetSha.toLowerCase() !== expectedSha.toLowerCase()) {
-      return { ok: false, reason: "Asset sha256 mismatch" };
-    }
-  }
-
-  return { ok: true, reason: "Asset verified" };
-}
-
-async function verifyTurnstile(request, env) {
-  if (!env?.TURNSTILE_SECRET_KEY) {
-    return { ok: true, reason: "Turnstile disabled" };
-  }
-
-  const token = request.headers.get("cf-turnstile-response") || "";
-  if (!token) return { ok: false, reason: "Missing Turnstile token" };
-
-  const ip = request.headers.get("CF-Connecting-IP") || "";
-  const form = new FormData();
-  form.append("secret", env.TURNSTILE_SECRET_KEY);
-  form.append("response", token);
-  if (ip) form.append("remoteip", ip);
-
-  const resp = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    body: form,
+    // Optional legacy header (only sent if keys include ASSET_ID_SHA256)
+    SEND_LEGACY_ASSET_SHA256_HEADER: false,
   });
 
-  const data = await resp.json().catch(() => null);
-  if (!data || data.success !== true) {
+  let cfg = {
+    ...DEFAULTS,
+    ENLACE_BASE: readEnlaceBaseFromMeta() || DEFAULTS.ENLACE_BASE_FALLBACK,
+  };
+
+  function getEndpoints() {
+    const base = String(cfg.ENLACE_BASE || "").replace(/\/+$/, "") || DEFAULTS.ENLACE_BASE_FALLBACK;
     return {
-      ok: false,
-      reason:
-        "Turnstile failed (double-check TURNSTILE_SECRET_KEY is the SECRET key, not the site key)",
+      base,
+      chat: `${base}/api/chat`,
+      voice: `${base}/api/voice`,
     };
   }
 
-  return { ok: true };
-}
+  // -------------------------
+  // 1) Public keys loader (ops-keys.json)
+  // -------------------------
+  let OPS_KEYS_CACHE = null;
+  let OPS_KEYS_PROMISE = null;
 
-function safeTextOnly(s) {
-  let out = "";
-  for (let i = 0; i < s.length; i++) {
-    const c = s.charCodeAt(i);
-    if (c === 0) continue;
-    const ok = c === 9 || c === 10 || c === 13 || (c >= 32 && c <= 126) || c >= 160;
-    if (ok) out += s[i];
-  }
-  out = out.replace(/[ \t]{3,}/g, "  ").replace(/\n{4,}/g, "\n\n\n");
-  return out.trim();
-}
+  async function loadOpsKeys() {
+    if (OPS_KEYS_CACHE) return OPS_KEYS_CACHE;
+    if (OPS_KEYS_PROMISE) return OPS_KEYS_PROMISE;
 
-function looksLikeCodeOrMarkup(text) {
-  const t = String(text || "").toLowerCase();
-  if (text.includes("```")) return true;
-  if (/<\/?[a-z][\s\S]*>/i.test(text)) return true;
-  if (t.includes("<script") || t.includes("javascript:")) return true;
-
-  const patterns = [
-    /\bfunction\b/i,
-    /\bclass\b/i,
-    /\bimport\b/i,
-    /\bexport\b/i,
-    /\brequire\s*\(/i,
-    /\bconst\b/i,
-    /\blet\b/i,
-    /\bvar\b/i,
-    /=>/i,
-    /\bdocument\./i,
-    /\bwindow\./i,
-    /\beval\s*\(/i,
-  ];
-  return patterns.some((re) => re.test(text));
-}
-
-function normalizeMessages(input) {
-  if (!Array.isArray(input)) return [];
-  const out = [];
-  for (const m of input.slice(-MAX_MESSAGES)) {
-    if (!m || typeof m !== "object") continue;
-    const role = String(m.role || "").toLowerCase();
-    if (role !== "user" && role !== "assistant") continue;
-
-    let content = typeof m.content === "string" ? m.content : "";
-    content = safeTextOnly(content);
-    if (!content) continue;
-
-    if (content.length > MAX_MESSAGE_CHARS) content = content.slice(0, MAX_MESSAGE_CHARS);
-    out.push({ role, content });
-  }
-  return out;
-}
-
-function parseGuardResult(res) {
-  const r = res?.response ?? res?.result?.response ?? res?.result ?? res;
-
-  if (r && typeof r === "object" && typeof r.safe === "boolean") {
-    return { safe: r.safe, categories: Array.isArray(r.categories) ? r.categories : [] };
-  }
-
-  if (typeof r === "string") {
-    const lower = r.toLowerCase();
-    if (lower.includes("unsafe")) return { safe: false, categories: [] };
-    if (lower.includes("safe")) return { safe: true, categories: [] };
-  }
-
-  return { safe: false, categories: ["GUARD_UNPARSEABLE"] };
-}
-
-function normalizeIso2(x) {
-  const s = String(x || "").trim();
-  if (!s) return "";
-  if (s.toUpperCase() === "EN") return "en";
-  if (s.toUpperCase() === "ES") return "es";
-  return s.slice(0, 2).toLowerCase();
-}
-
-function iso2ToBcp47(iso2) {
-  if (iso2 === "es") return "es-ES";
-  if (iso2 === "en") return "en-US";
-  return "";
-}
-
-function pickLangFromBody(body) {
-  const meta = body?.meta && typeof body.meta === "object" ? body.meta : {};
-  const iso2 =
-    normalizeIso2(meta.lang_iso2) ||
-    normalizeIso2(meta.iso2) ||
-    normalizeIso2(meta.lang) ||
-    "";
-
-  const bcp47 = String(meta.lang_bcp47 || meta.bcp47 || "").trim() || iso2ToBcp47(iso2);
-  return { iso2: iso2 || "en", bcp47: bcp47 || "en-US" };
-}
-
-function b64url(bytes) {
-  const bin = String.fromCharCode(...new Uint8Array(bytes));
-  const b64 = btoa(bin);
-  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-async function sha256Hex(input) {
-  const data = new TextEncoder().encode(input);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  const bytes = new Uint8Array(hash);
-  let out = "";
-  for (const b of bytes) out += b.toString(16).padStart(2, "0");
-  return out;
-}
-
-function extractHandshakePrivateJwk(env) {
-  // Expect HANDSHAKE_ID to be a JSON string.
-  // We accept:
-  // - {"d": "...", "n":"...", ...} (private JWK)
-  // - {"private": {...}} or {"jwk":{"private":{...}}}
-  const raw = env?.HANDSHAKE_ID;
-  if (!raw) return null;
-
-  let obj;
-  try {
-    obj = JSON.parse(String(raw));
-  } catch {
-    return null;
-  }
-
-  let jwk =
-    obj?.private ||
-    obj?.jwk?.private ||
-    (obj?.d && obj?.n ? obj : null);
-
-  if (!jwk) return null;
-
-  jwk = { ...jwk };
-  jwk.alg = "RS512";
-  jwk.key_ops = ["sign"];
-  return jwk;
-}
-
-async function buildBrainIdentityHeaders(env, bodyText) {
-  const h = {};
-
-  if (env?.NET_ID) h["x-net-id"] = String(env.NET_ID);
-  if (env?.NET_ID_SHA512) h["x-net-id-sha512"] = String(env.NET_ID_SHA512);
-
-  // These two env names are kept as-is in your dashboard; we just forward as metadata.
-  if (env?.ENLACE_BRAIN_Public_JWK) {
-    h["x-enlace-brain-public-jwk"] = typeof env.ENLACE_BRAIN_Public_JWK === "string"
-      ? env.ENLACE_BRAIN_Public_JWK
-      : JSON.stringify(env.ENLACE_BRAIN_Public_JWK);
-  }
-  if (env?.BRAIN_ENLACE_Public_JWK) {
-    h["x-brain-enlace-public-jwk"] = typeof env.BRAIN_ENLACE_Public_JWK === "string"
-      ? env.BRAIN_ENLACE_Public_JWK
-      : JSON.stringify(env.BRAIN_ENLACE_Public_JWK);
-  }
-
-  // Optional: sign a proof so Brain can verify calls really come from Enlace
-  const jwk = extractHandshakePrivateJwk(env);
-  if (jwk) {
-    const ts = Date.now().toString();
-    const nonce = crypto.randomUUID();
-    const bodyHash = await sha256Hex(bodyText);
-    const netId = String(env?.NET_ID || "ENLACE");
-
-    const payload = `${netId}.${ts}.${nonce}.${bodyHash}`;
-    const key = await crypto.subtle.importKey(
-      "jwk",
-      jwk,
-      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-512" },
-      false,
-      ["sign"]
-    );
-    const sig = await crypto.subtle.sign(
-      "RSASSA-PKCS1-v1_5",
-      key,
-      new TextEncoder().encode(payload)
-    );
-
-    h["x-handshake-ts"] = ts;
-    h["x-handshake-nonce"] = nonce;
-    h["x-handshake-sig"] = b64url(sig);
-    h["x-handshake-payload-hash"] = bodyHash;
-  }
-
-  return h;
-}
-
-async function callBrainSSE(env, payloadObj, identityHeaders) {
-  if (!env?.brain || typeof env.brain.fetch !== "function") {
-    throw new Error("Missing Service Binding: env.brain");
-  }
-
-  return env.brain.fetch("https://service/api/chat", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "accept": "text/event-stream",
-      ...identityHeaders,
-    },
-    body: JSON.stringify(payloadObj),
-  });
-}
-
-async function runWhisper(env, audioBytes) {
-  if (!env?.AI || typeof env.AI.run !== "function") {
-    throw new Error("Missing AI binding (env.AI)");
-  }
-  // Workers AI Whisper expects raw bytes in `audio`
-  const r = await env.AI.run(STT_MODEL_ID, { audio: audioBytes });
-  const text = r?.text || r?.result?.text || "";
-  return { text: String(text || "").trim(), raw: r };
-}
-
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    const origin = request.headers.get("Origin") || "";
-
-    // Preflight
-    if (request.method === "OPTIONS") {
-      const h = withBaseHeaders(origin, request);
-      return new Response(null, { status: 204, headers: h });
-    }
-
-    // Health
-    if (url.pathname === "/" || url.pathname === "/health") {
-      const h = withBaseHeaders(origin, request);
-      return new Response("enlace: ok", { status: 200, headers: h });
-    }
-
-    // Only allow browser origins we trust
-    const isBrowserCall = !!origin;
-    if (isBrowserCall && !ALLOWED_ORIGINS.has(origin)) {
-      return json(origin, request, 403, { error: "Origin not allowed" });
-    }
-
-    // Routes
-    if (url.pathname === "/api/chat") {
-      if (request.method !== "POST") {
-        return json(origin, request, 405, { error: "Method not allowed" });
-      }
-
-      const assetCheck = enforceAssetIdentity(request, env);
-      if (!assetCheck.ok) {
-        return json(origin, request, 403, { error: "Blocked: asset identity", detail: assetCheck.reason });
-      }
-
-      const ts = await verifyTurnstile(request, env);
-      if (!ts.ok) {
-        return json(origin, request, 403, { error: "Blocked: turnstile", detail: ts.reason });
-      }
-
-      const ct = (request.headers.get("content-type") || "").toLowerCase();
-      if (!ct.includes("application/json")) {
-        return json(origin, request, 415, { error: "content-type must be application/json" });
-      }
-
-      let raw = "";
+    OPS_KEYS_PROMISE = (async () => {
       try {
-        raw = await request.text();
+        const url = String(cfg.OPS_KEYS_URL || "ops-keys.json");
+        const resp = await fetch(url, { cache: "no-store" });
+        if (!resp.ok) throw new Error(`ops-keys.json HTTP ${resp.status}`);
+        const obj = await resp.json();
+        OPS_KEYS_CACHE = (obj && typeof obj === "object") ? obj : {};
+        return OPS_KEYS_CACHE;
       } catch {
-        return json(origin, request, 400, { error: "Failed to read body" });
+        OPS_KEYS_CACHE = {};
+        return OPS_KEYS_CACHE;
+      } finally {
+        OPS_KEYS_PROMISE = null;
       }
-      if (!raw || raw.length > MAX_JSON_BODY_CHARS) {
-        return json(origin, request, 413, { error: "Request too large" });
+    })();
+
+    return OPS_KEYS_PROMISE;
+  }
+
+  async function getUiIdentity() {
+    const k = await loadOpsKeys();
+    const assetIdZuluPu = String(k?.ASSET_ID_ZULU_Pu || "").trim();        // -> x-ops-asset-id
+    const srcSha512B64 = String(k?.src_PUBLIC_SHA512_B64 || "").trim();    // -> x-ops-src-sha512-b64
+
+    // Optional legacy:
+    const assetSha256Hex = String(k?.ASSET_ID_SHA256 || k?.ASSET_ID_SHA256_HEX || "").trim(); // -> x-ops-asset-sha256
+
+    return { assetIdZuluPu, srcSha512B64, assetSha256Hex };
+  }
+
+  // -------------------------
+  // 2) Turnstile token (public)
+  // -------------------------
+  function getTurnstileToken() {
+    if (!cfg.SEND_TURNSTILE_HEADER) return "";
+    try {
+      if (window.turnstile && typeof window.turnstile.getResponse === "function") {
+        return window.turnstile.getResponse() || "";
+      }
+    } catch {
+      return "";
+    }
+    return "";
+  }
+
+  // -------------------------
+  // 3) Client-side sanitizers / gates (helpful, not security)
+  // -------------------------
+  function safeTextOnly(s) {
+    if (s == null) return "";
+    let out = "";
+    const str = String(s);
+    for (let i = 0; i < str.length; i++) {
+      const c = str.charCodeAt(i);
+      if (c === 0) continue;
+      const ok = c === 9 || c === 10 || c === 13 || (c >= 32 && c <= 126) || c >= 160;
+      if (ok) out += str[i];
+    }
+    out = out.replace(/[ \t]{3,}/g, "  ").replace(/\n{4,}/g, "\n\n\n");
+    return out.trim();
+  }
+
+  function looksLikeCodeOrMarkup(text) {
+    const t = String(text || "");
+    const lower = t.toLowerCase();
+
+    if (t.includes("```")) return true;
+    if (/<\/?[a-z][\s\S]*>/i.test(t)) return true;
+    if (lower.includes("<script") || lower.includes("javascript:")) return true;
+
+    const patterns = [
+      /\bfunction\b/i,
+      /\bclass\b/i,
+      /\bimport\b/i,
+      /\bexport\b/i,
+      /\brequire\s*\(/i,
+      /\bconst\b/i,
+      /\blet\b/i,
+      /\bvar\b/i,
+      /=>/i,
+      /\bdocument\./i,
+      /\bwindow\./i,
+      /\beval\s*\(/i,
+    ];
+    return patterns.some((re) => re.test(t));
+  }
+
+  function normalizeMessages(input) {
+    if (!Array.isArray(input)) return [];
+    const out = [];
+    const slice = input.slice(-cfg.CLIENT_MAX_MESSAGES);
+
+    for (const m of slice) {
+      if (!m || typeof m !== "object") continue;
+      const role = String(m.role || "").toLowerCase();
+      if (role !== "user" && role !== "assistant") continue;
+
+      let content = (typeof m.content === "string") ? m.content : "";
+      content = safeTextOnly(content);
+      if (!content) continue;
+
+      if (content.length > cfg.CLIENT_MAX_MESSAGE_CHARS) {
+        content = content.slice(0, cfg.CLIENT_MAX_MESSAGE_CHARS);
       }
 
-      let body;
-      try {
-        body = JSON.parse(raw);
-      } catch {
-        return json(origin, request, 400, { error: "Invalid JSON" });
-      }
+      out.push({ role, content });
+    }
 
-      const honeypot = typeof body.honeypot === "string" ? body.honeypot.trim() : "";
-      if (honeypot) return json(origin, request, 403, { error: "Blocked: honeypot" });
+    return out;
+  }
 
-      const messages = normalizeMessages(body.messages);
-      if (!messages.length) {
-        return json(origin, request, 400, { error: "messages[] required" });
-      }
+  function extractLastUser(messages) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i] && messages[i].role === "user") return String(messages[i].content || "");
+    }
+    return "";
+  }
 
-      const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content || "";
-      if (!lastUser) return json(origin, request, 400, { error: "Missing user message" });
+  function validateAndBuildChatPayload(payload) {
+    const body = (payload && typeof payload === "object") ? payload : {};
+    const honeypot = (typeof body.honeypot === "string") ? body.honeypot.trim() : "";
+    if (honeypot) {
+      return { blocked: true, reason: "Blocked: honeypot (spam)" };
+    }
+
+    const messages = normalizeMessages(body.messages);
+    if (!messages.length) {
+      return { blocked: true, reason: "Blocked: messages[] required" };
+    }
+
+    if (cfg.CLIENT_BLOCK_CODE_OR_MARKUP) {
+      const lastUser = extractLastUser(messages);
+      if (!lastUser) return { blocked: true, reason: "Blocked: missing user message" };
       if (looksLikeCodeOrMarkup(lastUser)) {
-        return json(origin, request, 403, { error: "Blocked: code/markup detected" });
+        return { blocked: true, reason: "Blocked: code/markup detected (client gate)" };
       }
-
-      // Llama Guard safety gate
-      if (!env?.AI || typeof env.AI.run !== "function") {
-        return json(origin, request, 500, { error: "Missing AI binding (env.AI)" });
-      }
-
-      let guardRes;
-      try {
-        guardRes = await env.AI.run(GUARD_MODEL_ID, { messages });
-      } catch {
-        return json(origin, request, 502, { error: "Safety check unavailable" });
-      }
-
-      const verdict = parseGuardResult(guardRes);
-      if (!verdict.safe) {
-        return json(origin, request, 403, {
-          error: "Blocked by safety filter",
-          categories: verdict.categories || [],
-        });
-      }
-
-      // Language hints (for UI convenience headers)
-      const { iso2, bcp47 } = pickLangFromBody(body);
-
-      // Build identity headers for Brain
-      const identityHeaders = await buildBrainIdentityHeaders(env, raw);
-
-      // Call Brain as SSE
-      let brainResp;
-      try {
-        brainResp = await callBrainSSE(env, { messages, meta: body.meta || {} }, identityHeaders);
-      } catch (e) {
-        return json(origin, request, 502, {
-          error: "Brain unreachable",
-          detail: String(e?.message || e),
-        });
-      }
-
-      if (!brainResp.ok) {
-        const t = await brainResp.text().catch(() => "");
-        return json(origin, request, 502, {
-          error: "Brain error",
-          status: brainResp.status,
-          detail: t.slice(0, 2000),
-        });
-      }
-
-      const h = withBaseHeaders(origin, request, {
-        "x-chattia-text-iso2": iso2,
-        "x-chattia-text-bcp47": bcp47,
-        "content-type": "text/event-stream; charset=utf-8",
-        "cache-control": "no-store, no-transform",
-      });
-
-      // Proxy streaming body
-      return new Response(brainResp.body, { status: 200, headers: h });
     }
 
-    if (url.pathname === "/api/voice") {
-      if (request.method !== "POST") {
-        return json(origin, request, 405, { error: "Method not allowed" });
-      }
+    const meta = (body.meta && typeof body.meta === "object") ? body.meta : {};
 
-      const assetCheck = enforceAssetIdentity(request, env);
-      if (!assetCheck.ok) {
-        return json(origin, request, 403, { error: "Blocked: asset identity", detail: assetCheck.reason });
-      }
-
-      const ts = await verifyTurnstile(request, env);
-      if (!ts.ok) {
-        return json(origin, request, 403, { error: "Blocked: turnstile", detail: ts.reason });
-      }
-
-      const audioBuf = await request.arrayBuffer().catch(() => null);
-      if (!audioBuf) return json(origin, request, 400, { error: "Failed to read audio" });
-
-      if (audioBuf.byteLength <= 0) return json(origin, request, 400, { error: "Empty audio" });
-      if (audioBuf.byteLength > MAX_AUDIO_BYTES) return json(origin, request, 413, { error: "Audio too large" });
-
-      let stt;
-      try {
-        stt = await runWhisper(env, audioBuf);
-      } catch (e) {
-        return json(origin, request, 502, { error: "STT unavailable", detail: String(e?.message || e) });
-      }
-
-      const transcript = stt.text || "";
-      if (!transcript) {
-        return json(origin, request, 200, { transcript: "", note: "No speech detected" }, {
-          "x-chattia-voice-timeout-sec": "120",
-          "x-chattia-stt-iso2": "en",
-          "x-chattia-stt-bcp47": "en-US",
-          "x-chattia-stt-lang": "EN",
-        });
-      }
-
-      // Simple iso2 guess (good enough for headers; Brain can do deeper logic)
-      const maybeEs = /[¿¡]|(\b(hola|gracias|por favor|buenas|necesito|factura|pago)\b)/i.test(transcript);
-      const iso2 = maybeEs ? "es" : "en";
-      const bcp47 = iso2ToBcp47(iso2);
-      const legacy = iso2 === "es" ? "ES" : "EN";
-
-      const mode = (url.searchParams.get("mode") || "stt").toLowerCase();
-      if (mode === "stt") {
-        return json(origin, request, 200, {
-          transcript,
-          lang_iso2: iso2,
-          lang_bcp47: bcp47,
-        }, {
-          "x-chattia-voice-timeout-sec": "120",
-          "x-chattia-stt-iso2": iso2,
-          "x-chattia-stt-bcp47": bcp47,
-          "x-chattia-stt-lang": legacy,
-        });
-      }
-
-      // Optional: if mode != stt, forward transcript to Brain and stream SSE
-      const payload = {
-        messages: [{ role: "user", content: transcript }],
-        meta: { lang_iso2: iso2, lang_bcp47: bcp47 },
-      };
-
-      const identityHeaders = await buildBrainIdentityHeaders(env, JSON.stringify(payload));
-
-      let brainResp;
-      try {
-        brainResp = await callBrainSSE(env, payload, identityHeaders);
-      } catch (e) {
-        return json(origin, request, 502, { error: "Brain unreachable", detail: String(e?.message || e) });
-      }
-
-      if (!brainResp.ok) {
-        const t = await brainResp.text().catch(() => "");
-        return json(origin, request, 502, { error: "Brain error", status: brainResp.status, detail: t.slice(0, 2000) });
-      }
-
-      const h = withBaseHeaders(origin, request, {
-        "x-chattia-voice-timeout-sec": "120",
-        "x-chattia-stt-iso2": iso2,
-        "x-chattia-stt-bcp47": bcp47,
-        "x-chattia-stt-lang": legacy,
-        "content-type": "text/event-stream; charset=utf-8",
-        "cache-control": "no-store, no-transform",
-      });
-
-      return new Response(brainResp.body, { status: 200, headers: h });
+    // Ensure meta fields are strings if present (keeps JSON stable)
+    const safeMeta = {};
+    for (const [k, v] of Object.entries(meta)) {
+      if (v == null) continue;
+      const s = String(v).trim();
+      if (s) safeMeta[k] = s;
     }
 
-    return json(origin, request, 404, { error: "Not found" });
-  },
-};
+    const finalPayload = {
+      messages,
+      honeypot: "",
+      meta: safeMeta,
+    };
+
+    const jsonText = JSON.stringify(finalPayload);
+    if (jsonText.length > cfg.CLIENT_MAX_JSON_BODY_CHARS) {
+      return { blocked: true, reason: "Blocked: request too large (client cap)" };
+    }
+
+    return { blocked: false, payload: finalPayload, jsonText };
+  }
+
+  // -------------------------
+  // 4) Header builder (ONLY send allowlisted headers)
+  // -------------------------
+  async function buildCommonHeaders(acceptValue, contentType) {
+    const headers = {
+      "accept": acceptValue || "text/event-stream",
+    };
+    if (contentType) headers["content-type"] = contentType;
+
+    const ident = await getUiIdentity();
+
+    // New scheme (preferred)
+    if (ident.assetIdZuluPu) headers["x-ops-asset-id"] = ident.assetIdZuluPu;
+    if (ident.srcSha512B64) headers["x-ops-src-sha512-b64"] = ident.srcSha512B64;
+
+    // Optional legacy (ONLY if enabled)
+    if (cfg.SEND_LEGACY_ASSET_SHA256_HEADER && ident.assetSha256Hex) {
+      headers["x-ops-asset-sha256"] = ident.assetSha256Hex;
+    }
+
+    const ts = getTurnstileToken();
+    if (ts) headers["cf-turnstile-response"] = ts;
+
+    return headers;
+  }
+
+  // -------------------------
+  // 5) SSE parsing (proxy stream -> onToken)
+  // -------------------------
+  function extractTokenFromAnyShape(obj) {
+    if (!obj) return "";
+    if (typeof obj === "string") return obj;
+
+    if (typeof obj.response === "string") return obj.response;
+    if (typeof obj.text === "string") return obj.text;
+
+    if (obj.result && typeof obj.result === "object") {
+      if (typeof obj.result.response === "string") return obj.result.response;
+      if (typeof obj.result.text === "string") return obj.result.text;
+    }
+
+    if (obj.response && typeof obj.response === "object") {
+      if (typeof obj.response.content === "string") return obj.response.content;
+      if (typeof obj.response.response === "string") return obj.response.response;
+    }
+
+    if (Array.isArray(obj.choices) && obj.choices[0]) {
+      const c = obj.choices[0];
+      const delta = c.delta || c.message || c;
+      if (delta && typeof delta.content === "string") return delta.content;
+      if (typeof c.text === "string") return c.text;
+    }
+
+    return "";
+  }
+
+  function processSseEventData(data, onToken) {
+    const trimmed = String(data || "").trim();
+    if (!trimmed) return { done: false };
+    if (trimmed === "[DONE]") return { done: true };
+
+    let token = "";
+    try {
+      const obj = JSON.parse(trimmed);
+      token = extractTokenFromAnyShape(obj);
+    } catch {
+      token = trimmed;
+    }
+
+    if (token && typeof onToken === "function") onToken(token);
+    return { done: false };
+  }
+
+  async function readSseStream(resp, onToken) {
+    if (!resp.body) throw new Error("No response body (stream missing).");
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+
+    let buffer = "";
+    let eventData = "";
+    let doneSeen = false;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      buffer = buffer.replace(/\r\n/g, "\n");
+
+      let nl;
+      while ((nl = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, nl);
+        buffer = buffer.slice(nl + 1);
+
+        if (line === "") {
+          const res = processSseEventData(eventData, onToken);
+          eventData = "";
+          if (res.done) {
+            doneSeen = true;
+            break;
+          }
+          continue;
+        }
+
+        if (line.startsWith("data:")) {
+          let chunk = line.slice(5);
+          if (chunk.startsWith(" ")) chunk = chunk.slice(1);
+          eventData += (eventData ? "\n" : "") + chunk;
+        }
+      }
+
+      if (doneSeen) break;
+    }
+
+    if (!doneSeen && eventData) processSseEventData(eventData, onToken);
+  }
+
+  // -------------------------
+  // 6) Public API: EnlaceRepo
+  // -------------------------
+  async function ready() {
+    // refresh base from meta in case it changed after load
+    const metaBase = readEnlaceBaseFromMeta();
+    if (metaBase) cfg.ENLACE_BASE = metaBase;
+
+    await loadOpsKeys();
+    return true;
+  }
+
+  function getConfig() {
+    return { ...cfg, endpoints: getEndpoints() };
+  }
+
+  function setConfig(partial) {
+    if (!partial || typeof partial !== "object") return getConfig();
+    cfg = { ...cfg, ...partial };
+
+    // allow changing base at runtime
+    if (typeof cfg.ENLACE_BASE === "string") {
+      cfg.ENLACE_BASE = cfg.ENLACE_BASE.replace(/\/+$/, "");
+    }
+    return getConfig();
+  }
+
+  /**
+   * chatSSE(payload, { signal, onToken, onHeaders })
+   * - Calls Cloudflare Enlace /api/chat
+   * - Streams tokens to onToken(...)
+   * - Calls onHeaders(resp.headers) once
+   */
+  async function chatSSE(payload, opts) {
+    const { blocked, reason, payload: safePayload, jsonText } = validateAndBuildChatPayload(payload);
+    if (blocked) {
+      const err = new Error(reason || "Blocked by client gate");
+      err.name = "ClientGateError";
+      throw err;
+    }
+
+    const { chat } = getEndpoints();
+    const headers = await buildCommonHeaders("text/event-stream", "application/json");
+
+    const resp = await fetch(chat, {
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+      headers,
+      body: jsonText || JSON.stringify(safePayload),
+      signal: opts && opts.signal ? opts.signal : undefined,
+    });
+
+    if (opts && typeof opts.onHeaders === "function") {
+      try { opts.onHeaders(resp.headers); } catch {}
+    }
+
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => "");
+      throw new Error(`HTTP ${resp.status} ${resp.statusText}\n${t}`);
+    }
+
+    const ct = String(resp.headers.get("content-type") || "").toLowerCase();
+
+    // Some backends return JSON (non-stream)
+    if (ct.includes("application/json")) {
+      const obj = await resp.json().catch(() => null);
+      const token = extractTokenFromAnyShape(obj) || (obj ? JSON.stringify(obj) : "");
+      if (token && opts && typeof opts.onToken === "function") opts.onToken(token);
+      return;
+    }
+
+    // SSE stream
+    await readSseStream(resp, opts && typeof opts.onToken === "function" ? opts.onToken : null);
+  }
+
+  /**
+   * voiceSTT(blob, { signal })
+   * - Calls Cloudflare Enlace /api/voice?mode=stt
+   * - Returns: { transcript, lang_iso2, lang_bcp47, blocked, reason }
+   */
+  async function voiceSTT(blob, opts) {
+    const b = blob instanceof Blob ? blob : null;
+    if (!b) return { transcript: "", blocked: true, reason: "Invalid audio blob" };
+
+    if (b.size <= 0) return { transcript: "", blocked: true, reason: "Empty audio" };
+    if (b.size > cfg.CLIENT_MAX_AUDIO_BYTES) {
+      return { transcript: "", blocked: true, reason: "Audio too large (client cap)" };
+    }
+
+    const { voice } = getEndpoints();
+    const headers = await buildCommonHeaders("application/json", b.type || "application/octet-stream");
+
+    const resp = await fetch(`${voice}?mode=stt`, {
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+      headers,
+      body: b,
+      signal: opts && opts.signal ? opts.signal : undefined,
+    });
+
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => "");
+      return { transcript: "", blocked: true, reason: `Voice STT failed: HTTP ${resp.status}\n${t}` };
+    }
+
+    const obj = await resp.json().catch(() => null);
+    const transcript = safeTextOnly(obj?.transcript || obj?.text || obj?.result?.text || "");
+    const lang_iso2 = String(obj?.lang_iso2 || obj?.langIso2 || "").trim().toLowerCase();
+    const lang_bcp47 = String(obj?.lang_bcp47 || obj?.langBcp47 || "").trim();
+
+    // Client-side gate (optional): if transcript looks like code/markup, do not forward
+    if (cfg.CLIENT_BLOCK_CODE_OR_MARKUP && looksLikeCodeOrMarkup(transcript)) {
+      return { transcript: "", blocked: true, reason: "Blocked: transcript looked like code/markup (client gate)" };
+    }
+
+    return {
+      transcript,
+      lang_iso2,
+      lang_bcp47,
+      blocked: false,
+      reason: "",
+      _raw: obj,
+      _resp_headers: null, // kept for parity if you ever want to expose
+    };
+  }
+
+  // -------------------------
+  // 7) Expose globally
+  // -------------------------
+  window.EnlaceRepo = Object.freeze({
+    ready,
+    getConfig,
+    setConfig,
+    chatSSE,
+    voiceSTT,
+
+    // small helpers (optional)
+    _reloadKeys: async () => { OPS_KEYS_CACHE = null; return loadOpsKeys(); },
+  });
+
+  // Warm-up (non-blocking)
+  ready().catch(() => {});
+})();
