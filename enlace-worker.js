@@ -1,23 +1,22 @@
 /**
- * enlace-worker.js — REPO (GitHub Pages) “middleman helper” (v1.0)
+ * enlace-worker.js — REPO (GitHub Pages) “middleman helper” (v1.1)
  *
  * Purpose:
  * - Load repo config (ops-keys.json + meta tag)
  * - Client-side sanitize + block obvious code/markup/payloads
- * - Call Cloudflare Enlace Worker (/api/chat SSE, /api/voice STT)
- * - Attach identity headers expected by Cloudflare Enlace Worker
+ * - Call Cloudflare Enlace Worker (/api/chat SSE, /api/voice STT, optional /api/tts)
+ * - Attach identity headers expected by Cloudflare Enlace Worker (SHA512-only)
  *
- * NOT a security boundary (attackers can bypass). Still useful for:
- * - Reducing junk
- * - Preventing accidental code/payload pastes
- * - Consistent header building & config loading
+ * IMPORTANT:
+ * - SHA256 legacy header support REMOVED (prevents CORS preflight breaks)
  *
  * Exposes:
  *   window.EnlaceRepo = {
  *     ready(), getConfig(),
  *     sanitizeText(), looksBad(),
  *     chatSSE({messages, meta, honeypot}, {onToken, onHeaders, signal}),
- *     voiceSTT(blob, {signal})
+ *     voiceSTT(blob, {signal}),
+ *     tts({text, speaker, encoding, container}, {signal})
  *   }
  */
 
@@ -28,20 +27,19 @@
   // 0) Defaults (safe public fallbacks)
   // -------------------------
   const DEFAULTS = {
-    // If you add <meta name="chattia-enlace-base" content="https://...workers.dev" />
-    // it overrides this.
+    // <meta name="chattia-enlace-base" content="https://...workers.dev" />
     ENLACE_BASE: "https://enlace.grabem-holdem-nuts-right.workers.dev",
 
-    // Your NEW repo public identity (recommended)
-    // Put these in ops-keys.json if you prefer (supported).
+    // Repo public identity (SHA512-only scheme)
     OPS_ASSET_ID: "ASSET_ID_ZULU_WtXzFzHtzkLri6m_1SrNNQ",
-    SRC_PUBLIC_SHA512_B64: "de2V8678AuqGwTIp2SdtxWsistBzPHq318X4xNKPp39M44EML8po61xSAP//t4hZM8nBgkOVCMnbV4dGSE20RA==",
+    SRC_PUBLIC_SHA512_B64:
+      "de2V8678AuqGwTIp2SdtxWsistBzPHq318X4xNKPp39M44EML8po61xSAP//t4hZM8nBgkOVCMnbV4dGSE20RA==",
 
-    // Legacy optional (only if your Cloudflare worker still checks it)
-    ASSET_ID_SHA256: "",
-
-    // Turnstile: client can only provide token if Turnstile widget is present on page
+    // Turnstile: only sent if widget exists and returns a token
     SEND_TURNSTILE_HEADER: true,
+
+    // If true, we hard-stop before calling Enlace if identity is missing
+    REQUIRE_IDENTITY_HEADERS: true,
 
     // Repo config file path (same folder is simplest)
     OPS_KEYS_PATH: "ops-keys.json",
@@ -73,10 +71,7 @@
     // <meta name="chattia-enlace-base" content="https://...workers.dev">
     // legacy:
     // <meta name="chattia-enlace" content="https://...workers.dev">
-    const raw =
-      readMeta("chattia-enlace-base") ||
-      readMeta("chattia-enlace") ||
-      "";
+    const raw = readMeta("chattia-enlace-base") || readMeta("chattia-enlace") || "";
     return raw.replace(/\/+$/, "");
   }
 
@@ -92,8 +87,7 @@
 
   async function loadOpsKeysJson() {
     const u = new URL(DEFAULTS.OPS_KEYS_PATH, location.href);
-    // cache-bust to prevent stale GH pages caching
-    u.searchParams.set("v", String(Date.now()));
+    u.searchParams.set("v", String(Date.now())); // cache-bust GH pages caching
     return await fetchJsonSafe(u.toString());
   }
 
@@ -116,6 +110,10 @@
     return fallback;
   }
 
+  function normalizeNoTrailingSlashes(s) {
+    return String(s || "").trim().replace(/\/+$/, "");
+  }
+
   async function ready() {
     if (_readyPromise) return _readyPromise;
 
@@ -123,37 +121,58 @@
       const ops = await loadOpsKeysJson();
 
       const metaBase = readEnlaceBaseFromMeta();
-      const base = metaBase || pickString(ops, "ENLACE_BASE", "ENLACE", "ENLACE_API_BASE") || DEFAULTS.ENLACE_BASE;
+      const base =
+        metaBase ||
+        pickString(ops, "ENLACE_BASE", "ENLACE", "ENLACE_API_BASE") ||
+        DEFAULTS.ENLACE_BASE;
 
-      // Support your existing ops-keys.json shape:
-      // {
-      //   "TURNSTILE": "site-key",
-      //   "OPS_ASSET_ALLOWLIST": [...]
-      // }
-      //
-      // And new shape (recommended):
+      const cleanBase = normalizeNoTrailingSlashes(base);
+
+      // Supported ops-keys.json keys:
       // {
       //   "OPS_ASSET_ID": "ASSET_ID_ZULU_...",
       //   "SRC_PUBLIC_SHA512_B64": "...",
-      //   "ASSET_ID_SHA256": "optional legacy",
-      //   "SEND_TURNSTILE_HEADER": true
+      //   "SEND_TURNSTILE_HEADER": true,
+      //   "REQUIRE_IDENTITY_HEADERS": true,
+      //   "TURNSTILE_SITE_KEY": "0x...."   // optional if you render widget yourself
       // }
+      //
+      // Backward-compatible aliases:
+      // - ASSET_ID_ZULU_Pu     -> OPS_ASSET_ID
+      // - src_PUBLIC_SHA512_B64 -> SRC_PUBLIC_SHA512_B64
       const cfg = {
-        ENLACE_BASE: base.replace(/\/+$/, ""),
-        ENLACE_CHAT: base.replace(/\/+$/, "") + "/api/chat",
-        ENLACE_VOICE: base.replace(/\/+$/, "") + "/api/voice",
+        ENLACE_BASE: cleanBase,
+        ENLACE_CHAT: cleanBase + "/api/chat",
+        ENLACE_VOICE: cleanBase + "/api/voice",
+        ENLACE_TTS: cleanBase + "/api/tts",
 
-        OPS_ASSET_ID: pickString(ops, "OPS_ASSET_ID", "ASSET_ID_ZULU_Pu", "ASSET_ID") || DEFAULTS.OPS_ASSET_ID,
-        SRC_PUBLIC_SHA512_B64: pickString(ops, "SRC_PUBLIC_SHA512_B64", "src_PUBLIC_SHA512_B64") || DEFAULTS.SRC_PUBLIC_SHA512_B64,
-        ASSET_ID_SHA256: pickString(ops, "ASSET_ID_SHA256", "ASSET_SHA256") || DEFAULTS.ASSET_ID_SHA256,
+        OPS_ASSET_ID:
+          pickString(ops, "OPS_ASSET_ID", "ASSET_ID_ZULU_Pu", "ASSET_ID") ||
+          DEFAULTS.OPS_ASSET_ID,
 
-        SEND_TURNSTILE_HEADER: pickBool(ops, "SEND_TURNSTILE_HEADER", DEFAULTS.SEND_TURNSTILE_HEADER),
+        SRC_PUBLIC_SHA512_B64:
+          pickString(ops, "SRC_PUBLIC_SHA512_B64", "src_PUBLIC_SHA512_B64") ||
+          DEFAULTS.SRC_PUBLIC_SHA512_B64,
+
+        SEND_TURNSTILE_HEADER: pickBool(
+          ops,
+          "SEND_TURNSTILE_HEADER",
+          DEFAULTS.SEND_TURNSTILE_HEADER
+        ),
+
+        REQUIRE_IDENTITY_HEADERS: pickBool(
+          ops,
+          "REQUIRE_IDENTITY_HEADERS",
+          DEFAULTS.REQUIRE_IDENTITY_HEADERS
+        ),
 
         // Keep original Turnstile site key around if you render widget yourself
         TURNSTILE_SITE_KEY: pickString(ops, "TURNSTILE_SITE_KEY", "TURNSTILE") || "",
 
-        // Just stored (not enforced client-side). Server enforces allowlist.
-        OPS_ASSET_ALLOWLIST: Array.isArray(ops && ops.OPS_ASSET_ALLOWLIST) ? ops.OPS_ASSET_ALLOWLIST.slice() : [],
+        // informational only (server enforces)
+        OPS_ASSET_ALLOWLIST: Array.isArray(ops && ops.OPS_ASSET_ALLOWLIST)
+          ? ops.OPS_ASSET_ALLOWLIST.slice()
+          : [],
       };
 
       _config = cfg;
@@ -167,6 +186,23 @@
     return _config ? { ..._config } : null;
   }
 
+  function assertIdentityIfRequired() {
+    if (!_config) throw new Error("EnlaceRepo not ready (call EnlaceRepo.ready()).");
+    if (!_config.REQUIRE_IDENTITY_HEADERS) return;
+
+    const idOk = !!String(_config.OPS_ASSET_ID || "").trim();
+    const srcOk = !!String(_config.SRC_PUBLIC_SHA512_B64 || "").trim();
+
+    if (!idOk || !srcOk) {
+      throw new Error(
+        "Missing repo identity headers. Fix ops-keys.json:\n" +
+          "- OPS_ASSET_ID\n" +
+          "- SRC_PUBLIC_SHA512_B64\n" +
+          "Or set REQUIRE_IDENTITY_HEADERS=false temporarily."
+      );
+    }
+  }
+
   // -------------------------
   // 2) Sanitization + “block programming/markup/payload”
   // -------------------------
@@ -178,12 +214,20 @@
     for (let i = 0; i < s.length; i++) {
       const c = s.charCodeAt(i);
       if (c === 0) continue;
-      const ok = c === 9 || c === 10 || c === 13 || (c >= 32 && c <= 126) || c >= 160;
+      const ok =
+        c === 9 ||
+        c === 10 ||
+        c === 13 ||
+        (c >= 32 && c <= 126) ||
+        c >= 160;
       if (ok) out += s[i];
       if (lim && out.length >= lim) break;
     }
 
-    out = out.replace(/[ \t]{3,}/g, "  ").replace(/\n{4,}/g, "\n\n\n").trim();
+    out = out
+      .replace(/[ \t]{3,}/g, "  ")
+      .replace(/\n{4,}/g, "\n\n\n")
+      .trim();
     return out;
   }
 
@@ -230,7 +274,6 @@
 
       // Client-side block any “bad” user content
       if (role === "user" && looksBad(content)) {
-        // Replace with a safe message instead of forwarding payload
         out.push({
           role: "user",
           content: "Blocked by client-side gate: please send plain language only (no code/markup/payloads).",
@@ -258,21 +301,19 @@
   }
 
   // -------------------------
-  // 4) Header builder (identity -> Cloudflare Enlace Worker)
+  // 4) Header builder (SHA512-only identity -> Cloudflare Enlace Worker)
   // -------------------------
   async function buildHeaders(acceptValue, contentType) {
     await ready();
+    assertIdentityIfRequired();
 
     const h = {};
     if (acceptValue) h["accept"] = acceptValue;
     if (contentType) h["content-type"] = contentType;
 
-    // Required identity headers
+    // Required identity headers (SHA512-only)
     if (_config.OPS_ASSET_ID) h["x-ops-asset-id"] = _config.OPS_ASSET_ID;
     if (_config.SRC_PUBLIC_SHA512_B64) h["x-ops-src-sha512-b64"] = _config.SRC_PUBLIC_SHA512_B64;
-
-    // Legacy optional
-    if (_config.ASSET_ID_SHA256) h["x-ops-asset-sha256"] = _config.ASSET_ID_SHA256;
 
     // Turnstile optional
     const ts = getTurnstileToken();
@@ -335,17 +376,13 @@
     const onHeaders = opts && typeof opts.onHeaders === "function" ? opts.onHeaders : null;
     const signal = opts && opts.signal ? opts.signal : undefined;
 
-    // sanitize payload
     const safe = {
       messages: normalizeMessages(payload && payload.messages ? payload.messages : []),
       honeypot: sanitizeText(payload && payload.honeypot ? payload.honeypot : "", 200),
       meta: payload && payload.meta && typeof payload.meta === "object" ? payload.meta : {},
     };
 
-    // If user tried to send only “bad content”, safe.messages may contain the blocked message.
-    if (!safe.messages.length) {
-      throw new Error("No valid messages to send.");
-    }
+    if (!safe.messages.length) throw new Error("No valid messages to send.");
 
     const headers = await buildHeaders("text/event-stream", "application/json");
     const bodyText = JSON.stringify(safe);
@@ -447,9 +484,13 @@
     }
 
     const obj = await resp.json().catch(() => null);
-    const transcript = sanitizeText(obj && (obj.transcript || obj.text || (obj.result && obj.result.text)) ? (obj.transcript || obj.text || obj.result.text) : "", LIMITS.MAX_TEXT_CHARS);
+    const transcript = sanitizeText(
+      obj && (obj.transcript || obj.text || (obj.result && obj.result.text))
+        ? (obj.transcript || obj.text || obj.result.text)
+        : "",
+      LIMITS.MAX_TEXT_CHARS
+    );
 
-    // client-side block if transcript looks like code/markup
     if (looksBad(transcript)) {
       return { transcript: "", blocked: true, reason: "Blocked by client-side gate (voice transcript looked like code/markup/payload)" };
     }
@@ -461,7 +502,46 @@
   }
 
   // -------------------------
-  // 7) Export global
+  // 7) Optional: TTS -> /api/tts (returns audio Blob)
+  // -------------------------
+  async function tts(payload, opts) {
+    await ready();
+    const signal = opts && opts.signal ? opts.signal : undefined;
+
+    const text = sanitizeText(payload && payload.text ? payload.text : "", 4000);
+    if (!text) throw new Error("TTS requires text.");
+
+    const body = {
+      text,
+      speaker: sanitizeText(payload && payload.speaker ? payload.speaker : "", 40) || undefined,
+      encoding: sanitizeText(payload && payload.encoding ? payload.encoding : "", 20) || undefined,
+      container: sanitizeText(payload && payload.container ? payload.container : "", 20) || undefined,
+    };
+
+    const headers = await buildHeaders("audio/*", "application/json");
+
+    const resp = await fetch(_config.ENLACE_TTS, {
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+      headers,
+      body: JSON.stringify(body),
+      signal,
+    });
+
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => "");
+      throw new Error(`TTS failed: HTTP ${resp.status}\n${t}`);
+    }
+
+    const ct = resp.headers.get("content-type") || "audio/mpeg";
+    const buf = await resp.arrayBuffer();
+    return new Blob([buf], { type: ct });
+  }
+
+  // -------------------------
+  // 8) Export global
   // -------------------------
   window.EnlaceRepo = {
     ready,
@@ -470,5 +550,6 @@
     looksBad,
     chatSSE,
     voiceSTT,
+    tts,
   };
 })();
