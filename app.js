@@ -1,15 +1,19 @@
 /**
- * app.js — REPO UI (GitHub Pages) (v0.2 FIXED)
+ * app.js — REPO UI (GitHub Pages) (v0.3 KEYS UPDATED)
  * UI -> Enlace (/api/chat) with SSE streaming + Voice (mic -> /api/voice?mode=stt)
  *
  * Repo file (NOT a CF Worker).
  *
- * Fixes:
- * - Removed browser-side signing (private keys cannot live in a public repo).
- * - Sends ONLY headers that your Enlace already expects:
- *   x-ops-asset-id, x-ops-asset-sha256, cf-turnstile-response
- * - Sends meta.lang + meta.lang_iso2 + meta.lang_bcp47 (aligned with nettunian-io v0.6 FINAL).
- * - Aborts any active SSE stream before starting a new one (prevents overlap).
+ * Changes (your new scheme):
+ * - UI identity now uses ops-keys.json:
+ *   - ASSET_ID_ZULU_Pu (public) -> sent as: x-ops-asset-id
+ *   - src_PUBLIC_SHA512_B64     -> sent as: x-ops-src-sha512-b64
+ * - Removed old hardcoded:
+ *   - OPS_ASSET_ID = "https://github..."
+ *   - x-ops-asset-sha256 = (hex)
+ *
+ * Still optional:
+ * - cf-turnstile-response header ONLY if you actually render Turnstile on the page.
  */
 
 // -------------------------
@@ -30,11 +34,51 @@ const ENLACE_BASE = readEnlaceBaseFromMeta() || "https://enlace.grabem-holdem-nu
 const ENLACE_CHAT = `${ENLACE_BASE}/api/chat`;
 const ENLACE_VOICE = `${ENLACE_BASE}/api/voice`;
 
-// UI identity headers (only meaningful if Enlace OPS_ASSET_ALLOWLIST is enabled)
-const OPS_ASSET_ID = "https://github.com/chattiavato-a11y/chatbot_";
-const ASSET_ID_SHA256 = "F2829D0DECBDBD30EAC98EAECEA687DC9BF52FF3F9A074DE5E0B7E154A007A49";
+// -------------------------
+// 0.1) Public repo keys loader (ops-keys.json)
+// -------------------------
+const OPS_KEYS_URL = "ops-keys.json"; // same folder as index.html on GitHub Pages
 
-// Turnstile header (only if Turnstile is enabled on Enlace AND your UI actually renders Turnstile)
+let OPS_KEYS_CACHE = null;
+let OPS_KEYS_PROMISE = null;
+
+async function loadOpsKeys() {
+  if (OPS_KEYS_CACHE) return OPS_KEYS_CACHE;
+  if (OPS_KEYS_PROMISE) return OPS_KEYS_PROMISE;
+
+  OPS_KEYS_PROMISE = (async () => {
+    try {
+      const resp = await fetch(OPS_KEYS_URL, { cache: "no-store" });
+      if (!resp.ok) throw new Error(`ops-keys.json HTTP ${resp.status}`);
+      const obj = await resp.json();
+      OPS_KEYS_CACHE = (obj && typeof obj === "object") ? obj : {};
+      return OPS_KEYS_CACHE;
+    } catch {
+      // Safe fallback: run without identity headers if file missing
+      OPS_KEYS_CACHE = {};
+      return OPS_KEYS_CACHE;
+    } finally {
+      OPS_KEYS_PROMISE = null;
+    }
+  })();
+
+  return OPS_KEYS_PROMISE;
+}
+
+// UI identity headers (public)
+// - Pull from ops-keys.json:
+//   ASSET_ID_ZULU_Pu -> x-ops-asset-id
+//   src_PUBLIC_SHA512_B64 -> x-ops-src-sha512-b64
+async function getUiIdentity() {
+  const k = await loadOpsKeys();
+  return {
+    assetIdZuluPu: String(k?.ASSET_ID_ZULU_Pu || "").trim(),
+    srcSha512B64: String(k?.src_PUBLIC_SHA512_B64 || "").trim(),
+  };
+}
+
+// Turnstile header:
+// Set true ONLY if Turnstile is actually rendered on the UI and Enlace enforces it.
 const SEND_TURNSTILE_HEADER = true;
 
 // -------------------------
@@ -388,9 +432,12 @@ async function buildCommonHeaders(acceptValue) {
     "accept": acceptValue || "text/event-stream",
   };
 
-  if (OPS_ASSET_ID) headers["x-ops-asset-id"] = OPS_ASSET_ID;
-  if (ASSET_ID_SHA256) headers["x-ops-asset-sha256"] = ASSET_ID_SHA256;
+  // NEW: UI identity from ops-keys.json
+  const ident = await getUiIdentity();
+  if (ident.assetIdZuluPu) headers["x-ops-asset-id"] = ident.assetIdZuluPu;
+  if (ident.srcSha512B64) headers["x-ops-src-sha512-b64"] = ident.srcSha512B64;
 
+  // Optional: Turnstile token
   const ts = getTurnstileToken();
   if (ts) headers["cf-turnstile-response"] = ts;
 
@@ -643,13 +690,15 @@ function stopRecording() {
   }
 }
 
-function headersForVoiceBlob(blob) {
+async function headersForVoiceBlob(blob) {
   const headers = {
     "accept": "application/json",
   };
 
-  if (OPS_ASSET_ID) headers["x-ops-asset-id"] = OPS_ASSET_ID;
-  if (ASSET_ID_SHA256) headers["x-ops-asset-sha256"] = ASSET_ID_SHA256;
+  // NEW: UI identity from ops-keys.json
+  const ident = await getUiIdentity();
+  if (ident.assetIdZuluPu) headers["x-ops-asset-id"] = ident.assetIdZuluPu;
+  if (ident.srcSha512B64) headers["x-ops-src-sha512-b64"] = ident.srcSha512B64;
 
   const ts = getTurnstileToken();
   if (ts) headers["cf-turnstile-response"] = ts;
@@ -683,7 +732,7 @@ async function voiceStt(blob) {
     mode: "cors",
     credentials: "omit",
     cache: "no-store",
-    headers: headersForVoiceBlob(blob),
+    headers: await headersForVoiceBlob(blob),
     body: blob,
   });
 
@@ -830,3 +879,6 @@ applyLangMode("AUTO");
 setVoiceMode(false);
 setDocLangFromIso2(sessionIso2);
 showLangBadge(`Lang: ${langMode} • ${iso2ToBcp47(sessionIso2)}`);
+
+// Preload ops-keys.json (non-blocking)
+loadOpsKeys().catch(() => {});
