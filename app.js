@@ -1,85 +1,34 @@
 /**
- * app.js — REPO UI (GitHub Pages) (v0.3 KEYS UPDATED)
- * UI -> Enlace (/api/chat) with SSE streaming + Voice (mic -> /api/voice?mode=stt)
+ * app.js — REPO UI (GitHub Pages) (v0.4 ENLACE_REPO MIDDLEMAN)
+ * UI -> EnlaceRepo (repo “helper”) -> Cloudflare Enlace (/api/chat SSE, /api/voice?mode=stt)
  *
- * Repo file (NOT a CF Worker).
+ * IMPORTANT:
+ * - Make sure index.html loads enlace-worker.js BEFORE app.js:
+ *     <script src="enlace-worker.js" defer></script>
+ *     <script src="app.js" defer></script>
  *
- * Changes (your new scheme):
- * - UI identity now uses ops-keys.json:
- *   - ASSET_ID_ZULU_Pu (public) -> sent as: x-ops-asset-id
- *   - src_PUBLIC_SHA512_B64     -> sent as: x-ops-src-sha512-b64
- * - Removed old hardcoded:
- *   - OPS_ASSET_ID = "https://github..."
- *   - x-ops-asset-sha256 = (hex)
+ * What changed:
+ * - All network fetch calls are now routed through window.EnlaceRepo:
+ *     - EnlaceRepo.chatSSE(...)
+ *     - EnlaceRepo.voiceSTT(...)
+ * - app.js no longer fetches ops-keys.json or builds identity headers directly.
+ *   That is done inside enlace-worker.js (EnlaceRepo).
  *
  * Still optional:
- * - cf-turnstile-response header ONLY if you actually render Turnstile on the page.
+ * - Turnstile token header ONLY if Turnstile is actually rendered on the page
+ *   (handled inside EnlaceRepo if enabled there).
  */
 
 // -------------------------
-// 0) Enlace endpoint config
+// 0) Require EnlaceRepo
 // -------------------------
-function readEnlaceBaseFromMeta() {
-  // supports either:
-  // <meta name="chattia-enlace-base" content="https://...workers.dev">
-  // or legacy: <meta name="chattia-enlace" content="https://...workers.dev">
-  const m1 = document.querySelector('meta[name="chattia-enlace-base"]');
-  const m2 = document.querySelector('meta[name="chattia-enlace"]');
-  const raw = (m1 && m1.content ? String(m1.content) : (m2 && m2.content ? String(m2.content) : "")).trim();
-  return raw.replace(/\/+$/, "");
+function getEnlaceRepoOrThrow() {
+  const r = window.EnlaceRepo;
+  if (!r || typeof r.ready !== "function" || typeof r.chatSSE !== "function" || typeof r.voiceSTT !== "function") {
+    throw new Error("Missing EnlaceRepo. Load enlace-worker.js BEFORE app.js.");
+  }
+  return r;
 }
-
-// If meta tag is missing, fallback to your current worker
-const ENLACE_BASE = readEnlaceBaseFromMeta() || "https://enlace.grabem-holdem-nuts-right.workers.dev";
-const ENLACE_CHAT = `${ENLACE_BASE}/api/chat`;
-const ENLACE_VOICE = `${ENLACE_BASE}/api/voice`;
-
-// -------------------------
-// 0.1) Public repo keys loader (ops-keys.json)
-// -------------------------
-const OPS_KEYS_URL = "ops-keys.json"; // same folder as index.html on GitHub Pages
-
-let OPS_KEYS_CACHE = null;
-let OPS_KEYS_PROMISE = null;
-
-async function loadOpsKeys() {
-  if (OPS_KEYS_CACHE) return OPS_KEYS_CACHE;
-  if (OPS_KEYS_PROMISE) return OPS_KEYS_PROMISE;
-
-  OPS_KEYS_PROMISE = (async () => {
-    try {
-      const resp = await fetch(OPS_KEYS_URL, { cache: "no-store" });
-      if (!resp.ok) throw new Error(`ops-keys.json HTTP ${resp.status}`);
-      const obj = await resp.json();
-      OPS_KEYS_CACHE = (obj && typeof obj === "object") ? obj : {};
-      return OPS_KEYS_CACHE;
-    } catch {
-      // Safe fallback: run without identity headers if file missing
-      OPS_KEYS_CACHE = {};
-      return OPS_KEYS_CACHE;
-    } finally {
-      OPS_KEYS_PROMISE = null;
-    }
-  })();
-
-  return OPS_KEYS_PROMISE;
-}
-
-// UI identity headers (public)
-// - Pull from ops-keys.json:
-//   ASSET_ID_ZULU_Pu -> x-ops-asset-id
-//   src_PUBLIC_SHA512_B64 -> x-ops-src-sha512-b64
-async function getUiIdentity() {
-  const k = await loadOpsKeys();
-  return {
-    assetIdZuluPu: String(k?.ASSET_ID_ZULU_Pu || "").trim(),
-    srcSha512B64: String(k?.src_PUBLIC_SHA512_B64 || "").trim(),
-  };
-}
-
-// Turnstile header:
-// Set true ONLY if Turnstile is actually rendered on the UI and Enlace enforces it.
-const SEND_TURNSTILE_HEADER = true;
 
 // -------------------------
 // 1) DOM
@@ -161,18 +110,6 @@ function safeTtsText(s) {
 function getHoneypotValue() {
   if (!elHoneypot) return "";
   return String(elHoneypot.value || "").trim();
-}
-
-function getTurnstileToken() {
-  if (!SEND_TURNSTILE_HEADER) return "";
-  try {
-    if (window.turnstile && typeof window.turnstile.getResponse === "function") {
-      return window.turnstile.getResponse() || "";
-    }
-  } catch {
-    return "";
-  }
-  return "";
 }
 
 function abortActiveStream() {
@@ -380,150 +317,25 @@ function speakReply(text, iso2Hint) {
 }
 
 // -------------------------
-// 5) SSE helpers
+// 5) EnlaceRepo network wrappers (REPLACED fetch calls)
 // -------------------------
-function extractTokenFromAnyShape(obj) {
-  if (!obj) return "";
-  if (typeof obj === "string") return obj;
-
-  if (typeof obj.response === "string") return obj.response;
-  if (typeof obj.text === "string") return obj.text;
-
-  if (obj.result && typeof obj.result === "object") {
-    if (typeof obj.result.response === "string") return obj.result.response;
-    if (typeof obj.result.text === "string") return obj.result.text;
-  }
-
-  if (obj.response && typeof obj.response === "object") {
-    if (typeof obj.response.content === "string") return obj.response.content;
-    if (typeof obj.response.response === "string") return obj.response.response;
-  }
-
-  if (Array.isArray(obj.choices) && obj.choices[0]) {
-    const c = obj.choices[0];
-    const delta = c.delta || c.message || c;
-    if (delta && typeof delta.content === "string") return delta.content;
-    if (typeof c.text === "string") return c.text;
-  }
-
-  return "";
-}
-
-function processSseEventData(data, onToken) {
-  const trimmed = String(data || "").trim();
-  if (!trimmed) return { done: false };
-  if (trimmed === "[DONE]") return { done: true };
-
-  let token = "";
-  try {
-    const obj = JSON.parse(trimmed);
-    token = extractTokenFromAnyShape(obj);
-  } catch {
-    token = trimmed;
-  }
-
-  if (token) onToken(token);
-  return { done: false };
-}
-
-async function buildCommonHeaders(acceptValue) {
-  const headers = {
-    "content-type": "application/json",
-    "accept": acceptValue || "text/event-stream",
-  };
-
-  // NEW: UI identity from ops-keys.json
-  const ident = await getUiIdentity();
-  if (ident.assetIdZuluPu) headers["x-ops-asset-id"] = ident.assetIdZuluPu;
-  if (ident.srcSha512B64) headers["x-ops-src-sha512-b64"] = ident.srcSha512B64;
-
-  // Optional: Turnstile token
-  const ts = getTurnstileToken();
-  if (ts) headers["cf-turnstile-response"] = ts;
-
-  return headers;
-}
-
-async function streamChatSse(payload, onToken, onHeaders) {
+async function streamChatViaEnlaceRepo(payload, onToken, onHeaders) {
   // Abort any prior stream before starting a new one
   abortActiveStream();
   abortCtrl = new AbortController();
 
-  const bodyText = JSON.stringify(payload);
-  const headers = await buildCommonHeaders("text/event-stream");
+  const repo = getEnlaceRepoOrThrow();
+  await repo.ready(); // ensure ops-keys.json + meta loaded
 
-  const resp = await fetch(ENLACE_CHAT, {
-    method: "POST",
-    mode: "cors",
-    credentials: "omit",
-    cache: "no-store",
-    headers,
-    body: bodyText,
+  await repo.chatSSE(payload, {
     signal: abortCtrl.signal,
+    onToken: (token) => { if (typeof onToken === "function") onToken(token); },
+    onHeaders: (hdrs) => { if (typeof onHeaders === "function") onHeaders(hdrs); },
   });
-
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`HTTP ${resp.status} ${resp.statusText}\n${text}`);
-  }
-
-  if (typeof onHeaders === "function") onHeaders(resp.headers);
-
-  const ct = (resp.headers.get("content-type") || "").toLowerCase();
-
-  if (ct.includes("application/json")) {
-    const obj = await resp.json().catch(() => null);
-    const token = extractTokenFromAnyShape(obj) || JSON.stringify(obj || {});
-    if (token) onToken(token);
-    return;
-  }
-
-  if (!resp.body) throw new Error("No response body (stream missing).");
-
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-
-  let buffer = "";
-  let eventData = "";
-  let doneSeen = false;
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    buffer = buffer.replace(/\r\n/g, "\n");
-
-    let nl;
-    while ((nl = buffer.indexOf("\n")) !== -1) {
-      const line = buffer.slice(0, nl);
-      buffer = buffer.slice(nl + 1);
-
-      if (line === "") {
-        const res = processSseEventData(eventData, onToken);
-        eventData = "";
-        if (res.done) {
-          doneSeen = true;
-          break;
-        }
-        continue;
-      }
-
-      if (line.startsWith("data:")) {
-        let chunk = line.slice(5);
-        if (chunk.startsWith(" ")) chunk = chunk.slice(1);
-        eventData += (eventData ? "\n" : "") + chunk;
-      }
-    }
-
-    if (doneSeen) break;
-  }
-
-  if (!doneSeen && eventData) processSseEventData(eventData, onToken);
 }
 
 // -------------------------
-// 6) Text chat -> /api/chat (SSE)
+// 6) Text chat -> /api/chat (SSE via EnlaceRepo)
 // -------------------------
 function decideIso2ForUserText(userText) {
   if (langMode === "EN") return "en";
@@ -564,10 +376,10 @@ async function sendMessage(userText) {
       },
     };
 
-    await streamChatSse(
+    await streamChatViaEnlaceRepo(
       payload,
       (token) => {
-        botText += token;
+        botText += String(token || "");
         if (assistantEl) assistantEl.textContent = botText;
         if (elMainList && elMainList.parentElement) {
           const box = elMainList.parentElement;
@@ -606,7 +418,7 @@ async function sendMessage(userText) {
 }
 
 // -------------------------
-// 7) Voice: Hold-to-talk -> /api/voice?mode=stt -> then /api/chat
+// 7) Voice: Hold-to-talk -> voiceSTT via EnlaceRepo -> then /api/chat
 // -------------------------
 function canRecordAudio() {
   return !!(navigator.mediaDevices &&
@@ -690,82 +502,43 @@ function stopRecording() {
   }
 }
 
-async function headersForVoiceBlob(blob) {
-  const headers = {
-    "accept": "application/json",
-  };
+async function voiceSttViaEnlaceRepo(blob) {
+  const repo = getEnlaceRepoOrThrow();
+  await repo.ready();
 
-  // NEW: UI identity from ops-keys.json
-  const ident = await getUiIdentity();
-  if (ident.assetIdZuluPu) headers["x-ops-asset-id"] = ident.assetIdZuluPu;
-  if (ident.srcSha512B64) headers["x-ops-src-sha512-b64"] = ident.srcSha512B64;
+  // EnlaceRepo.voiceSTT returns:
+  // { transcript, lang_iso2, lang_bcp47, blocked, reason }
+  const res = await repo.voiceSTT(blob, {});
+  const transcript = safeTextOnly(res && res.transcript ? res.transcript : "");
 
-  const ts = getTurnstileToken();
-  if (ts) headers["cf-turnstile-response"] = ts;
-
-  if (blob && blob.type) headers["content-type"] = blob.type;
-
-  return headers;
-}
-
-function iso2FromVoiceResponse(respHeaders, bodyObj, transcriptFallback) {
-  const hIso2 = String(respHeaders.get("x-chattia-stt-iso2") || "").trim().toLowerCase();
-  if (hIso2) return hIso2;
-
-  const hLegacy = String(respHeaders.get("x-chattia-stt-lang") || "").trim().toUpperCase();
-  if (hLegacy === "ES") return "es";
-  if (hLegacy === "EN") return "en";
-
-  const bIso2 = String((bodyObj && (bodyObj.lang_iso2 || bodyObj.langIso2)) || "").trim().toLowerCase();
-  if (bIso2) return bIso2;
-
-  const bLegacy = String((bodyObj && bodyObj.lang) || "").trim().toUpperCase();
-  if (bLegacy === "ES") return "es";
-  if (bLegacy === "EN") return "en";
-
-  return detectIso2FastENES(transcriptFallback || "");
-}
-
-async function voiceStt(blob) {
-  const resp = await fetch(`${ENLACE_VOICE}?mode=stt`, {
-    method: "POST",
-    mode: "cors",
-    credentials: "omit",
-    cache: "no-store",
-    headers: await headersForVoiceBlob(blob),
-    body: blob,
-  });
-
-  if (!resp.ok) {
-    const t = await resp.text().catch(() => "");
-    throw new Error(`Voice STT failed: HTTP ${resp.status}\n${t}`);
+  if (res && res.blocked) {
+    return { transcript: "", iso2: "", blocked: true, reason: String(res.reason || "Blocked by client-side gate") };
   }
 
-  const obj = await resp.json().catch(() => null);
-
-  const transcript = safeTextOnly(
-    (obj && (obj.transcript || obj.text || obj.result?.text)) ? (obj.transcript || obj.text || obj.result?.text) : ""
-  );
-
-  const iso2 = iso2FromVoiceResponse(resp.headers, obj, transcript);
-
-  return { transcript, iso2 };
+  const iso2 = String(res && res.lang_iso2 ? res.lang_iso2 : "").trim().toLowerCase() || detectIso2FastENES(transcript);
+  return { transcript, iso2, blocked: false };
 }
 
 async function handleVoiceBlob(blob) {
   try {
     setStatus("Transcribing…", true);
 
-    const { transcript, iso2 } = await voiceStt(blob);
+    const { transcript, iso2, blocked, reason } = await voiceSttViaEnlaceRepo(blob);
+
+    if (blocked) {
+      setStatus("Blocked.", false);
+      appendLine("assistant", `Voice blocked:\n${reason || "Blocked by client-side gate."}`);
+      return;
+    }
 
     if (!transcript) {
       setStatus("No transcription produced.", false);
       return;
     }
 
-    lastSttIso2 = iso2;
+    lastSttIso2 = iso2 || "en";
 
-    if (langMode === "AUTO") sessionIso2 = iso2;
+    if (langMode === "AUTO") sessionIso2 = lastSttIso2;
     if (langMode === "EN") sessionIso2 = "en";
     if (langMode === "ES") sessionIso2 = "es";
 
@@ -880,5 +653,11 @@ setVoiceMode(false);
 setDocLangFromIso2(sessionIso2);
 showLangBadge(`Lang: ${langMode} • ${iso2ToBcp47(sessionIso2)}`);
 
-// Preload ops-keys.json (non-blocking)
-loadOpsKeys().catch(() => {});
+// Warm up EnlaceRepo (non-blocking)
+try {
+  const repo = getEnlaceRepoOrThrow();
+  repo.ready().catch(() => {});
+} catch (e) {
+  setStatus("Config error", false);
+  appendLine("assistant", `Setup error:\n${String(e?.message || e)}`);
+}
