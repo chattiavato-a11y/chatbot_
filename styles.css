@@ -216,6 +216,42 @@ body {
   outline: none;
 }
 
+.voice-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.voice-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.voice-btn:hover {
+  background: rgba(16, 163, 127, 0.12);
+  color: var(--accent);
+}
+
+.voice-btn.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(16, 163, 127, 0.35);
+}
+
+.voice-btn:disabled {
+  cursor: not-allowed;
+  color: #94a3b8;
+  background: transparent;
+  box-shadow: none;
+}
+
 .send-btn {
   border: none;
   border-radius: 12px;
@@ -241,6 +277,29 @@ body {
 .footer-hint {
   font-size: 0.75rem;
   color: var(--muted);
+}
+
+.compliance-panel {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  display: grid;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.compliance-panel strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.compliance-panel ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
 }
 
 @media (max-width: 640px) {
