@@ -4,6 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Chattia</title>
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; frame-ancestors 'none'; upgrade-insecure-requests"
+  />
+  <meta http-equiv="Access-Control-Allow-Origin" content="https://chattia.ai" />
+  <meta http-equiv="Access-Control-Allow-Methods" content="GET, POST, OPTIONS" />
+  <meta http-equiv="Access-Control-Allow-Headers" content="Content-Type, Authorization" />
+  <meta name="description" content="Chattia delivers secure, human-centered concierge chat experiences with compliance-first design, fast performance, and AI-ready guidance." />
+  <meta name="robots" content="index, follow" />
+  <meta name="theme-color" content="#10a37f" />
+  <link rel="canonical" href="https://chattia.ai/" />
+  <meta property="og:title" content="Chattia — Secure Concierge Chat UI" />
+  <meta property="og:description" content="A compliance-first chat interface optimized for Core Web Vitals, security headers, and SEO-ready metadata." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://chattia.ai/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Chattia — Secure Concierge Chat UI" />
+  <meta name="twitter:description" content="A compliant, performance-ready chat UI with CSP, CORS, and Core Web Vitals targets." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -240,6 +258,29 @@
       color: var(--muted);
     }
 
+    .compliance-panel {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: #f8fafc;
+      display: grid;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .compliance-panel strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .compliance-panel ul {
+      margin: 6px 0 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 4px;
+    }
+
     @media (max-width: 640px) {
       body {
         padding: 16px 12px;
@@ -320,6 +361,15 @@
       </form>
       <div class="footer-hint">
         Chattia can provide secure, compliant guidance. Responses are simulated for this demo UI.
+      </div>
+      <div class="compliance-panel" aria-label="Security, performance, and SEO expectations">
+        <div><strong>Security headers:</strong> CSP allows self + Google Fonts; CORS allows https://chattia.ai only.</div>
+        <div><strong>Performance targets:</strong></div>
+        <ul>
+          <li>Mobile: FCP &lt; 1.8s, LCP &lt; 2.5s</li>
+          <li>Desktop: FCP &lt; 1.0s, LCP &lt; 1.8s</li>
+        </ul>
+        <div><strong>SEO readiness:</strong> canonical URL, Open Graph, and Twitter metadata configured.</div>
       </div>
     </footer>
   </main>
