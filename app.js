@@ -4,14 +4,20 @@ const sendBtn = document.getElementById("send-btn");
 const chatLog = document.getElementById("chat-log");
 const voiceBtn = document.getElementById("voice-btn");
 
-const workerEndpoint = "https://enlace.grabem-holdem-nuts-right.workers.dev";
-const allowedOrigins = [
-  "https://chattiavato-a11y.github.io",
-  "https://chattia.io",
-  "https://www.chattia.io",
-  "https://opsonlinesupport.com",
-  "https://www.opsonlinesupport.com",
-];
+const configUrl = "worker.config.json";
+const defaultConfig = {
+  workerEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev",
+  allowedOrigins: [
+    "https://chattiavato-a11y.github.io",
+    "https://chattia.io",
+    "https://www.chattia.io",
+    "https://opsonlinesupport.com",
+    "https://www.opsonlinesupport.com",
+  ],
+  requiredHeaders: ["Content-Type", "Accept"],
+};
+let workerEndpoint = defaultConfig.workerEndpoint;
+let allowedOrigins = [...defaultConfig.allowedOrigins];
 
 const updateSendState = () => {
   sendBtn.disabled = input.value.trim().length === 0;
@@ -110,6 +116,23 @@ const notifyWorker = async () => {
   }).catch(() => null);
 };
 
+const loadRegistryConfig = async () => {
+  if (!window.fetch) return;
+  try {
+    const response = await fetch(configUrl, { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (data.workerEndpoint) {
+      workerEndpoint = data.workerEndpoint;
+    }
+    if (Array.isArray(data.allowedOrigins) && data.allowedOrigins.length > 0) {
+      allowedOrigins = data.allowedOrigins;
+    }
+  } catch (error) {
+    console.warn("Unable to load worker registry config.", error);
+  }
+};
+
 const buildMessages = (message) => [
   {
     role: "user",
@@ -194,5 +217,10 @@ form.addEventListener("submit", (event) => {
     });
 });
 
-updateSendState();
-notifyWorker();
+const init = async () => {
+  await loadRegistryConfig();
+  updateSendState();
+  notifyWorker();
+};
+
+init();
