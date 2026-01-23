@@ -5,21 +5,25 @@ const chatLog = document.getElementById("chat-log");
 const voiceBtn = document.getElementById("voice-btn");
 
 const configUrl = "worker.config.json";
-const defaultConfig = {
-  workerEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev",
-  allowedOrigins: [
-    "https://chattiavato-a11y.github.io",
-    "https://www.chattia.io",
-    "https://chattia.io",
-  ],
-  requiredHeaders: ["Content-Type", "Accept"],
-};
-let workerEndpoint = defaultConfig.workerEndpoint;
-let allowedOrigins = [...defaultConfig.allowedOrigins];
-let requiredHeaders = [...defaultConfig.requiredHeaders];
+let workerEndpoint = "";
+let allowedOrigins = [];
+let requiredHeaders = [];
+let isStreaming = false;
+let activeController = null;
+let activeAssistantBubble = null;
 
 const isOriginAllowed = (origin, allowedList) =>
   allowedList.some((allowedOrigin) => allowedOrigin === origin);
+
+const originStatus = document.getElementById("origin-status");
+const endpointStatus = document.getElementById("endpoint-status");
+const cancelBtn = document.getElementById("cancel-btn");
+
+const setStatusLine = (element, text, isWarning = false) => {
+  if (!element) return;
+  element.textContent = text;
+  element.classList.toggle("warning", isWarning);
+};
 
 const getRequestHeaders = () => {
   const headers = {
@@ -39,7 +43,7 @@ const getRequestHeaders = () => {
 };
 
 const updateSendState = () => {
-  sendBtn.disabled = input.value.trim().length === 0;
+  sendBtn.disabled = isStreaming || input.value.trim().length === 0;
 };
 
 input.addEventListener("input", updateSendState);
@@ -78,13 +82,19 @@ const addMessage = (text, isUser) => {
 
 const recognitionEngine = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition;
-let isListening = false;
+let isVoiceActive = false;
+let mediaRecorder;
+let recordingChunks = [];
+let recordingTimeout;
 
 const setVoiceState = (active) => {
-  isListening = active;
+  isVoiceActive = active;
   voiceBtn.classList.toggle("active", active);
   voiceBtn.setAttribute("aria-pressed", String(active));
-  voiceBtn.setAttribute("aria-label", active ? "Stop voice input" : "Start voice input");
+  voiceBtn.setAttribute(
+    "aria-label",
+    active ? "Stop voice input" : "Start voice input"
+  );
 };
 
 if (recognitionEngine) {
@@ -112,27 +122,146 @@ if (recognitionEngine) {
       updateSendState();
     }
   });
-} else {
-  voiceBtn.disabled = true;
-  voiceBtn.setAttribute("aria-label", "Voice input not supported");
+
+  recognition.addEventListener("error", (event) => {
+    console.warn("Speech recognition error, switching to voice fallback.", event);
+    setVoiceState(false);
+    startVoiceFallback();
+  });
 }
 
-voiceBtn.addEventListener("click", () => {
-  if (!recognition) return;
-  if (isListening) {
-    recognition.stop();
+const resetRecording = () => {
+  recordingChunks = [];
+  if (recordingTimeout) {
+    clearTimeout(recordingTimeout);
+    recordingTimeout = null;
+  }
+};
+
+const startVoiceFallback = async () => {
+  if (isVoiceActive) {
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+      mediaRecorder.stop();
+    }
     return;
   }
-  recognition.start();
+
+  if (!workerEndpoint) {
+    console.warn("Voice fallback requires a configured worker endpoint.");
+    return;
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    console.warn("Media devices not available for voice fallback.");
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    resetRecording();
+    setVoiceState(true);
+
+    mediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size > 0) {
+        recordingChunks.push(event.data);
+      }
+    });
+
+    mediaRecorder.addEventListener("stop", async () => {
+      setVoiceState(false);
+      stream.getTracks().forEach((track) => track.stop());
+      const audioBlob = new Blob(recordingChunks, {
+        type: mediaRecorder.mimeType || "audio/webm",
+      });
+      resetRecording();
+      if (!audioBlob.size) return;
+
+      try {
+        const response = await fetch(`${workerEndpoint}/api/voice?mode=stt`, {
+          method: "POST",
+          mode: "cors",
+          cache: "no-store",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": audioBlob.type,
+          },
+          body: audioBlob,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Voice transcription failed.");
+        }
+
+        const payload = await response.json();
+        const transcript =
+          payload.transcript || payload.text || payload.message || "";
+        if (transcript) {
+          input.value = transcript.trim();
+          updateSendState();
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    });
+
+    mediaRecorder.start();
+    recordingTimeout = setTimeout(() => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+      }
+    }, 5000);
+  } catch (error) {
+    console.error("Unable to start voice fallback.", error);
+    setVoiceState(false);
+  }
+};
+
+voiceBtn.addEventListener("click", () => {
+  if (recognition) {
+    if (isVoiceActive) {
+      recognition.stop();
+      return;
+    }
+    recognition.start();
+    return;
+  }
+
+  startVoiceFallback();
 });
 
+const setStreamingState = (active) => {
+  isStreaming = active;
+  updateSendState();
+  if (cancelBtn) {
+    cancelBtn.disabled = !active;
+    cancelBtn.classList.toggle("active", active);
+  }
+};
+
+const cancelStream = () => {
+  if (!activeController) return;
+  activeController.abort();
+  activeController = null;
+  setStreamingState(false);
+  if (activeAssistantBubble) {
+    activeAssistantBubble.textContent = activeAssistantBubble.textContent
+      ? `${activeAssistantBubble.textContent}\n\nRequest canceled.`
+      : "Request canceled.";
+    activeAssistantBubble = null;
+  }
+};
+
+cancelBtn?.addEventListener("click", cancelStream);
+
 const notifyWorker = async () => {
-  if (!window.fetch) return;
-  if (!isOriginAllowed(window.location.origin, allowedOrigins)) return;
+  if (!window.fetch || !workerEndpoint) return;
 
   await fetch(`${workerEndpoint}/health`, {
     method: "GET",
     mode: "cors",
+    cache: "no-store",
   }).catch(() => null);
 };
 
@@ -191,16 +320,60 @@ const streamWorkerResponse = async (response, bubble) => {
         .filter((line) => line.startsWith("data:"))
         .map((line) => line.replace(/^data:\s?/, ""));
       const data = dataLines.join("\n").trim();
-      if (!data || data === "[DONE]") return;
-      appendText(data);
+      if (data && data !== "[DONE]") {
+        appendText(data);
+      }
     });
   }
 };
 
-form.addEventListener("submit", (event) => {
+const readWorkerError = async (response) => {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    try {
+      const payload = await response.json();
+      if (payload?.error) {
+        return payload.detail
+          ? `${payload.error}: ${payload.detail}`
+          : payload.error;
+      }
+      return JSON.stringify(payload);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  return response.text();
+};
+
+const warnIfOriginMissing = () => {
+  const originAllowed = isOriginAllowed(window.location.origin, allowedOrigins);
+  if (!originAllowed) {
+    console.warn(
+      `Origin ${window.location.origin} is not listed in worker.config.json.`
+    );
+  }
+  setStatusLine(
+    originStatus,
+    originAllowed
+      ? `Origin: ${window.location.origin}`
+      : `Origin: ${window.location.origin} (not listed)`,
+    !originAllowed
+  );
+};
+
+const updateEndpointStatus = () => {
+  const isConfigured = Boolean(workerEndpoint);
+  setStatusLine(
+    endpointStatus,
+    isConfigured ? `Endpoint: ${workerEndpoint}` : "Endpoint: not configured",
+    !isConfigured
+  );
+};
+
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const message = input.value.trim();
-  if (!message) return;
+  if (!message || isStreaming) return;
 
   addMessage(message, true);
   input.value = "";
@@ -209,42 +382,63 @@ form.addEventListener("submit", (event) => {
 
   const assistantBubble = addMessage("Thinking…", false);
   assistantBubble.textContent = "";
+  activeAssistantBubble = assistantBubble;
 
-  if (!isOriginAllowed(window.location.origin, allowedOrigins)) {
+  if (!workerEndpoint) {
     assistantBubble.textContent =
-      "This origin is not authorized to reach the secure assistant endpoint.";
+      "The assistant endpoint is not configured. Please check worker.config.json.";
     return;
   }
 
-  fetch(`${workerEndpoint}/api/chat`, {
-    method: "POST",
-    headers: getRequestHeaders(),
-    body: JSON.stringify({
-      messages: buildMessages(message),
-      meta: {
-        source: "chattia-ui",
-        currentUrl: window.location.href,
-        allowedOrigins,
-      },
-    }),
-  })
-    .then((response) => {
-      if (!response.ok) {
-        return response.text().then((text) => {
-          throw new Error(text || `Request failed (${response.status})`);
-        });
-      }
-      return streamWorkerResponse(response, assistantBubble);
-    })
-    .catch((error) => {
-      assistantBubble.textContent =
-        "We couldn't reach the secure assistant. Please try again shortly.";
-      console.error(error);
+  warnIfOriginMissing();
+  setStreamingState(true);
+  const controller = new AbortController();
+  activeController = controller;
+
+  try {
+    const response = await fetch(`${workerEndpoint}/api/chat`, {
+      method: "POST",
+      mode: "cors",
+      cache: "no-store",
+      headers: getRequestHeaders(),
+      body: JSON.stringify({
+        messages: buildMessages(message),
+        meta: {
+          source: "chattia-ui",
+          currentUrl: window.location.href,
+          allowedOrigins,
+        },
+      }),
+      signal: controller.signal,
     });
+
+    if (!response.ok) {
+      const errorText = await readWorkerError(response);
+      assistantBubble.textContent =
+        errorText || `Request failed (${response.status}).`;
+      return;
+    }
+
+    await streamWorkerResponse(response, assistantBubble);
+  } catch (error) {
+    if (error.name === "AbortError") {
+      return;
+    }
+    assistantBubble.textContent =
+      error?.message ||
+      "We couldn't reach the secure assistant. Please try again shortly.";
+    console.error(error);
+  } finally {
+    activeController = null;
+    activeAssistantBubble = null;
+    setStreamingState(false);
+  }
 });
 
 const init = async () => {
   await loadRegistryConfig();
+  warnIfOriginMissing();
+  updateEndpointStatus();
   updateSendState();
   notifyWorker();
 };

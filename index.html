@@ -43,6 +43,12 @@
           <div class="status-pill brand-status"><span></span>Online Light</div>
         </div>
       </div>
+      <div class="header-actions" aria-live="polite">
+        <div class="status-stack">
+          <span id="origin-status" class="status-line">Origin: loading…</span>
+          <span id="endpoint-status" class="status-line">Endpoint: loading…</span>
+        </div>
+      </div>
     </header>
 
     <section class="chat-body" id="chat-log" aria-live="polite">
@@ -92,6 +98,7 @@
             />
           </svg>
         </button>
+        <button class="cancel-btn" type="button" id="cancel-btn" disabled>Cancel</button>
         <button class="send-btn" type="submit" id="send-btn" disabled>Send</button>
       </form>
     </footer>
