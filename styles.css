@@ -106,6 +106,21 @@ body {
   color: var(--muted);
 }
 
+.status-stack {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.status-line {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.status-line.warning {
+  color: var(--edge-red);
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -266,6 +281,30 @@ body {
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 8px 18px rgba(124, 58, 237, 0.24);
+}
+
+.cancel-btn {
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--text);
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border 0.2s ease, color 0.2s ease;
+}
+
+.cancel-btn.active {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #b91c1c;
+}
+
+.cancel-btn:disabled {
+  cursor: not-allowed;
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.4);
+  background: #f8fafc;
 }
 
 .send-btn:disabled {
