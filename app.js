@@ -9,10 +9,8 @@ const defaultConfig = {
   workerEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev",
   allowedOrigins: [
     "https://chattiavato-a11y.github.io",
-    "https://chattia.io",
     "https://www.chattia.io",
-    "https://opsonlinesupport.com",
-    "https://www.opsonlinesupport.com",
+    "https://chattia.io",
   ],
   requiredHeaders: ["Content-Type", "Accept"],
 };
