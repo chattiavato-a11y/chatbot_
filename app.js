@@ -49,8 +49,21 @@ const deriveWorkerEndpoint = (assistantEndpoint) => {
   return "";
 };
 
-const isOriginAllowed = (origin, allowedList) =>
-  allowedList.some((allowedOrigin) => allowedOrigin === origin);
+const normalizeOrigin = (value) => {
+  if (!value) return "";
+  try {
+    return new URL(String(value), window.location.origin).origin.toLowerCase();
+  } catch (error) {
+    return String(value).trim().replace(/\/$/, "").toLowerCase();
+  }
+};
+
+const isOriginAllowed = (origin, allowedList) => {
+  const normalizedOrigin = normalizeOrigin(origin);
+  return allowedList.some(
+    (allowedOrigin) => normalizeOrigin(allowedOrigin) === normalizedOrigin
+  );
+};
 
 const originStatus = document.getElementById("origin-status");
 const endpointStatus = document.getElementById("endpoint-status");

@@ -15,23 +15,41 @@
     ],
   };
 
-  const CONFIG_URL = "worker_files/worker.config.json";
+  const resolveConfigUrl = () => {
+    const scriptUrl = document.currentScript?.src;
+    if (scriptUrl) {
+      return new URL("worker.config.json", scriptUrl).toString();
+    }
+    return new URL("worker_files/worker.config.json", window.location.href).toString();
+  };
+
+  const CONFIG_URL = resolveConfigUrl();
   let config = { ...DEFAULT_CONFIG };
   let originToAssetId = new Map();
   let configPromise = null;
+
+  const normalizeOrigin = (value) => {
+    if (!value) return "";
+    try {
+      return new URL(String(value), window.location.origin).origin.toLowerCase();
+    } catch (error) {
+      return String(value).trim().replace(/\/$/, "").toLowerCase();
+    }
+  };
 
   const rebuildOriginMap = () => {
     originToAssetId = new Map();
     config.allowedOrigins.forEach((origin, index) => {
       const assetId = config.allowedOriginAssetIds[index] || "";
-      if (origin && assetId) {
-        originToAssetId.set(origin, assetId);
+      const normalizedOrigin = normalizeOrigin(origin);
+      if (normalizedOrigin && assetId) {
+        originToAssetId.set(normalizedOrigin, assetId);
       }
     });
   };
 
   const getAssetIdForOrigin = (origin = window.location.origin) =>
-    originToAssetId.get(origin) || "";
+    originToAssetId.get(normalizeOrigin(origin)) || "";
 
   const loadAssetRegistry = async (registryUrl) => {
     const response = await fetch(registryUrl, { cache: "no-store" });
