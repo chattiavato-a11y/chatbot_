@@ -73,6 +73,12 @@ body {
   gap: 12px;
 }
 
+.brand-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .brand-mark {
   width: 36px;
   height: 36px;
