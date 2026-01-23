@@ -6,17 +6,17 @@
   "display_name": "Chattia Worker Client Config",
   "classification": "public",
   "source": {
-    "origin_url": "https://chattia.io/worker.config.json",
+    "origin_url": "https://chattia.io/worker_files/worker.config.json",
     "repository": "chatbot_",
-    "path": "worker.config.json",
+    "path": "worker_files/worker.config.json",
     "version": "v1"
   },
   "integrity": {
     "sha512": "4193d692f78b7cecb75924901bd92e1147418d429f7bb50fc2895528709d46ecf5fa2ea09705b41183cf3a4112fe01980a101d0b8c242ea0375c2b6536e877b5"
   },
   "serving": {
-    "primary_url": "https://chattia.io/worker.config.json",
-    "fallback_url": "https://chattiavato-a11y.github.io/chatbot_/worker.config.json",
+    "primary_url": "https://chattia.io/worker_files/worker.config.json",
+    "fallback_url": "https://chattiavato-a11y.github.io/chatbot_/worker_files/worker.config.json",
     "cache_ttl_seconds": 300
   },
   "policy": {

@@ -1,5 +1,5 @@
 {
-  "assetRegistry": "worker.assets.json",
+  "assetRegistry": "worker_files/worker.assets.json",
   "workerEndpointAssetId": "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
   "gatewayEndpointAssetId": "asset_01J7Y2D4XABCD3EFGHJKMNPRTE",
   "allowedOriginAssetIds": [

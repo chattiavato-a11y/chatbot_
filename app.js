@@ -5,8 +5,8 @@ const chatLog = document.getElementById("chat-log");
 const voiceBtn = document.getElementById("voice-btn");
 const voiceHelper = document.getElementById("voice-helper");
 
-const configUrl = "worker.config.json";
-const defaultAssetRegistryUrl = "worker.assets.json";
+const configUrl = "worker_files/worker.config.json";
+const defaultAssetRegistryUrl = "worker_files/worker.assets.json";
 let workerEndpoint = "";
 let gatewayEndpoint = "";
 let allowedOrigins = [];
@@ -440,7 +440,7 @@ const warnIfOriginMissing = () => {
   const originAllowed = isOriginAllowed(window.location.origin, allowedOrigins);
   if (!originAllowed) {
     console.warn(
-      `Origin ${window.location.origin} is not listed in worker.config.json.`
+      `Origin ${window.location.origin} is not listed in worker_files/worker.config.json.`
     );
   }
   setStatusLine(
@@ -480,7 +480,7 @@ form.addEventListener("submit", async (event) => {
   const endpoint = getActiveEndpoint();
   if (!endpoint) {
     assistantBubble.textContent =
-      "The assistant endpoint is not configured. Please check worker.config.json.";
+      "The assistant endpoint is not configured. Please check worker_files/worker.config.json.";
     stopThinking();
     return;
   }
