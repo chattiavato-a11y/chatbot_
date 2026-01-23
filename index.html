@@ -313,7 +313,7 @@
         <div class="brand-mark">CH</div>
         <div>
           <h1>Chattia</h1>
-          <p>Concierge chat experience</p>
+          <p>Online</p>
         </div>
       </div>
       <div class="header-actions">
@@ -377,65 +377,6 @@
     </footer>
   </main>
 
-  <script>
-    const form = document.getElementById("chat-form");
-    const input = document.getElementById("chat-input");
-    const sendBtn = document.getElementById("send-btn");
-    const chatLog = document.getElementById("chat-log");
-
-    const updateSendState = () => {
-      sendBtn.disabled = input.value.trim().length === 0;
-    };
-
-    input.addEventListener("input", updateSendState);
-    input.addEventListener("focus", () => {
-      chatLog.scrollTop = chatLog.scrollHeight;
-    });
-
-    const addMessage = (text, isUser) => {
-      const row = document.createElement("div");
-      row.className = `message-row${isUser ? " user" : ""}`;
-
-      if (!isUser) {
-        const avatar = document.createElement("div");
-        avatar.className = "avatar assistant";
-        avatar.textContent = "AI";
-        row.appendChild(avatar);
-      }
-
-      const content = document.createElement("div");
-      const bubble = document.createElement("div");
-      bubble.className = `bubble ${isUser ? "user" : "assistant"}`;
-      bubble.textContent = text;
-
-      const meta = document.createElement("div");
-      meta.className = "meta";
-      meta.textContent = isUser ? "You · just now" : "Chattia · just now";
-
-      content.appendChild(bubble);
-      content.appendChild(meta);
-
-      row.appendChild(content);
-      chatLog.appendChild(row);
-      chatLog.scrollTop = chatLog.scrollHeight;
-    };
-
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const message = input.value.trim();
-      if (!message) return;
-
-      addMessage(message, true);
-      input.value = "";
-      updateSendState();
-      input.blur();
-
-      setTimeout(() => {
-        addMessage("Thanks! A specialist reply would appear here in production.", false);
-      }, 500);
-    });
-
-    updateSendState();
-  </script>
+  <script src="app.js"></script>
 </body>
 </html>
