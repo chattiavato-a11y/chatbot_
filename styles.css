@@ -219,12 +219,13 @@ body {
 .send-btn {
   border: none;
   border-radius: 12px;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--edge-purple), var(--edge-red), var(--edge-fuchsia));
   color: #fff;
   padding: 10px 16px;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 8px 18px rgba(124, 58, 237, 0.24);
 }
 
 .send-btn:disabled {
@@ -235,7 +236,7 @@ body {
 
 .send-btn:not(:disabled):hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(16, 163, 127, 0.25);
+  box-shadow: 0 12px 24px rgba(239, 68, 68, 0.28);
 }
 
 .footer-hint {
