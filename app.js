@@ -4,7 +4,7 @@ const sendBtn = document.getElementById("send-btn");
 const chatLog = document.getElementById("chat-log");
 const voiceBtn = document.getElementById("voice-btn");
 
-const workerEndpoint = "https://enlace.grabem-holdem-nuts-right.workers.dev/";
+const workerEndpoint = "https://enlace.grabem-holdem-nuts-right.workers.dev";
 const allowedOrigins = [
   "https://chattiavato-a11y.github.io",
   "https://chattia.io",
@@ -48,6 +48,7 @@ const addMessage = (text, isUser) => {
   row.appendChild(content);
   chatLog.appendChild(row);
   chatLog.scrollTop = chatLog.scrollHeight;
+  return bubble;
 };
 
 const recognitionEngine = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -103,21 +104,51 @@ voiceBtn.addEventListener("click", () => {
 const notifyWorker = async () => {
   if (!window.fetch) return;
 
-  const payload = {
-    source: "chattia-ui",
-    timestamp: new Date().toISOString(),
-    currentUrl: window.location.href,
-    allowedOrigins,
+  await fetch(`${workerEndpoint}/health`, {
+    method: "GET",
+    mode: "cors",
+  }).catch(() => null);
+};
+
+const buildMessages = (message) => [
+  {
+    role: "user",
+    content: message,
+  },
+];
+
+const streamWorkerResponse = async (response, bubble) => {
+  if (!response.body) {
+    bubble.textContent = "We couldn't connect to the assistant stream.";
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const appendText = (text) => {
+    bubble.textContent += text;
+    chatLog.scrollTop = chatLog.scrollHeight;
   };
 
-  await fetch(workerEndpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-    keepalive: true,
-  });
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() || "";
+    parts.forEach((part) => {
+      const lines = part.split("\n");
+      const dataLines = lines
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.replace(/^data:\s?/, ""));
+      const data = dataLines.join("\n").trim();
+      if (!data || data === "[DONE]") return;
+      appendText(data);
+    });
+  }
 };
 
 form.addEventListener("submit", (event) => {
@@ -130,9 +161,37 @@ form.addEventListener("submit", (event) => {
   updateSendState();
   input.blur();
 
-  setTimeout(() => {
-    addMessage("Thanks! A specialist reply would appear here in production.", false);
-  }, 500);
+  const assistantBubble = addMessage("Thinking…", false);
+  assistantBubble.textContent = "";
+
+  fetch(`${workerEndpoint}/api/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify({
+      messages: buildMessages(message),
+      meta: {
+        source: "chattia-ui",
+        currentUrl: window.location.href,
+        allowedOrigins,
+      },
+    }),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        return response.text().then((text) => {
+          throw new Error(text || `Request failed (${response.status})`);
+        });
+      }
+      return streamWorkerResponse(response, assistantBubble);
+    })
+    .catch((error) => {
+      assistantBubble.textContent =
+        "We couldn't reach the secure assistant. Please try again shortly.";
+      console.error(error);
+    });
 });
 
 updateSendState();
