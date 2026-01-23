@@ -3,6 +3,7 @@ const input = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
 const chatLog = document.getElementById("chat-log");
 const voiceBtn = document.getElementById("voice-btn");
+const voiceHelper = document.getElementById("voice-helper");
 
 const configUrl = "worker.config.json";
 let workerEndpoint = "";
@@ -122,12 +123,13 @@ if (recognitionEngine) {
       updateSendState();
     }
   });
-
-  recognition.addEventListener("error", (event) => {
-    console.warn("Speech recognition error, switching to voice fallback.", event);
-    setVoiceState(false);
-    startVoiceFallback();
-  });
+} else {
+  voiceBtn.disabled = true;
+  voiceBtn.setAttribute("aria-label", "Voice input not supported");
+  if (voiceHelper) {
+    voiceHelper.textContent =
+      "Voice input is unavailable in this browser. Use the message box to continue.";
+  }
 }
 
 const resetRecording = () => {
@@ -302,7 +304,12 @@ const streamWorkerResponse = async (response, bubble) => {
   const decoder = new TextDecoder();
   let buffer = "";
 
+  let hasChunk = false;
   const appendText = (text) => {
+    if (!hasChunk) {
+      bubble.textContent = "";
+      hasChunk = true;
+    }
     bubble.textContent += text;
     chatLog.scrollTop = chatLog.scrollHeight;
   };
@@ -381,8 +388,6 @@ form.addEventListener("submit", async (event) => {
   input.blur();
 
   const assistantBubble = addMessage("Thinking…", false);
-  assistantBubble.textContent = "";
-  activeAssistantBubble = assistantBubble;
 
   if (!workerEndpoint) {
     assistantBubble.textContent =

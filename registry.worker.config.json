@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chattia.ai/registry/worker-config.json",
+  "$id": "https://chattia.io/registry/worker-config.json",
   "asset_id": "asset_01J7Y2D4XABCD3EFGHJKMNPQRS",
   "asset_type": "config",
   "display_name": "Chattia Worker Client Config",
   "classification": "public",
   "source": {
-    "origin_url": "https://chattia.ai/worker.config.json",
+    "origin_url": "https://chattia.io/worker.config.json",
     "repository": "chatbot_",
     "path": "worker.config.json",
     "version": "v1"
@@ -15,7 +15,7 @@
     "sha512": "d5d36bf9dec133a252469ad2eb7c3125deb56907385b68ab01f2b9677c3ad4e9df93d2464d27695172e1913ce8c542138b2b2f818dff1e515a5adb0817880859"
   },
   "serving": {
-    "primary_url": "https://chattia.ai/worker.config.json",
+    "primary_url": "https://chattia.io/worker.config.json",
     "fallback_url": "https://chattiavato-a11y.github.io/chatbot_/worker.config.json",
     "cache_ttl_seconds": 300
   },
@@ -30,12 +30,17 @@
   },
   "audit": {
     "created_at": "2025-02-14T00:00:00Z",
-    "updated_at": "2025-02-14T00:00:00Z",
+    "updated_at": "2026-01-23T18:50:54Z",
     "change_log": [
       {
         "by": "automation",
         "action": "initial registry record for worker client config",
         "when": "2025-02-14T00:00:00Z"
+      },
+      {
+        "by": "automation",
+        "action": "remove non-.io origins and align registry urls",
+        "when": "2026-01-23T18:50:54Z"
       }
     ]
   }
