@@ -31,7 +31,7 @@
 
     body {
       margin: 0;
-      min-height: 100vh;
+      height: 100vh;
       font-family: "Inter", system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
@@ -39,6 +39,7 @@
       align-items: stretch;
       justify-content: center;
       padding: 32px 16px;
+      overflow: hidden;
     }
 
     .chat-app {
@@ -50,7 +51,7 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      min-height: 78vh;
+      height: 100%;
     }
 
     .chat-header {
@@ -126,6 +127,8 @@
       flex-direction: column;
       gap: 22px;
       overflow-y: auto;
+      overscroll-behavior: contain;
+      scroll-behavior: smooth;
     }
 
     .message-row {
@@ -184,7 +187,7 @@
 
     .chat-footer {
       border-top: 1px solid var(--border);
-      padding: 18px 24px 24px;
+      padding: 18px 24px calc(24px + env(safe-area-inset-bottom));
       background: #ffffff;
       display: grid;
       gap: 10px;
@@ -246,7 +249,7 @@
       }
 
       .chat-app {
-        min-height: 85vh;
+        height: 100%;
       }
 
       .chat-header,
@@ -335,6 +338,9 @@
     };
 
     input.addEventListener("input", updateSendState);
+    input.addEventListener("focus", () => {
+      chatLog.scrollTop = chatLog.scrollHeight;
+    });
 
     const addMessage = (text, isUser) => {
       const row = document.createElement("div");
@@ -372,6 +378,7 @@
       addMessage(message, true);
       input.value = "";
       updateSendState();
+      input.blur();
 
       setTimeout(() => {
         addMessage("Thanks! A specialist reply would appear here in production.", false);
