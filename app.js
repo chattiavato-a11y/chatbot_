@@ -44,7 +44,6 @@ const isOriginAllowed = (origin, allowedList) =>
 const originStatus = document.getElementById("origin-status");
 const endpointStatus = document.getElementById("endpoint-status");
 const thinkingStatus = document.getElementById("thinking-status");
-const cancelBtn = document.getElementById("cancel-btn");
 const thinkingFrames = ["Thinking.", "Thinking..", "Thinking...", "Thinking...."];
 let thinkingInterval = null;
 let thinkingIndex = 0;
@@ -545,26 +544,7 @@ function tryAutoSend(transcript) {
 const setStreamingState = (active) => {
   isStreaming = active;
   updateSendState();
-  if (cancelBtn) {
-    cancelBtn.disabled = !active;
-    cancelBtn.classList.toggle("active", active);
-  }
 };
-
-const cancelStream = () => {
-  if (!activeController) return;
-  activeController.abort();
-  activeController = null;
-  setStreamingState(false);
-  if (activeAssistantBubble) {
-    activeAssistantBubble.textContent = activeAssistantBubble.textContent
-      ? `${activeAssistantBubble.textContent}\n\nRequest canceled.`
-      : "Request canceled.";
-    activeAssistantBubble = null;
-  }
-};
-
-cancelBtn?.addEventListener("click", cancelStream);
 
 const notifyWorker = async () => {
   const endpoint = getActiveEndpoint();
