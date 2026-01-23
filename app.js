@@ -23,17 +23,11 @@ const defaultConfig = {
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
   ],
 
-  requiredHeaders: ["Content-Type", "Accept"],
 };
 
-const configUrl = "worker_files/worker.config.json";
-const defaultAssetRegistryUrl = defaultConfig.assetRegistry;
 let workerEndpoint = defaultConfig.workerEndpoint;
 let gatewayEndpoint = defaultConfig.gatewayEndpoint;
 let allowedOrigins = [...defaultConfig.allowedOrigins];
-let allowedOriginAssetIds = [...defaultConfig.allowedOriginAssetIds];
-let requiredHeaders = [...defaultConfig.requiredHeaders];
-let originToAssetId = new Map();
 let isStreaming = false;
 let activeController = null;
 let activeAssistantBubble = null;
@@ -44,6 +38,8 @@ const isOriginAllowed = (origin, allowedList) =>
 const originStatus = document.getElementById("origin-status");
 const endpointStatus = document.getElementById("endpoint-status");
 const thinkingStatus = document.getElementById("thinking-status");
+const responseMeta = document.getElementById("response-meta");
+const voiceHelper = document.getElementById("voice-helper");
 const cancelBtn = document.getElementById("cancel-btn");
 const thinkingFrames = ["Thinking.", "Thinking..", "Thinking...", "Thinking...."];
 let thinkingInterval = null;
@@ -56,49 +52,28 @@ const setStatusLine = (element, text, isWarning = false) => {
   element.classList.toggle("warning", isWarning);
 };
 
-const rebuildOriginMap = () => {
-  originToAssetId = new Map();
-  for (let i = 0; i < allowedOrigins.length; i++) {
-    const origin = allowedOrigins[i];
-    const assetId = allowedOriginAssetIds[i] || "";
-    if (origin && assetId) {
-      originToAssetId.set(origin, assetId);
-    }
-  }
+const buildResponseMeta = (headers) => {
+  if (!headers) return "";
+  const values = [
+    { key: "x-chattia-lang-iso2", label: "lang" },
+    { key: "x-chattia-model", label: "model" },
+    { key: "x-chattia-stt-iso2", label: "stt" },
+    { key: "x-chattia-voice-timeout-sec", label: "voice timeout" },
+    { key: "x-chattia-tts-iso2", label: "tts" },
+  ];
+  const items = values
+    .map(({ key, label }) => {
+      const value = headers.get(key);
+      return value ? `${label}: ${value}` : "";
+    })
+    .filter(Boolean);
+  return items.join(" · ");
 };
 
-const getAssetIdForThisOrigin = () => {
-  const origin = window.location.origin;
-  return originToAssetId.get(origin) || "";
+const setResponseMeta = (headers, element) => {
+  if (!element) return;
+  element.textContent = buildResponseMeta(headers);
 };
-
-const getRequestHeaders = () => {
-  const assetId = getAssetIdForThisOrigin();
-
-  if (!assetId) {
-    throw new Error(
-      `Origin not registered: ${window.location.origin}. Add it to worker.config.json allowedOrigins + allowedOriginAssetIds.`
-    );
-  }
-
-  const headers = {
-    "Content-Type": "application/json",
-    Accept: "text/event-stream",
-    "x-ops-asset-id": assetId,
-  };
-
-  if (requiredHeaders.length > 0) {
-    requiredHeaders.forEach((header) => {
-      if (!headers[header]) {
-        console.warn(`Missing required header: ${header}`);
-      }
-    });
-  }
-
-  return headers;
-};
-
-rebuildOriginMap();
 
 const updateSendState = () => {
   sendBtn.disabled = isStreaming || input.value.trim().length === 0;
@@ -188,9 +163,6 @@ const addMessage = (text, isUser) => {
 // -------------------------
 // 0) CONFIG
 // -------------------------
-
-const ENLACE_VOICE_STT =
-  "https://enlace.grabem-holdem-nuts-right.workers.dev/api/voice?mode=stt";
 
 // If you want it to auto-send after STT result:
 // - set to true if you already have window.sendMessageFromUI(text) OR a button click handler below
@@ -333,16 +305,10 @@ function pickInputEl() {
 }
 
 async function postBinarySTT(blob) {
-  const res = await fetch(ENLACE_VOICE_STT, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      // content-type will be set by browser for Blob body in most cases,
-      // but we can set it explicitly to the recorder mime:
-      "content-type": blob.type || "audio/webm",
-    },
-    body: blob,
-  });
+  if (!window.EnlaceRepo?.postVoiceSTT) {
+    throw new Error("Enlace repo module is not loaded.");
+  }
+  const res = await window.EnlaceRepo.postVoiceSTT(blob);
 
   const text = await res.text().catch(() => "");
   let json;
@@ -356,6 +322,7 @@ async function postBinarySTT(blob) {
     const detail = json?.error || json?.detail || json?.raw || `HTTP ${res.status}`;
     throw new Error(String(detail).slice(0, 400));
   }
+  setResponseMeta(res.headers, voiceHelper);
   return json;
 }
 
@@ -566,72 +533,16 @@ const cancelStream = () => {
 
 cancelBtn?.addEventListener("click", cancelStream);
 
-const notifyWorker = async () => {
-  const endpoint = getActiveEndpoint();
-  if (!window.fetch || !endpoint) return;
-
-  await fetch(`${endpoint}/health`, {
-    method: "GET",
-    mode: "cors",
-    cache: "no-store",
-  }).catch(() => null);
-};
-
-const loadAssetRegistry = async (registryUrl) => {
-  const response = await fetch(registryUrl, { cache: "no-store" });
-  if (!response.ok) return [];
-  const registry = await response.json();
-  if (Array.isArray(registry.assets)) {
-    return registry.assets;
-  }
-  if (Array.isArray(registry)) {
-    return registry;
-  }
-  return [];
-};
-
-const resolveAssetUrl = (assets, assetId) => {
-  if (!assetId) return "";
-  const asset = assets.find((entry) => entry.asset_id === assetId);
-  return asset?.serving?.primary_url || asset?.source?.origin_url || "";
-};
-
 const loadRegistryConfig = async () => {
-  if (!window.fetch) return;
+  if (!window.EnlaceRepo?.init) return;
   try {
-    const response = await fetch(configUrl, { cache: "no-store" });
-    if (!response.ok) return;
-    const data = await response.json();
+    await window.EnlaceRepo.init();
+    const data = window.EnlaceRepo.getConfig();
     if (data.workerEndpoint) {
       workerEndpoint = data.workerEndpoint;
     }
-    if (data.gatewayEndpoint) {
-      gatewayEndpoint = data.gatewayEndpoint;
-    }
     if (Array.isArray(data.allowedOrigins) && data.allowedOrigins.length > 0) {
       allowedOrigins = data.allowedOrigins;
-    }
-    if (Array.isArray(data.requiredHeaders) && data.requiredHeaders.length > 0) {
-      requiredHeaders = data.requiredHeaders;
-    }
-    if (
-      Array.isArray(data.allowedOriginAssetIds) &&
-      data.allowedOriginAssetIds.length > 0
-    ) {
-      allowedOriginAssetIds = data.allowedOriginAssetIds;
-    }
-
-    rebuildOriginMap();
-
-    if (data.workerEndpointAssetId || data.gatewayEndpointAssetId) {
-      const registryUrl = data.assetRegistry || defaultAssetRegistryUrl;
-      const assets = await loadAssetRegistry(registryUrl);
-      if (data.workerEndpointAssetId) {
-        workerEndpoint = resolveAssetUrl(assets, data.workerEndpointAssetId);
-      }
-      if (data.gatewayEndpointAssetId) {
-        gatewayEndpoint = resolveAssetUrl(assets, data.gatewayEndpointAssetId);
-      }
     }
   } catch (error) {
     console.warn("Unable to load worker registry config.", error);
@@ -761,30 +672,27 @@ form.addEventListener("submit", async (event) => {
   activeController = controller;
 
   try {
-    let headers;
     try {
-      headers = getRequestHeaders();
+      if (!window.EnlaceRepo?.postChat) {
+        throw new Error("Enlace repo module is not loaded.");
+      }
     } catch (error) {
       assistantBubble.textContent = String(error?.message || error);
       stopThinking();
       return;
     }
 
-    const response = await fetch(`${endpoint}/api/chat`, {
-      method: "POST",
-      mode: "cors",
-      cache: "no-store",
-      headers,
-      body: JSON.stringify({
+    const response = await window.EnlaceRepo.postChat(
+      {
         messages: buildMessages(message),
         meta: {
           source: "chattia-ui",
           currentUrl: window.location.href,
           allowedOrigins,
         },
-      }),
-      signal: controller.signal,
-    });
+      },
+      { signal: controller.signal }
+    );
 
     if (!response.ok) {
       const errorText = await readWorkerError(response);
@@ -794,6 +702,7 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
+    setResponseMeta(response.headers, responseMeta);
     await streamWorkerResponse(response, assistantBubble);
   } catch (error) {
     if (error.name === "AbortError") {
@@ -816,7 +725,6 @@ const init = async () => {
   warnIfOriginMissing();
   updateEndpointStatus();
   updateSendState();
-  notifyWorker();
   stopThinking();
 };
 
