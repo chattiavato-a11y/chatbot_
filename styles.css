@@ -248,9 +248,19 @@ body {
   transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.voice-btn svg {
+.voice-btn .voice-icon {
   width: 18px;
   height: 18px;
+}
+
+.voice-icon .voice-wave {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.voice-icon .voice-bar {
+  fill: currentColor;
+  transform-origin: center;
 }
 
 .voice-btn:hover {
@@ -264,11 +274,57 @@ body {
   box-shadow: 0 8px 18px rgba(16, 163, 127, 0.35);
 }
 
+.voice-btn.active .voice-mic {
+  opacity: 0;
+}
+
+.voice-btn.active .voice-wave {
+  opacity: 1;
+}
+
+.voice-btn.active .voice-bar {
+  animation: voicePulse 0.9s ease-in-out infinite;
+}
+
+.voice-btn.active .bar-2 {
+  animation-delay: 0.1s;
+}
+
+.voice-btn.active .bar-3 {
+  animation-delay: 0.2s;
+}
+
+.voice-btn.active .bar-4 {
+  animation-delay: 0.1s;
+}
+
+.voice-btn.active .bar-5 {
+  animation-delay: 0.25s;
+}
+
 .voice-btn:disabled {
   cursor: not-allowed;
   color: #94a3b8;
   background: transparent;
   box-shadow: none;
+}
+
+.voice-helper {
+  font-size: 0.75rem;
+  color: var(--muted);
+  min-width: 130px;
+}
+
+@keyframes voicePulse {
+  0%,
+  100% {
+    transform: scaleY(0.6);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
 }
 
 .send-btn {
