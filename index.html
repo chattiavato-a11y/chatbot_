@@ -80,13 +80,23 @@
           required
         />
         <button class="voice-btn" type="button" id="voice-btn" aria-label="Start voice input" aria-pressed="false">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path
-              fill="currentColor"
-              d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"
-            />
+          <svg class="voice-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <g class="voice-mic">
+              <path
+                fill="currentColor"
+                d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"
+              />
+            </g>
+            <g class="voice-wave">
+              <rect class="voice-bar bar-1" x="3" y="9" width="2" height="6" rx="1" />
+              <rect class="voice-bar bar-2" x="7" y="6" width="2" height="12" rx="1" />
+              <rect class="voice-bar bar-3" x="11" y="4" width="2" height="16" rx="1" />
+              <rect class="voice-bar bar-4" x="15" y="6" width="2" height="12" rx="1" />
+              <rect class="voice-bar bar-5" x="19" y="9" width="2" height="6" rx="1" />
+            </g>
           </svg>
         </button>
+        <span id="voice-helper" class="voice-helper" aria-live="polite"></span>
         <button class="cancel-btn" type="button" id="cancel-btn" disabled>Cancel</button>
         <button class="send-btn" type="submit" id="send-btn" disabled>Send</button>
       </form>

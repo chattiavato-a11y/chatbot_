@@ -2,8 +2,6 @@ const form = document.getElementById("chat-form");
 const input = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
 const chatLog = document.getElementById("chat-log");
-const voiceBtn = document.getElementById("voice-btn");
-const voiceHelper = document.getElementById("voice-helper");
 
 const configUrl = "worker_files/worker.config.json";
 const defaultAssetRegistryUrl = "worker_files/worker.assets.json";
@@ -119,157 +117,378 @@ const addMessage = (text, isUser) => {
   return bubble;
 };
 
-const recognitionEngine = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognition;
-let isVoiceActive = false;
-let mediaRecorder;
-let recordingChunks = [];
-let recordingTimeout;
+/**
+ * app.js — add a dynamic Voice icon (mic) that records + sends to Enlace /api/voice?mode=stt
+ *
+ * ✅ No libraries
+ * ✅ Creates its own floating mic button (no HTML edits needed)
+ * ✅ Click = start/stop recording
+ * ✅ Shows live states: idle / recording / uploading / error
+ * ✅ Works with your Enlace:
+ *    - POST https://enlace.../api/voice?mode=stt  (binary audio)
+ *    - returns JSON { transcript, lang_iso2, ... }
+ *
+ * NOTE:
+ * - This snippet assumes you have a "Send" flow already. If you have an input box,
+ *   we will auto-insert the transcript into it and optionally auto-send (toggle below).
+ */
 
-const setVoiceState = (active) => {
-  isVoiceActive = active;
-  voiceBtn.classList.toggle("active", active);
-  voiceBtn.setAttribute("aria-pressed", String(active));
-  voiceBtn.setAttribute(
-    "aria-label",
-    active ? "Stop voice input" : "Start voice input"
-  );
-};
+// -------------------------
+// 0) CONFIG
+// -------------------------
 
-if (recognitionEngine) {
-  recognition = new recognitionEngine();
-  recognition.lang = "en-US";
-  recognition.interimResults = true;
-  recognition.continuous = false;
+const ENLACE_VOICE_STT =
+  "https://enlace.grabem-holdem-nuts-right.workers.dev/api/voice?mode=stt";
 
-  recognition.addEventListener("start", () => {
-    setVoiceState(true);
-    input.focus();
-  });
+// If you want it to auto-send after STT result:
+// - set to true if you already have window.sendMessageFromUI(text) OR a button click handler below
+const AUTO_SEND_AFTER_STT = false;
 
-  recognition.addEventListener("end", () => {
-    setVoiceState(false);
-  });
+// If you have a text input, set its selector (or leave null to auto-detect common ones)
+const INPUT_SELECTOR = null; // e.g. "#msgInput" or ".composer textarea"
 
-  recognition.addEventListener("result", (event) => {
-    const transcript = Array.from(event.results)
-      .map((result) => result[0].transcript)
-      .join("")
-      .trim();
-    if (transcript) {
-      input.value = transcript;
-      updateSendState();
-    }
-  });
-} else {
-  voiceBtn.disabled = true;
-  voiceBtn.setAttribute("aria-label", "Voice input not supported");
-  if (voiceHelper) {
-    voiceHelper.textContent =
-      "Voice input is unavailable in this browser. Use the message box to continue.";
+// -------------------------
+// 1) Minimal styling + button creation
+// -------------------------
+
+function injectMicStyles() {
+  const css = `
+  .chattia-mic-btn{
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 9999;
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(0,0,0,.45);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    user-select:none;
+    transition: transform .12s ease, opacity .12s ease;
   }
+  .chattia-mic-btn:hover{ transform: translateY(-1px); }
+  .chattia-mic-btn:active{ transform: translateY(1px) scale(.98); }
+
+  .chattia-mic-ring{
+    position:absolute;
+    inset: -10px;
+    border-radius: 999px;
+    border: 2px solid rgba(255,255,255,.18);
+    opacity: 0;
+    pointer-events:none;
+  }
+
+  /* states */
+  .chattia-mic-idle{ opacity: 0.92; }
+  .chattia-mic-rec{
+    background: rgba(180,0,0,.55);
+    border-color: rgba(255,80,80,.35);
+  }
+  .chattia-mic-rec .chattia-mic-ring{
+    opacity: .85;
+    animation: chattiaPulse 1.15s ease-in-out infinite;
+  }
+  .chattia-mic-busy{
+    opacity: 0.75;
+    cursor: progress;
+  }
+  .chattia-mic-err{
+    background: rgba(255,140,0,.45);
+    border-color: rgba(255,180,80,.35);
+  }
+
+  @keyframes chattiaPulse{
+    0%{ transform: scale(.85); opacity:.35; }
+    50%{ transform: scale(1.05); opacity:.85; }
+    100%{ transform: scale(.85); opacity:.35; }
+  }
+
+  .chattia-mic-ico{
+    width: 22px; height: 22px;
+    fill: rgba(255,255,255,.95);
+  }
+  .chattia-mic-tip{
+    position: fixed;
+    right: 18px;
+    bottom: 82px;
+    z-index: 9999;
+    font: 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    background: rgba(0,0,0,.55);
+    border: 1px solid rgba(255,255,255,.18);
+    color: rgba(255,255,255,.92);
+    padding: 8px 10px;
+    border-radius: 12px;
+    max-width: 260px;
+    display:none;
+  }
+  .chattia-mic-tip.show{ display:block; }
+  `;
+  const style = document.createElement("style");
+  style.textContent = css;
+  document.head.appendChild(style);
 }
 
-const resetRecording = () => {
-  recordingChunks = [];
-  if (recordingTimeout) {
-    clearTimeout(recordingTimeout);
-    recordingTimeout = null;
-  }
-};
+function micSVG() {
+  return `
+  <svg class="chattia-mic-ico" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>
+  </svg>`;
+}
 
-const startVoiceFallback = async () => {
-  if (isVoiceActive) {
-    if (mediaRecorder && mediaRecorder.state === "recording") {
-      mediaRecorder.stop();
-    }
-    return;
-  }
+function createMicButton() {
+  injectMicStyles();
 
-  if (!workerEndpoint) {
-    console.warn("Voice fallback requires a configured worker endpoint.");
-    return;
-  }
+  const tip = document.createElement("div");
+  tip.className = "chattia-mic-tip";
+  tip.textContent = "Click to talk • Click again to stop";
+  document.body.appendChild(tip);
 
-  if (!navigator.mediaDevices?.getUserMedia) {
-    console.warn("Media devices not available for voice fallback.");
-    return;
-  }
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "chattia-mic-btn chattia-mic-idle";
+  btn.setAttribute("aria-label", "Voice input");
+  btn.innerHTML = `<span class="chattia-mic-ring"></span>${micSVG()}`;
+  document.body.appendChild(btn);
 
+  const showTip = (msg) => {
+    tip.textContent = msg;
+    tip.classList.add("show");
+    clearTimeout(showTip._t);
+    showTip._t = setTimeout(() => tip.classList.remove("show"), 2200);
+  };
+
+  return { btn, showTip };
+}
+
+// -------------------------
+// 2) Audio capture (MediaRecorder) + send to Enlace
+// -------------------------
+
+function pickInputEl() {
+  if (INPUT_SELECTOR) return document.querySelector(INPUT_SELECTOR);
+  return (
+    document.querySelector('textarea#message') ||
+    document.querySelector('textarea[name="message"]') ||
+    document.querySelector("textarea") ||
+    document.querySelector('input[type="text"]')
+  );
+}
+
+async function postBinarySTT(blob) {
+  const res = await fetch(ENLACE_VOICE_STT, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      // content-type will be set by browser for Blob body in most cases,
+      // but we can set it explicitly to the recorder mime:
+      "content-type": blob.type || "audio/webm",
+    },
+    body: blob,
+  });
+
+  const text = await res.text().catch(() => "");
+  let json;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
-    resetRecording();
-    setVoiceState(true);
-
-    mediaRecorder.addEventListener("dataavailable", (event) => {
-      if (event.data.size > 0) {
-        recordingChunks.push(event.data);
-      }
-    });
-
-    mediaRecorder.addEventListener("stop", async () => {
-      setVoiceState(false);
-      stream.getTracks().forEach((track) => track.stop());
-      const audioBlob = new Blob(recordingChunks, {
-        type: mediaRecorder.mimeType || "audio/webm",
-      });
-      resetRecording();
-      if (!audioBlob.size) return;
-
-      try {
-        const response = await fetch(`${workerEndpoint}/api/voice?mode=stt`, {
-          method: "POST",
-          mode: "cors",
-          cache: "no-store",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": audioBlob.type,
-          },
-          body: audioBlob,
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || "Voice transcription failed.");
-        }
-
-        const payload = await response.json();
-        const transcript =
-          payload.transcript || payload.text || payload.message || "";
-        if (transcript) {
-          input.value = transcript.trim();
-          updateSendState();
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    });
-
-    mediaRecorder.start();
-    recordingTimeout = setTimeout(() => {
-      if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
-      }
-    }, 5000);
-  } catch (error) {
-    console.error("Unable to start voice fallback.", error);
-    setVoiceState(false);
+    json = JSON.parse(text);
+  } catch {
+    json = { raw: text };
   }
-};
 
-voiceBtn.addEventListener("click", () => {
-  if (recognition) {
-    if (isVoiceActive) {
-      recognition.stop();
+  if (!res.ok) {
+    const detail = json?.error || json?.detail || json?.raw || `HTTP ${res.status}`;
+    throw new Error(String(detail).slice(0, 400));
+  }
+  return json;
+}
+
+function safeTextOnly(value) {
+  const text = String(value || "");
+  let out = "";
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    if (code === 0) continue;
+    const ok =
+      code === 9 || code === 10 || code === 13 || (code >= 32 && code <= 126) || code >= 160;
+    if (ok) out += text[i];
+  }
+  return out.trim();
+}
+
+// Optional: if you already have a chat send function, wire it here
+function tryAutoSend(transcript) {
+  if (!AUTO_SEND_AFTER_STT) return false;
+
+  // 1) If you have an explicit function:
+  if (typeof window.sendMessageFromUI === "function") {
+    window.sendMessageFromUI(transcript);
+    return true;
+  }
+
+  // 2) Or try clicking an obvious send button:
+  const sendButton =
+    document.querySelector("button#send") ||
+    document.querySelector('button[data-send="true"]') ||
+    document.querySelector('button[type="submit"]');
+
+  if (sendButton) {
+    sendButton.click();
+    return true;
+  }
+
+  return false;
+}
+
+// -------------------------
+// 3) Main: dynamic mic button behavior
+// -------------------------
+
+(function initVoiceMic() {
+  const { btn, showTip } = createMicButton();
+
+  let recorder = null;
+  let chunks = [];
+  let isRecording = false;
+  let isBusy = false;
+
+  const setState = (state) => {
+    btn.classList.remove(
+      "chattia-mic-idle",
+      "chattia-mic-rec",
+      "chattia-mic-busy",
+      "chattia-mic-err"
+    );
+    btn.classList.add(state);
+  };
+
+  const startRecording = async () => {
+    if (isBusy || isRecording) return;
+
+    // Browser permission prompt happens here
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (error) {
+      setState("chattia-mic-err");
+      showTip("Mic permission blocked");
       return;
     }
-    recognition.start();
-    return;
-  }
 
-  startVoiceFallback();
-});
+    // Choose a supported mime
+    const preferred = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/ogg;codecs=opus",
+      "audio/ogg",
+    ];
+    let mimeType = "";
+    for (const mt of preferred) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(mt)) {
+        mimeType = mt;
+        break;
+      }
+    }
+
+    chunks = [];
+    recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+
+    recorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) chunks.push(event.data);
+    };
+
+    recorder.onstop = async () => {
+      // stop tracks (release mic)
+      try {
+        stream.getTracks().forEach((track) => track.stop());
+      } catch {}
+
+      const blob = new Blob(chunks, { type: recorder?.mimeType || "audio/webm" });
+      recorder = null;
+      chunks = [];
+
+      // If user stopped immediately, ignore tiny blobs
+      if (!blob || blob.size < 800) {
+        setState("chattia-mic-idle");
+        showTip("No audio captured");
+        isRecording = false;
+        return;
+      }
+
+      // Send to Enlace STT
+      try {
+        isBusy = true;
+        setState("chattia-mic-busy");
+        showTip("Transcribing…");
+
+        const stt = await postBinarySTT(blob);
+        const transcript = safeTextOnly(stt?.transcript || "");
+
+        if (!transcript) {
+          setState("chattia-mic-err");
+          showTip("No transcript");
+          return;
+        }
+
+        // Put transcript into input if present
+        const inputEl = pickInputEl();
+        if (inputEl) {
+          inputEl.value = transcript;
+          // Trigger input event so frameworks/listeners update state
+          inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+
+        showTip(stt?.lang_iso2 === "es" ? "Listo ✅" : "Ready ✅");
+
+        // Optional auto-send
+        const sent = tryAutoSend(transcript);
+        if (sent) showTip("Sent ✅");
+
+        setState("chattia-mic-idle");
+      } catch (error) {
+        setState("chattia-mic-err");
+        showTip(`STT error: ${String(error?.message || error).slice(0, 120)}`);
+      } finally {
+        isBusy = false;
+        isRecording = false;
+      }
+    };
+
+    recorder.start(250); // collect chunks every 250ms
+    isRecording = true;
+    setState("chattia-mic-rec");
+    showTip("Recording… click again to stop");
+  };
+
+  const stopRecording = () => {
+    if (!recorder || !isRecording) return;
+    try {
+      recorder.stop();
+    } catch {}
+    isRecording = false;
+    setState("chattia-mic-busy");
+    showTip("Uploading…");
+  };
+
+  btn.addEventListener("click", () => {
+    if (isBusy) return;
+    if (isRecording) stopRecording();
+    else startRecording();
+  });
+
+  // Keyboard shortcut: Ctrl+Shift+V toggles voice
+  window.addEventListener("keydown", (event) => {
+    if (event.ctrlKey && event.shiftKey && (event.key === "V" || event.key === "v")) {
+      event.preventDefault();
+      btn.click();
+    }
+  });
+})();
+
 
 const setStreamingState = (active) => {
   isStreaming = active;
