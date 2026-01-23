@@ -12,7 +12,7 @@
     "version": "v1"
   },
   "integrity": {
-    "sha512": "76c55c7ff6ef938fbbe5dc254f961607b862212c829a6626246d507d906d2176e556d8b8c06af67ff7dda4ed5a711a426773cb96dafb1bd0ccfc6f0ccc5d0508"
+    "sha512": "d5d36bf9dec133a252469ad2eb7c3125deb56907385b68ab01f2b9677c3ad4e9df93d2464d27695172e1913ce8c542138b2b2f818dff1e515a5adb0817880859"
   },
   "serving": {
     "primary_url": "https://chattia.ai/worker.config.json",
@@ -23,10 +23,8 @@
     "retention_days": 365,
     "allowed_origins": [
       "https://chattiavato-a11y.github.io",
-      "https://chattia.io",
       "https://www.chattia.io",
-      "https://opsonlinesupport.com",
-      "https://www.opsonlinesupport.com"
+      "https://chattia.io"
     ],
     "required_headers": ["Content-Type", "Accept"]
   },
