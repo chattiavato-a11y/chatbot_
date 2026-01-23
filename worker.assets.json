@@ -41,6 +41,46 @@
       }
     },
     {
+      "asset_id": "asset_01J7Y2D4XABCD3EFGHJKMNPRTE",
+      "asset_type": "config",
+      "display_name": "Chattia Gateway Endpoint",
+      "classification": "public",
+      "source": {
+        "origin_url": "https://enlace-gateway.example.workers.dev",
+        "repository": "chatbot_",
+        "path": "worker.assets.json#gateway-endpoint",
+        "version": "v1"
+      },
+      "integrity": {
+        "sha512": "c71b25f224b3fe427c7c57b01e74a37a3a9301cf2bd69ce54e1b0902243c00ca3b8f90b55df2b3ce2b963bcb5f2362c7059834fa43b7f5299acb193b966e6c7d"
+      },
+      "serving": {
+        "primary_url": "https://enlace-gateway.example.workers.dev",
+        "fallback_url": "https://enlace-gateway.example.workers.dev",
+        "cache_ttl_seconds": 300
+      },
+      "policy": {
+        "retention_days": 365,
+        "allowed_origins": [
+          "https://www.chattia.io",
+          "https://chattia.io",
+          "https://chattiavato-a11y.github.io"
+        ],
+        "required_headers": ["Content-Type", "Accept"]
+      },
+      "audit": {
+        "created_at": "2026-02-01T00:00:00Z",
+        "updated_at": "2026-02-01T00:00:00Z",
+        "change_log": [
+          {
+            "by": "automation",
+            "action": "register gateway endpoint asset id",
+            "when": "2026-02-01T00:00:00Z"
+          }
+        ]
+      }
+    },
+    {
       "asset_id": "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
       "asset_type": "config",
       "display_name": "Chattia Origin (www)",
