@@ -1,5 +1,5 @@
 const DEFAULT_ALLOWED_ORIGINS = [];
-const DEFAULT_REQUIRED_HEADERS = ["Content-Type", "Accept"];
+const DEFAULT_REQUIRED_HEADERS = ["Accept", "X-Ops-Asset-Id"];
 const MAX_BODY_BYTES = 250000;
 
 const SECURITY_PATTERNS = [
@@ -35,13 +35,29 @@ const buildCorsHeaders = (origin, allowedOrigins) => {
     headers.set("Vary", "Origin");
   }
   headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  headers.set("Access-Control-Allow-Headers", "Content-Type, Accept");
+  headers.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Accept, X-Ops-Asset-Id"
+  );
   headers.set("Access-Control-Max-Age", "86400");
   return headers;
 };
 
 const ensureRequiredHeaders = (request, requiredHeaders) =>
   requiredHeaders.every((header) => request.headers.has(header));
+
+const getRequiredHeadersForRequest = (request, requiredHeaders) => {
+  const { pathname, searchParams } = new URL(request.url);
+  if (pathname === "/api/voice" && searchParams.get("mode") === "stt") {
+    return ["Accept", "X-Ops-Asset-Id"];
+  }
+  return requiredHeaders;
+};
+
+const isVoiceSttRequest = (request) => {
+  const { pathname, searchParams } = new URL(request.url);
+  return pathname === "/api/voice" && searchParams.get("mode") === "stt";
+};
 
 const sanitizeString = (value, findings) => {
   let sanitized = value.replace(/[\u0000-\u001F\u007F]/g, "");
@@ -100,6 +116,7 @@ export default {
     const requiredHeaders = normalizeRequiredHeaders(env.REQUIRED_HEADERS);
     const origin = request.headers.get("Origin") || "";
     const corsHeaders = buildCorsHeaders(origin, allowedOrigins);
+    const isVoiceStt = isVoiceSttRequest(request);
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
@@ -122,46 +139,69 @@ export default {
       return new Response("Method Not Allowed", { status: 405 });
     }
 
-    if (!ensureRequiredHeaders(request, requiredHeaders)) {
+    const requestRequiredHeaders = getRequiredHeadersForRequest(
+      request,
+      requiredHeaders
+    );
+    if (!ensureRequiredHeaders(request, requestRequiredHeaders)) {
       return new Response("Missing required headers.", { status: 400 });
     }
 
     const contentType = request.headers.get("Content-Type") || "";
-    if (!contentType.includes("application/json")) {
+    const isJson = contentType.includes("application/json");
+    if (!isJson && !isVoiceStt) {
       return new Response("Unsupported content type.", { status: 415 });
     }
 
-    const rawBody = await request.text();
-    if (rawBody.length > MAX_BODY_BYTES) {
-      return new Response("Payload too large.", { status: 413 });
-    }
-
-    let payload;
-    try {
-      payload = JSON.parse(rawBody);
-    } catch (error) {
-      return new Response("Invalid JSON payload.", { status: 400 });
-    }
-
-    const findings = new Set();
-    const sanitizedPayload = sanitizeValue(payload, findings);
     const requestId = crypto.randomUUID();
-    const forwardedPayload = enrichPayload(
-      sanitizedPayload,
-      request,
-      findings,
-      requestId
-    );
-
+    let upstreamResponse;
     const targetUrl = buildTargetUrl(request.url, env.ENLACE_URL);
-    const upstreamResponse = await fetch(targetUrl.toString(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: request.headers.get("Accept") || "application/json",
-      },
-      body: JSON.stringify(forwardedPayload),
-    });
+
+    if (isVoiceStt && !isJson) {
+      const rawBody = await request.arrayBuffer();
+      if (rawBody.byteLength > MAX_BODY_BYTES) {
+        return new Response("Payload too large.", { status: 413 });
+      }
+
+      upstreamResponse = await fetch(targetUrl.toString(), {
+        method: "POST",
+        headers: {
+          "Content-Type": contentType || "application/octet-stream",
+          Accept: request.headers.get("Accept") || "application/json",
+        },
+        body: rawBody,
+      });
+    } else {
+      const rawBody = await request.text();
+      if (rawBody.length > MAX_BODY_BYTES) {
+        return new Response("Payload too large.", { status: 413 });
+      }
+
+      let payload;
+      try {
+        payload = JSON.parse(rawBody);
+      } catch (error) {
+        return new Response("Invalid JSON payload.", { status: 400 });
+      }
+
+      const findings = new Set();
+      const sanitizedPayload = sanitizeValue(payload, findings);
+      const forwardedPayload = enrichPayload(
+        sanitizedPayload,
+        request,
+        findings,
+        requestId
+      );
+
+      upstreamResponse = await fetch(targetUrl.toString(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: request.headers.get("Accept") || "application/json",
+        },
+        body: JSON.stringify(forwardedPayload),
+      });
+    }
 
     const responseHeaders = new Headers(upstreamResponse.headers);
     corsHeaders.forEach((value, key) => responseHeaders.set(key, value));

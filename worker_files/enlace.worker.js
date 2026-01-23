@@ -75,6 +75,26 @@
           config.workerEndpoint = resolved;
         }
       }
+
+      if (!config.workerEndpoint && data.assistantEndpoint) {
+        try {
+          const assistantUrl = new URL(
+            data.assistantEndpoint,
+            window.location.origin
+          );
+          if (assistantUrl.pathname.endsWith("/api/chat")) {
+            assistantUrl.pathname = assistantUrl.pathname.replace(
+              /\/api\/chat\/?$/,
+              ""
+            );
+          }
+          assistantUrl.search = "";
+          assistantUrl.hash = "";
+          config.workerEndpoint = assistantUrl.toString().replace(/\/$/, "");
+        } catch (error) {
+          console.warn("Unable to parse assistant endpoint.", error);
+        }
+      }
     } catch (error) {
       console.warn("Unable to load Enlace repo config.", error);
     } finally {
