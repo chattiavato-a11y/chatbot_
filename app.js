@@ -2,12 +2,10 @@ const form = document.getElementById("chat-form");
 const input = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
 const chatLog = document.getElementById("chat-log");
-
 const defaultConfig = {
   assetRegistry: "worker_files/worker.assets.json",
   workerEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev",
   gatewayEndpoint: "",
-
   workerEndpointAssetId: "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
   gatewayEndpointAssetId: "asset_01J7Y2D4XABCD3EFGHJKMNPRTE",
 
@@ -45,7 +43,6 @@ const thinkingFrames = ["Thinking.", "Thinking..", "Thinking...", "Thinking...."
 let thinkingInterval = null;
 let thinkingIndex = 0;
 let activeThinkingBubble = null;
-
 const setStatusLine = (element, text, isWarning = false) => {
   if (!element) return;
   element.textContent = text;
@@ -198,7 +195,6 @@ function injectMicStyles() {
   }
   .chattia-mic-btn:hover{ transform: translateY(-1px); }
   .chattia-mic-btn:active{ transform: translateY(1px) scale(.98); }
-
   .chattia-mic-ring{
     position:absolute;
     inset: -10px;
@@ -512,23 +508,6 @@ function tryAutoSend(transcript) {
 const setStreamingState = (active) => {
   isStreaming = active;
   updateSendState();
-  if (cancelBtn) {
-    cancelBtn.disabled = !active;
-    cancelBtn.classList.toggle("active", active);
-  }
-};
-
-const cancelStream = () => {
-  if (!activeController) return;
-  activeController.abort();
-  activeController = null;
-  setStreamingState(false);
-  if (activeAssistantBubble) {
-    activeAssistantBubble.textContent = activeAssistantBubble.textContent
-      ? `${activeAssistantBubble.textContent}\n\nRequest canceled.`
-      : "Request canceled.";
-    activeAssistantBubble = null;
-  }
 };
 
 cancelBtn?.addEventListener("click", cancelStream);
@@ -550,7 +529,6 @@ const loadRegistryConfig = async () => {
 };
 
 const getActiveEndpoint = () => gatewayEndpoint || workerEndpoint;
-
 const buildMessages = (message) => [
   {
     role: "user",
@@ -567,7 +545,6 @@ const streamWorkerResponse = async (response, bubble) => {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-
   let hasChunk = false;
   const appendText = (text) => {
     if (!hasChunk) {
@@ -583,7 +560,6 @@ const streamWorkerResponse = async (response, bubble) => {
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-
     const parts = buffer.split("\n\n");
     buffer = parts.pop() || "";
     parts.forEach((part) => {
