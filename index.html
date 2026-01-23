@@ -234,6 +234,42 @@
       outline: none;
     }
 
+    .voice-btn {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .voice-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .voice-btn:hover {
+      background: rgba(16, 163, 127, 0.12);
+      color: var(--accent);
+    }
+
+    .voice-btn.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(16, 163, 127, 0.35);
+    }
+
+    .voice-btn:disabled {
+      cursor: not-allowed;
+      color: #94a3b8;
+      background: transparent;
+      box-shadow: none;
+    }
+
     .send-btn {
       border: none;
       border-radius: 12px;
@@ -360,6 +396,14 @@
           aria-label="Type your message"
           required
         />
+        <button class="voice-btn" type="button" id="voice-btn" aria-label="Start voice input" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path
+              fill="currentColor"
+              d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"
+            />
+          </svg>
+        </button>
         <button class="send-btn" type="submit" id="send-btn" disabled>Send</button>
       </form>
       <div class="footer-hint">
