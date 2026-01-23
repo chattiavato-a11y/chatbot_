@@ -1,7 +1,14 @@
 {
   "assetRegistry": "worker_files/worker.assets.json",
+  "workerEndpoint": "https://enlace.grabem-holdem-nuts-right.workers.dev",
+  "gatewayEndpoint": "",
   "workerEndpointAssetId": "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
   "gatewayEndpointAssetId": "asset_01J7Y2D4XABCD3EFGHJKMNPRTE",
+  "allowedOrigins": [
+    "https://www.chattia.io",
+    "https://chattia.io",
+    "https://chattiavato-a11y.github.io"
+  ],
   "allowedOriginAssetIds": [
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
