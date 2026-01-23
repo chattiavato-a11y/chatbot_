@@ -79,7 +79,7 @@ const stopThinking = () => {
   }
   activeThinkingBubble = null;
   if (thinkingStatus) {
-    thinkingStatus.textContent = "Online";
+    thinkingStatus.textContent = "Standing by.";
   }
 };
 
