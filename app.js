@@ -18,6 +18,27 @@ const defaultConfig = {
 };
 let workerEndpoint = defaultConfig.workerEndpoint;
 let allowedOrigins = [...defaultConfig.allowedOrigins];
+let requiredHeaders = [...defaultConfig.requiredHeaders];
+
+const isOriginAllowed = (origin, allowedList) =>
+  allowedList.some((allowedOrigin) => allowedOrigin === origin);
+
+const getRequestHeaders = () => {
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "text/event-stream",
+  };
+
+  if (requiredHeaders.length > 0) {
+    requiredHeaders.forEach((header) => {
+      if (!headers[header]) {
+        console.warn(`Missing required header: ${header}`);
+      }
+    });
+  }
+
+  return headers;
+};
 
 const updateSendState = () => {
   sendBtn.disabled = input.value.trim().length === 0;
@@ -109,6 +130,7 @@ voiceBtn.addEventListener("click", () => {
 
 const notifyWorker = async () => {
   if (!window.fetch) return;
+  if (!isOriginAllowed(window.location.origin, allowedOrigins)) return;
 
   await fetch(`${workerEndpoint}/health`, {
     method: "GET",
@@ -127,6 +149,9 @@ const loadRegistryConfig = async () => {
     }
     if (Array.isArray(data.allowedOrigins) && data.allowedOrigins.length > 0) {
       allowedOrigins = data.allowedOrigins;
+    }
+    if (Array.isArray(data.requiredHeaders) && data.requiredHeaders.length > 0) {
+      requiredHeaders = data.requiredHeaders;
     }
   } catch (error) {
     console.warn("Unable to load worker registry config.", error);
@@ -187,12 +212,15 @@ form.addEventListener("submit", (event) => {
   const assistantBubble = addMessage("Thinking…", false);
   assistantBubble.textContent = "";
 
+  if (!isOriginAllowed(window.location.origin, allowedOrigins)) {
+    assistantBubble.textContent =
+      "This origin is not authorized to reach the secure assistant endpoint.";
+    return;
+  }
+
   fetch(`${workerEndpoint}/api/chat`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "text/event-stream",
-    },
+    headers: getRequestHeaders(),
     body: JSON.stringify({
       messages: buildMessages(message),
       meta: {
