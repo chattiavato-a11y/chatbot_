@@ -8,6 +8,7 @@ const voiceHelper = document.getElementById("voice-helper");
 const configUrl = "worker.config.json";
 const defaultAssetRegistryUrl = "worker.assets.json";
 let workerEndpoint = "";
+let gatewayEndpoint = "";
 let allowedOrigins = [];
 let requiredHeaders = [];
 let isStreaming = false;
@@ -295,9 +296,10 @@ const cancelStream = () => {
 cancelBtn?.addEventListener("click", cancelStream);
 
 const notifyWorker = async () => {
-  if (!window.fetch || !workerEndpoint) return;
+  const endpoint = getActiveEndpoint();
+  if (!window.fetch || !endpoint) return;
 
-  await fetch(`${workerEndpoint}/health`, {
+  await fetch(`${endpoint}/health`, {
     method: "GET",
     mode: "cors",
     cache: "no-store",
@@ -332,6 +334,9 @@ const loadRegistryConfig = async () => {
     if (data.workerEndpoint) {
       workerEndpoint = data.workerEndpoint;
     }
+    if (data.gatewayEndpoint) {
+      gatewayEndpoint = data.gatewayEndpoint;
+    }
     if (Array.isArray(data.allowedOrigins) && data.allowedOrigins.length > 0) {
       allowedOrigins = data.allowedOrigins;
     }
@@ -339,11 +344,18 @@ const loadRegistryConfig = async () => {
       requiredHeaders = data.requiredHeaders;
     }
 
-    if (data.workerEndpointAssetId || data.allowedOriginAssetIds) {
+    if (
+      data.workerEndpointAssetId ||
+      data.gatewayEndpointAssetId ||
+      data.allowedOriginAssetIds
+    ) {
       const registryUrl = data.assetRegistry || defaultAssetRegistryUrl;
       const assets = await loadAssetRegistry(registryUrl);
       if (data.workerEndpointAssetId) {
         workerEndpoint = resolveAssetUrl(assets, data.workerEndpointAssetId);
+      }
+      if (data.gatewayEndpointAssetId) {
+        gatewayEndpoint = resolveAssetUrl(assets, data.gatewayEndpointAssetId);
       }
       if (Array.isArray(data.allowedOriginAssetIds)) {
         allowedOrigins = data.allowedOriginAssetIds
@@ -355,6 +367,8 @@ const loadRegistryConfig = async () => {
     console.warn("Unable to load worker registry config.", error);
   }
 };
+
+const getActiveEndpoint = () => gatewayEndpoint || workerEndpoint;
 
 const buildMessages = (message) => [
   {
@@ -439,10 +453,13 @@ const warnIfOriginMissing = () => {
 };
 
 const updateEndpointStatus = () => {
-  const isConfigured = Boolean(workerEndpoint);
+  const activeEndpoint = getActiveEndpoint();
+  const isConfigured = Boolean(activeEndpoint);
   setStatusLine(
     endpointStatus,
-    isConfigured ? `Endpoint: ${workerEndpoint}` : "Endpoint: not configured",
+    isConfigured
+      ? `Endpoint: ${activeEndpoint}${gatewayEndpoint ? " (gateway)" : ""}`
+      : "Endpoint: not configured",
     !isConfigured
   );
 };
@@ -460,7 +477,8 @@ form.addEventListener("submit", async (event) => {
   const assistantBubble = addMessage("Thinking.", false);
   startThinking(assistantBubble);
 
-  if (!workerEndpoint) {
+  const endpoint = getActiveEndpoint();
+  if (!endpoint) {
     assistantBubble.textContent =
       "The assistant endpoint is not configured. Please check worker.config.json.";
     stopThinking();
@@ -473,7 +491,7 @@ form.addEventListener("submit", async (event) => {
   activeController = controller;
 
   try {
-    const response = await fetch(`${workerEndpoint}/api/chat`, {
+    const response = await fetch(`${endpoint}/api/chat`, {
       method: "POST",
       mode: "cors",
       cache: "no-store",
