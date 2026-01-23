@@ -8,7 +8,7 @@
       "source": {
         "origin_url": "https://enlace.grabem-holdem-nuts-right.workers.dev",
         "repository": "chatbot_",
-        "path": "worker.assets.json#worker-endpoint",
+        "path": "worker_files/worker.assets.json#worker-endpoint",
         "version": "v1"
       },
       "integrity": {
@@ -48,7 +48,7 @@
       "source": {
         "origin_url": "https://enlace-gateway.example.workers.dev",
         "repository": "chatbot_",
-        "path": "worker.assets.json#gateway-endpoint",
+        "path": "worker_files/worker.assets.json#gateway-endpoint",
         "version": "v1"
       },
       "integrity": {
@@ -88,7 +88,7 @@
       "source": {
         "origin_url": "https://www.chattia.io",
         "repository": "chatbot_",
-        "path": "worker.assets.json#origin-www",
+        "path": "worker_files/worker.assets.json#origin-www",
         "version": "v1"
       },
       "integrity": {
@@ -124,7 +124,7 @@
       "source": {
         "origin_url": "https://chattia.io",
         "repository": "chatbot_",
-        "path": "worker.assets.json#origin-root",
+        "path": "worker_files/worker.assets.json#origin-root",
         "version": "v1"
       },
       "integrity": {
@@ -160,7 +160,7 @@
       "source": {
         "origin_url": "https://chattiavato-a11y.github.io",
         "repository": "chatbot_",
-        "path": "worker.assets.json#origin-github",
+        "path": "worker_files/worker.assets.json#origin-github",
         "version": "v1"
       },
       "integrity": {
