@@ -5,6 +5,9 @@ const chatLog = document.getElementById("chat-log");
 const defaultConfig = {
   assetRegistry: "worker_files/worker.assets.json",
   workerEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev",
+  assistantEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat",
+  voiceEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev/api/voice",
+  ttsEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev/api/tts",
   gatewayEndpoint: "",
   workerEndpointAssetId: "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
   gatewayEndpointAssetId: "asset_01J7Y2D4XABCD3EFGHJKMNPRTE",
@@ -29,6 +32,22 @@ let allowedOrigins = [...defaultConfig.allowedOrigins];
 let isStreaming = false;
 let activeController = null;
 let activeAssistantBubble = null;
+
+const deriveWorkerEndpoint = (assistantEndpoint) => {
+  if (!assistantEndpoint) return "";
+  try {
+    const url = new URL(assistantEndpoint, window.location.origin);
+    if (url.pathname.endsWith("/api/chat")) {
+      url.pathname = url.pathname.replace(/\/api\/chat\/?$/, "");
+    }
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch (error) {
+    console.warn("Unable to parse assistant endpoint.", error);
+  }
+  return "";
+};
 
 const isOriginAllowed = (origin, allowedList) =>
   allowedList.some((allowedOrigin) => allowedOrigin === origin);
@@ -519,6 +538,11 @@ const loadRegistryConfig = async () => {
     const data = window.EnlaceRepo.getConfig();
     if (data.workerEndpoint) {
       workerEndpoint = data.workerEndpoint;
+    } else if (data.assistantEndpoint) {
+      const derivedEndpoint = deriveWorkerEndpoint(data.assistantEndpoint);
+      if (derivedEndpoint) {
+        workerEndpoint = derivedEndpoint;
+      }
     }
     if (Array.isArray(data.allowedOrigins) && data.allowedOrigins.length > 0) {
       allowedOrigins = data.allowedOrigins;
