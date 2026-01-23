@@ -3,6 +3,9 @@
   --bg: #f7f7f8;
   --panel: #ffffff;
   --border: #e5e7eb;
+  --edge-purple: #7c3aed;
+  --edge-red: #ef4444;
+  --edge-fuchsia: #e879f9;
   --text: #0f172a;
   --muted: #6b7280;
   --assistant: #f3f4f6;
@@ -20,7 +23,11 @@ body {
   margin: 0;
   height: 100vh;
   font-family: "Inter", system-ui, -apple-system, sans-serif;
-  background: var(--bg);
+  background:
+    radial-gradient(900px circle at 12% 8%, rgba(124, 58, 237, 0.12), transparent 55%),
+    radial-gradient(700px circle at 88% 6%, rgba(239, 68, 68, 0.12), transparent 55%),
+    radial-gradient(800px circle at 88% 92%, rgba(232, 121, 249, 0.14), transparent 55%),
+    var(--bg);
   color: var(--text);
   display: flex;
   align-items: stretch;
@@ -31,10 +38,16 @@ body {
 
 .chat-app {
   width: min(960px, 100%);
-  background: var(--panel);
+  background:
+    linear-gradient(var(--panel), var(--panel)) padding-box,
+    linear-gradient(135deg, rgba(124, 58, 237, 0.65), rgba(239, 68, 68, 0.55), rgba(232, 121, 249, 0.65)) border-box;
   border-radius: 20px;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  border: 1px solid transparent;
+  box-shadow:
+    var(--shadow),
+    0 0 0 1px rgba(124, 58, 237, 0.08),
+    0 0 28px rgba(232, 121, 249, 0.12);
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -46,7 +59,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 18px 24px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(124, 58, 237, 0.2);
   background: #ffffff;
 }
 
@@ -95,7 +108,7 @@ body {
   gap: 6px;
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(232, 121, 249, 0.3);
   background: #f8fafc;
 }
 
@@ -173,7 +186,7 @@ body {
 }
 
 .chat-footer {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid rgba(239, 68, 68, 0.18);
   padding: 18px 24px calc(24px + env(safe-area-inset-bottom));
   background: #ffffff;
   display: grid;
@@ -184,7 +197,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(124, 58, 237, 0.18);
   border-radius: 16px;
   padding: 10px 14px;
   background: #f9fafb;
