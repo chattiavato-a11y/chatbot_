@@ -3,12 +3,37 @@ const input = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
 const chatLog = document.getElementById("chat-log");
 
+const defaultConfig = {
+  assetRegistry: "worker_files/worker.assets.json",
+  workerEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev",
+  gatewayEndpoint: "",
+
+  workerEndpointAssetId: "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
+  gatewayEndpointAssetId: "asset_01J7Y2D4XABCD3EFGHJKMNPRTE",
+
+  allowedOrigins: [
+    "https://www.chattia.io",
+    "https://chattia.io",
+    "https://chattiavato-a11y.github.io",
+  ],
+
+  allowedOriginAssetIds: [
+    "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
+    "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
+    "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
+  ],
+
+  requiredHeaders: ["Content-Type", "Accept"],
+};
+
 const configUrl = "worker_files/worker.config.json";
-const defaultAssetRegistryUrl = "worker_files/worker.assets.json";
-let workerEndpoint = "";
-let gatewayEndpoint = "";
-let allowedOrigins = [];
-let requiredHeaders = [];
+const defaultAssetRegistryUrl = defaultConfig.assetRegistry;
+let workerEndpoint = defaultConfig.workerEndpoint;
+let gatewayEndpoint = defaultConfig.gatewayEndpoint;
+let allowedOrigins = [...defaultConfig.allowedOrigins];
+let allowedOriginAssetIds = [...defaultConfig.allowedOriginAssetIds];
+let requiredHeaders = [...defaultConfig.requiredHeaders];
+let originToAssetId = new Map();
 let isStreaming = false;
 let activeController = null;
 let activeAssistantBubble = null;
@@ -31,10 +56,35 @@ const setStatusLine = (element, text, isWarning = false) => {
   element.classList.toggle("warning", isWarning);
 };
 
+const rebuildOriginMap = () => {
+  originToAssetId = new Map();
+  for (let i = 0; i < allowedOrigins.length; i++) {
+    const origin = allowedOrigins[i];
+    const assetId = allowedOriginAssetIds[i] || "";
+    if (origin && assetId) {
+      originToAssetId.set(origin, assetId);
+    }
+  }
+};
+
+const getAssetIdForThisOrigin = () => {
+  const origin = window.location.origin;
+  return originToAssetId.get(origin) || "";
+};
+
 const getRequestHeaders = () => {
+  const assetId = getAssetIdForThisOrigin();
+
+  if (!assetId) {
+    throw new Error(
+      `Origin not registered: ${window.location.origin}. Add it to worker.config.json allowedOrigins + allowedOriginAssetIds.`
+    );
+  }
+
   const headers = {
     "Content-Type": "application/json",
     Accept: "text/event-stream",
+    "x-ops-asset-id": assetId,
   };
 
   if (requiredHeaders.length > 0) {
@@ -47,6 +97,8 @@ const getRequestHeaders = () => {
 
   return headers;
 };
+
+rebuildOriginMap();
 
 const updateSendState = () => {
   sendBtn.disabled = isStreaming || input.value.trim().length === 0;
@@ -562,12 +614,16 @@ const loadRegistryConfig = async () => {
     if (Array.isArray(data.requiredHeaders) && data.requiredHeaders.length > 0) {
       requiredHeaders = data.requiredHeaders;
     }
-
     if (
-      data.workerEndpointAssetId ||
-      data.gatewayEndpointAssetId ||
-      data.allowedOriginAssetIds
+      Array.isArray(data.allowedOriginAssetIds) &&
+      data.allowedOriginAssetIds.length > 0
     ) {
+      allowedOriginAssetIds = data.allowedOriginAssetIds;
+    }
+
+    rebuildOriginMap();
+
+    if (data.workerEndpointAssetId || data.gatewayEndpointAssetId) {
       const registryUrl = data.assetRegistry || defaultAssetRegistryUrl;
       const assets = await loadAssetRegistry(registryUrl);
       if (data.workerEndpointAssetId) {
@@ -575,11 +631,6 @@ const loadRegistryConfig = async () => {
       }
       if (data.gatewayEndpointAssetId) {
         gatewayEndpoint = resolveAssetUrl(assets, data.gatewayEndpointAssetId);
-      }
-      if (Array.isArray(data.allowedOriginAssetIds)) {
-        allowedOrigins = data.allowedOriginAssetIds
-          .map((assetId) => resolveAssetUrl(assets, assetId))
-          .filter(Boolean);
       }
     }
   } catch (error) {
@@ -710,11 +761,20 @@ form.addEventListener("submit", async (event) => {
   activeController = controller;
 
   try {
+    let headers;
+    try {
+      headers = getRequestHeaders();
+    } catch (error) {
+      assistantBubble.textContent = String(error?.message || error);
+      stopThinking();
+      return;
+    }
+
     const response = await fetch(`${endpoint}/api/chat`, {
       method: "POST",
       mode: "cors",
       cache: "no-store",
-      headers: getRequestHeaders(),
+      headers,
       body: JSON.stringify({
         messages: buildMessages(message),
         meta: {
