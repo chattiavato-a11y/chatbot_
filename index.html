@@ -1,1 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LuxeServe Concierge Chatbot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #0c0b0f;
+      --panel: rgba(255, 255, 255, 0.06);
+      --panel-strong: rgba(255, 255, 255, 0.12);
+      --gold: #d9b77b;
+      --rose: #f6d1c3;
+      --text: #f7f2ea;
+      --muted: rgba(247, 242, 234, 0.68);
+      --accent: #7dd7d1;
+      --success: #9be15d;
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+    }
 
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Manrope", sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top, rgba(125, 215, 209, 0.1), transparent 45%),
+        radial-gradient(circle at 20% 20%, rgba(217, 183, 123, 0.18), transparent 40%),
+        radial-gradient(circle at 80% 10%, rgba(246, 209, 195, 0.2), transparent 45%),
+        var(--bg);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 16px;
+    }
+
+    main {
+      width: min(1200px, 100%);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 28px;
+    }
+
+    .hero {
+      padding: 36px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .hero h1 {
+      font-family: "Playfair Display", serif;
+      font-size: clamp(2.3rem, 3vw, 3.5rem);
+      margin: 0;
+      line-height: 1.15;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .pill {
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .cta-primary {
+      background: linear-gradient(120deg, var(--gold), var(--rose));
+      color: #1b1b1b;
+      border: none;
+      padding: 14px 28px;
+      border-radius: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 12px 28px rgba(217, 183, 123, 0.35);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .cta-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px rgba(217, 183, 123, 0.5);
+    }
+
+    .cta-secondary {
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 10px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .assistant-card {
+      padding: 32px;
+      border-radius: 24px;
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .assistant-card header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(125, 215, 209, 0.12);
+      color: var(--accent);
+      font-size: 0.85rem;
+      border: 1px solid rgba(125, 215, 209, 0.3);
+    }
+
+    .status span {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(125, 215, 209, 0.7);
+    }
+
+    .chat-window {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .bubble {
+      padding: 14px 16px;
+      border-radius: 16px;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .bubble.bot {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .bubble.user {
+      align-self: flex-end;
+      background: rgba(217, 183, 123, 0.18);
+      border: 1px solid rgba(217, 183, 123, 0.3);
+    }
+
+    .lead-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .lead-form label {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .lead-form input,
+    .lead-form select {
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.35);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .lead-form input::placeholder {
+      color: rgba(247, 242, 234, 0.5);
+    }
+
+    .inline-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .trust-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+    }
+
+    .trust-card {
+      padding: 16px;
+      border-radius: 18px;
+      background: var(--panel-strong);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .trust-card strong {
+      color: var(--text);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .footer-note {
+      font-size: 0.8rem;
+      color: rgba(247, 242, 234, 0.5);
+    }
+
+    @media (max-width: 720px) {
+      .hero,
+      .assistant-card {
+        padding: 26px;
+      }
+
+      .cta-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .cta-primary,
+      .cta-secondary {
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero" aria-label="Luxurious customer service welcome">
+      <div>
+        <div class="pill-row">
+          <span class="pill">HCI 2026 ready</span>
+          <span class="pill">Customer Experience first</span>
+          <span class="pill">Lead generation concierge</span>
+        </div>
+        <h1>Welcome to the LuxeServe Customer Concierge.</h1>
+        <p>
+          Delight your guests with a premium, always-on assistant that listens deeply, anticipates needs,
+          and captures high-intent opportunities. Every interaction is designed for clarity, empathy, and
+          a frictionless journey toward confident decisions.
+        </p>
+      </div>
+      <div class="cta-row">
+        <button class="cta-primary" type="button">Launch the Concierge Chat</button>
+        <a class="cta-secondary" href="#lead">Book a tailored CX audit</a>
+      </div>
+      <div class="trust-grid">
+        <div class="trust-card">
+          <strong>White-glove service</strong>
+          Responsive guidance, adaptive tone, and clear next steps for every visitor.
+        </div>
+        <div class="trust-card">
+          <strong>Experience-led analytics</strong>
+          Capture sentiment, intent, and conversion signals to personalize follow-ups.
+        </div>
+        <div class="trust-card">
+          <strong>Human + AI harmony</strong>
+          Seamless handoffs to specialists without losing context or warmth.
+        </div>
+      </div>
+    </section>
+
+    <section class="assistant-card" aria-label="Lead generation assistant">
+      <header>
+        <div>
+          <h2 style="margin: 0 0 6px; font-size: 1.4rem;">Luxe Concierge AI</h2>
+          <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">
+            Ready to curate an unforgettable journey.
+          </p>
+        </div>
+        <div class="status"><span></span>Available 24/7</div>
+      </header>
+
+      <div class="chat-window">
+        <div class="bubble bot">
+          Welcome back. Which experience are you elevating today—VIP onboarding, premium support,
+          or bespoke product discovery?
+        </div>
+        <div class="bubble user">Bespoke product discovery with lead capture.</div>
+        <div class="bubble bot">
+          Perfect. I will personalize a guided path, then connect you with a CX strategist for a live
+          walkthrough. Let’s begin with your brand vision and audience.
+        </div>
+      </div>
+
+      <form id="lead" class="lead-form" aria-label="Lead generation form">
+        <div>
+          <label for="name">Your name</label>
+          <input id="name" name="name" type="text" placeholder="Avery James" />
+        </div>
+        <div class="inline-fields">
+          <div>
+            <label for="company">Company</label>
+            <input id="company" name="company" type="text" placeholder="Lumina Atelier" />
+          </div>
+          <div>
+            <label for="role">Role</label>
+            <input id="role" name="role" type="text" placeholder="CX Director" />
+          </div>
+        </div>
+        <div class="inline-fields">
+          <div>
+            <label for="email">Work email</label>
+            <input id="email" name="email" type="email" placeholder="name@luxeserve.com" />
+          </div>
+          <div>
+            <label for="priority">Top priority</label>
+            <select id="priority" name="priority">
+              <option>Lead qualification</option>
+              <option>Retention uplift</option>
+              <option>Luxury support scale</option>
+              <option>AI concierge launch</option>
+            </select>
+          </div>
+        </div>
+        <button class="cta-primary" type="submit">Reserve my CX strategy session</button>
+        <span class="footer-note">
+          By submitting, you agree to a thoughtful follow-up focused on value, privacy, and premium care.
+        </span>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
