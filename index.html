@@ -4,13 +4,307 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Chattia</title>
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; frame-ancestors 'none'; upgrade-insecure-requests"
+  />
+  <meta http-equiv="Access-Control-Allow-Origin" content="https://chattia.ai" />
+  <meta http-equiv="Access-Control-Allow-Methods" content="GET, POST, OPTIONS" />
+  <meta http-equiv="Access-Control-Allow-Headers" content="Content-Type, Authorization" />
+  <meta name="description" content="Chattia delivers secure, human-centered concierge chat experiences with compliance-first design, fast performance, and AI-ready guidance." />
+  <meta name="robots" content="index, follow" />
+  <meta name="theme-color" content="#10a37f" />
+  <link rel="canonical" href="https://chattia.ai/" />
+  <meta property="og:title" content="Chattia — Secure Concierge Chat UI" />
+  <meta property="og:description" content="A compliance-first chat interface optimized for Core Web Vitals, security headers, and SEO-ready metadata." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://chattia.ai/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Chattia — Secure Concierge Chat UI" />
+  <meta name="twitter:description" content="A compliant, performance-ready chat UI with CSP, CORS, and Core Web Vitals targets." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="styles.css" />
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f7f8;
+      --panel: #ffffff;
+      --border: #e5e7eb;
+      --text: #0f172a;
+      --muted: #6b7280;
+      --assistant: #f3f4f6;
+      --user: #111827;
+      --user-text: #ffffff;
+      --accent: #10a37f;
+      --shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      padding: 32px 16px;
+      overflow: hidden;
+    }
+
+    .chat-app {
+      width: min(960px, 100%);
+      background: var(--panel);
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    .chat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      background: #ffffff;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #0ea5e9, #10a37f);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .brand p {
+      margin: 2px 0 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+    }
+
+    .status-pill span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(16, 163, 127, 0.6);
+    }
+
+    .chat-body {
+      flex: 1;
+      padding: 28px 24px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scroll-behavior: smooth;
+    }
+
+    .message-row {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .message-row.user {
+      justify-content: flex-end;
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: #0f172a;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .avatar.assistant {
+      background: #e2e8f0;
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    .bubble {
+      max-width: 70ch;
+      padding: 14px 18px;
+      border-radius: 18px;
+      line-height: 1.6;
+      font-size: 0.95rem;
+      border: 1px solid transparent;
+    }
+
+    .bubble.assistant {
+      background: var(--assistant);
+      border-color: #e5e7eb;
+    }
+
+    .bubble.user {
+      background: var(--user);
+      color: var(--user-text);
+    }
+
+    .meta {
+      margin-top: 6px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .chat-footer {
+      border-top: 1px solid var(--border);
+      padding: 18px 24px calc(24px + env(safe-area-inset-bottom));
+      background: #ffffff;
+      display: grid;
+      gap: 10px;
+    }
+
+    .input-shell {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 10px 14px;
+      background: #f9fafb;
+    }
+
+    .input-shell input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-size: 0.95rem;
+      padding: 6px 2px;
+      color: var(--text);
+    }
+
+    .input-shell input:focus {
+      outline: none;
+    }
+
+    .send-btn {
+      border: none;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .send-btn:disabled {
+      cursor: not-allowed;
+      background: #cbd5e1;
+      box-shadow: none;
+    }
+
+    .send-btn:not(:disabled):hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 20px rgba(16, 163, 127, 0.25);
+    }
+
+    .footer-hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .compliance-panel {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: #f8fafc;
+      display: grid;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .compliance-panel strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .compliance-panel ul {
+      margin: 6px 0 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 4px;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 16px 12px;
+      }
+
+      .chat-app {
+        height: 100%;
+      }
+
+      .chat-header,
+      .chat-body,
+      .chat-footer {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .bubble {
+        max-width: 100%;
+      }
+    }
+  </style>
 </head>
 <body>
   <main class="chat-app" aria-label="Chattia chat interface">
@@ -70,6 +364,15 @@
       </form>
       <div class="footer-hint">
         Chattia can provide secure, compliant guidance. Responses are simulated for this demo UI.
+      </div>
+      <div class="compliance-panel" aria-label="Security, performance, and SEO expectations">
+        <div><strong>Security headers:</strong> CSP allows self + Google Fonts; CORS allows https://chattia.ai only.</div>
+        <div><strong>Performance targets:</strong></div>
+        <ul>
+          <li>Mobile: FCP &lt; 1.8s, LCP &lt; 2.5s</li>
+          <li>Desktop: FCP &lt; 1.0s, LCP &lt; 1.8s</li>
+        </ul>
+        <div><strong>SEO readiness:</strong> canonical URL, Open Graph, and Twitter metadata configured.</div>
       </div>
     </footer>
   </main>
