@@ -18,7 +18,12 @@ const isOriginAllowed = (origin, allowedList) =>
 
 const originStatus = document.getElementById("origin-status");
 const endpointStatus = document.getElementById("endpoint-status");
+const thinkingStatus = document.getElementById("thinking-status");
 const cancelBtn = document.getElementById("cancel-btn");
+const thinkingFrames = ["Thinking.", "Thinking..", "Thinking...", "Thinking...."];
+let thinkingInterval = null;
+let thinkingIndex = 0;
+let activeThinkingBubble = null;
 
 const setStatusLine = (element, text, isWarning = false) => {
   if (!element) return;
@@ -45,6 +50,37 @@ const getRequestHeaders = () => {
 
 const updateSendState = () => {
   sendBtn.disabled = isStreaming || input.value.trim().length === 0;
+};
+
+const updateThinkingText = () => {
+  const text = thinkingFrames[thinkingIndex % thinkingFrames.length];
+  thinkingIndex += 1;
+  if (thinkingStatus) {
+    thinkingStatus.textContent = text;
+  }
+  if (activeThinkingBubble) {
+    activeThinkingBubble.textContent = text;
+  }
+};
+
+const startThinking = (bubble) => {
+  activeThinkingBubble = bubble ?? activeThinkingBubble;
+  thinkingIndex = 0;
+  updateThinkingText();
+  if (!thinkingInterval) {
+    thinkingInterval = setInterval(updateThinkingText, 500);
+  }
+};
+
+const stopThinking = () => {
+  if (thinkingInterval) {
+    clearInterval(thinkingInterval);
+    thinkingInterval = null;
+  }
+  activeThinkingBubble = null;
+  if (thinkingStatus) {
+    thinkingStatus.textContent = "Online";
+  }
 };
 
 input.addEventListener("input", updateSendState);
@@ -307,6 +343,7 @@ const streamWorkerResponse = async (response, bubble) => {
   let hasChunk = false;
   const appendText = (text) => {
     if (!hasChunk) {
+      stopThinking();
       bubble.textContent = "";
       hasChunk = true;
     }
@@ -387,11 +424,13 @@ form.addEventListener("submit", async (event) => {
   updateSendState();
   input.blur();
 
-  const assistantBubble = addMessage("Thinking…", false);
+  const assistantBubble = addMessage("Thinking.", false);
+  startThinking(assistantBubble);
 
   if (!workerEndpoint) {
     assistantBubble.textContent =
       "The assistant endpoint is not configured. Please check worker.config.json.";
+    stopThinking();
     return;
   }
 
@@ -421,6 +460,7 @@ form.addEventListener("submit", async (event) => {
       const errorText = await readWorkerError(response);
       assistantBubble.textContent =
         errorText || `Request failed (${response.status}).`;
+      stopThinking();
       return;
     }
 
@@ -437,6 +477,7 @@ form.addEventListener("submit", async (event) => {
     activeController = null;
     activeAssistantBubble = null;
     setStreamingState(false);
+    stopThinking();
   }
 });
 
@@ -446,6 +487,7 @@ const init = async () => {
   updateEndpointStatus();
   updateSendState();
   notifyWorker();
+  stopThinking();
 };
 
 init();
