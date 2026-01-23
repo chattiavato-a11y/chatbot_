@@ -6,7 +6,7 @@
   "ttsEndpoint": "https://enlace.grabem-holdem-nuts-right.workers.dev/api/tts",
   "gatewayEndpoint": "",
   "workerEndpointAssetId": "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
-  "gatewayEndpointAssetId": "asset_01J7Y2D4XABCD3EFGHJKMNPRTE",
+  "gatewayEndpointAssetId": "",
   "allowedOrigins": [
     "https://www.chattia.io",
     "https://chattia.io",
