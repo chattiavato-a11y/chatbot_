@@ -2,6 +2,7 @@ const form = document.getElementById("chat-form");
 const input = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
 const chatLog = document.getElementById("chat-log");
+const voiceBtn = document.getElementById("voice-btn");
 
 const workerEndpoint = "https://enlace.grabem-holdem-nuts-right.workers.dev/";
 const allowedOrigins = [
@@ -48,6 +49,56 @@ const addMessage = (text, isUser) => {
   chatLog.appendChild(row);
   chatLog.scrollTop = chatLog.scrollHeight;
 };
+
+const recognitionEngine = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition;
+let isListening = false;
+
+const setVoiceState = (active) => {
+  isListening = active;
+  voiceBtn.classList.toggle("active", active);
+  voiceBtn.setAttribute("aria-pressed", String(active));
+  voiceBtn.setAttribute("aria-label", active ? "Stop voice input" : "Start voice input");
+};
+
+if (recognitionEngine) {
+  recognition = new recognitionEngine();
+  recognition.lang = "en-US";
+  recognition.interimResults = true;
+  recognition.continuous = false;
+
+  recognition.addEventListener("start", () => {
+    setVoiceState(true);
+    input.focus();
+  });
+
+  recognition.addEventListener("end", () => {
+    setVoiceState(false);
+  });
+
+  recognition.addEventListener("result", (event) => {
+    const transcript = Array.from(event.results)
+      .map((result) => result[0].transcript)
+      .join("")
+      .trim();
+    if (transcript) {
+      input.value = transcript;
+      updateSendState();
+    }
+  });
+} else {
+  voiceBtn.disabled = true;
+  voiceBtn.setAttribute("aria-label", "Voice input not supported");
+}
+
+voiceBtn.addEventListener("click", () => {
+  if (!recognition) return;
+  if (isListening) {
+    recognition.stop();
+    return;
+  }
+  recognition.start();
+});
 
 const notifyWorker = async () => {
   if (!window.fetch) return;
