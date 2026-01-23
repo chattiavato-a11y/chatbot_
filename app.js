@@ -6,6 +6,7 @@ const voiceBtn = document.getElementById("voice-btn");
 const voiceHelper = document.getElementById("voice-helper");
 
 const configUrl = "worker.config.json";
+const defaultAssetRegistryUrl = "worker.assets.json";
 let workerEndpoint = "";
 let allowedOrigins = [];
 let requiredHeaders = [];
@@ -303,6 +304,25 @@ const notifyWorker = async () => {
   }).catch(() => null);
 };
 
+const loadAssetRegistry = async (registryUrl) => {
+  const response = await fetch(registryUrl, { cache: "no-store" });
+  if (!response.ok) return [];
+  const registry = await response.json();
+  if (Array.isArray(registry.assets)) {
+    return registry.assets;
+  }
+  if (Array.isArray(registry)) {
+    return registry;
+  }
+  return [];
+};
+
+const resolveAssetUrl = (assets, assetId) => {
+  if (!assetId) return "";
+  const asset = assets.find((entry) => entry.asset_id === assetId);
+  return asset?.serving?.primary_url || asset?.source?.origin_url || "";
+};
+
 const loadRegistryConfig = async () => {
   if (!window.fetch) return;
   try {
@@ -317,6 +337,19 @@ const loadRegistryConfig = async () => {
     }
     if (Array.isArray(data.requiredHeaders) && data.requiredHeaders.length > 0) {
       requiredHeaders = data.requiredHeaders;
+    }
+
+    if (data.workerEndpointAssetId || data.allowedOriginAssetIds) {
+      const registryUrl = data.assetRegistry || defaultAssetRegistryUrl;
+      const assets = await loadAssetRegistry(registryUrl);
+      if (data.workerEndpointAssetId) {
+        workerEndpoint = resolveAssetUrl(assets, data.workerEndpointAssetId);
+      }
+      if (Array.isArray(data.allowedOriginAssetIds)) {
+        allowedOrigins = data.allowedOriginAssetIds
+          .map((assetId) => resolveAssetUrl(assets, assetId))
+          .filter(Boolean);
+      }
     }
   } catch (error) {
     console.warn("Unable to load worker registry config.", error);
