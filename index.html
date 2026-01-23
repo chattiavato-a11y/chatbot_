@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OPS AI Chatbot</title>
+  <title>Chattia</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -263,13 +263,13 @@
   </style>
 </head>
 <body>
-  <main class="chat-app" aria-label="OPS AI chat interface">
+  <main class="chat-app" aria-label="Chattia chat interface">
     <header class="chat-header">
       <div class="brand">
-        <div class="brand-mark">OA</div>
+        <div class="brand-mark">CH</div>
         <div>
-          <h1>OPS AI Chatbot</h1>
-          <p>ChatGPT-style concierge experience</p>
+          <h1>Chattia</h1>
+          <p>Concierge chat experience</p>
         </div>
       </div>
       <div class="header-actions">
@@ -285,7 +285,7 @@
             Welcome! I can help craft secure, human-centered experiences. Share your goal and I will
             build a tailored plan.
           </div>
-          <div class="meta">OPS AI · Just now</div>
+          <div class="meta">Chattia · Just now</div>
         </div>
       </div>
       <div class="message-row user">
@@ -301,7 +301,7 @@
             Done. You now have a crisp header, familiar spacing, and the clean message styling you
             would expect from ChatGPT. Use the input below to continue the conversation.
           </div>
-          <div class="meta">OPS AI · 1 min ago</div>
+          <div class="meta">Chattia · 1 min ago</div>
         </div>
       </div>
     </section>
@@ -311,7 +311,7 @@
         <input
           id="chat-input"
           type="text"
-          placeholder="Type your message here"
+          placeholder="Message Chattia..."
           maxlength="256"
           aria-label="Type your message"
           required
@@ -319,7 +319,7 @@
         <button class="send-btn" type="submit" id="send-btn" disabled>Send</button>
       </form>
       <div class="footer-hint">
-        OPS AI can provide secure, compliant guidance. Responses are simulated for this demo UI.
+        Chattia can provide secure, compliant guidance. Responses are simulated for this demo UI.
       </div>
     </footer>
   </main>
@@ -354,7 +354,7 @@
 
       const meta = document.createElement("div");
       meta.className = "meta";
-      meta.textContent = isUser ? "You · just now" : "OPS AI · just now";
+      meta.textContent = isUser ? "You · just now" : "Chattia · just now";
 
       content.appendChild(bubble);
       content.appendChild(meta);
