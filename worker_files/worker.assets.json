@@ -25,7 +25,8 @@
           "https://www.chattia.io",
           "https://chattia.io",
           "https://chattiavato-a11y.github.io",
-          "https://dash.cloudflare.com"
+          "https://dash.cloudflare.com",
+          "https://enlace.grabem-holdem-nuts-right.workers.dev"
         ],
         "required_headers": ["Content-Type", "Accept"]
       },

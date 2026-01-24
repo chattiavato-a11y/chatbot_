@@ -7,11 +7,13 @@
       "https://www.chattia.io",
       "https://chattia.io",
       "https://chattiavato-a11y.github.io",
+      "https://enlace.grabem-holdem-nuts-right.workers.dev",
     ],
     allowedOriginAssetIds: [
       "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
       "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
       "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
+      "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
     ],
   };
 

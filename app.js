@@ -7,6 +7,8 @@ const OPS_ASSET_BY_ORIGIN = {
   "https://www.chattia.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
   "https://chattia.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
   "https://chattiavato-a11y.github.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
+  "https://enlace.grabem-holdem-nuts-right.workers.dev":
+    "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
 };
 const OPS_ASSET_ID = OPS_ASSET_BY_ORIGIN[window.location.origin] || "";
 window.OPS_ASSET_BY_ORIGIN = OPS_ASSET_BY_ORIGIN;
@@ -26,12 +28,14 @@ const defaultConfig = {
     "https://www.chattia.io",
     "https://chattia.io",
     "https://chattiavato-a11y.github.io",
+    "https://enlace.grabem-holdem-nuts-right.workers.dev",
   ],
 
   allowedOriginAssetIds: [
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
+    "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
   ],
 
 };
