@@ -199,6 +199,7 @@
       headers: buildHeaders({
         accept: "text/event-stream",
         contentType: "application/json",
+        extraHeaders: options.extraHeaders,
       }),
       body: JSON.stringify(payload),
       signal: options.signal,
@@ -216,6 +217,7 @@
       headers: buildHeaders({
         accept: "application/json",
         contentType: blob?.type || "audio/webm",
+        extraHeaders: options.extraHeaders,
       }),
       body: blob,
       signal: options.signal,
@@ -233,6 +235,7 @@
       headers: buildHeaders({
         accept: "text/event-stream",
         contentType: "application/json",
+        extraHeaders: options.extraHeaders,
       }),
       body: JSON.stringify(payload),
       signal: options.signal,
@@ -250,6 +253,7 @@
       headers: buildHeaders({
         accept: "audio/mpeg",
         contentType: "application/json",
+        extraHeaders: options.extraHeaders,
       }),
       body: JSON.stringify(payload),
       signal: options.signal,

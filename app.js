@@ -222,15 +222,13 @@ const addMessage = (text, isUser) => {
 
 // ===== Voice / Mic (Enlace STT) =====
 
-const ENLACE_ORIGIN = defaultConfig.workerEndpoint;
-const ENLACE_VOICE_API = `${ENLACE_ORIGIN}/api/voice?mode=stt`;
-
 let micStream = null;
 let micRecorder = null;
 let micChunks = [];
 let micRecording = false;
 let voiceReplyRequested = false;
 let activeVoiceAudio = null;
+let lastVoiceLanguage = "";
 
 function getSupportedMimeType() {
   const candidates = [
@@ -269,7 +267,13 @@ async function playVoiceReply(text) {
     activeVoiceAudio.pause();
     activeVoiceAudio = null;
   }
-  const res = await window.EnlaceRepo.postTTS({ text });
+  const voiceLanguage = getPreferredLanguage();
+  const res = await window.EnlaceRepo.postTTS(
+    { text, language: voiceLanguage || undefined },
+    {
+      extraHeaders: buildLanguageHeaders(voiceLanguage),
+    }
+  );
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     throw new Error(`TTS failed (${res.status}): ${detail.slice(0, 200)}`);
@@ -328,14 +332,12 @@ async function stopMicAndTranscribe() {
   micRecording = false;
   setMicUI(false);
 
-  const headers = { Accept: "application/json" };
-  if (OPS_ASSET_ID) {
-    headers["x-ops-asset-id"] = OPS_ASSET_ID;
+  if (!window.EnlaceRepo?.postVoiceSTT) {
+    throw new Error("Enlace voice module is not loaded.");
   }
-  const res = await fetch(ENLACE_VOICE_API, {
-    method: "POST",
-    headers,
-    body: blob,
+  const preferredLanguage = getPreferredLanguage();
+  const res = await window.EnlaceRepo.postVoiceSTT(blob, {
+    extraHeaders: buildLanguageHeaders(preferredLanguage),
   });
 
   if (!res.ok) {
@@ -344,6 +346,12 @@ async function stopMicAndTranscribe() {
   }
 
   logResponseMeta(res.headers);
+  const detectedLanguage = res.headers.get("x-chattia-stt-iso2");
+  if (detectedLanguage) {
+    lastVoiceLanguage = detectedLanguage;
+  } else if (!lastVoiceLanguage && preferredLanguage) {
+    lastVoiceLanguage = preferredLanguage;
+  }
   const data = await res.json();
   const transcript = data?.transcript ? String(data.transcript) : "";
   if (!transcript) throw new Error("No transcript returned.");
@@ -462,6 +470,22 @@ const getLanguageMeta = () => {
   return {
     language_hint: primary,
     language_list: languages,
+  };
+};
+
+const getPreferredLanguage = () =>
+  lastVoiceLanguage ||
+  navigator.language ||
+  (Array.isArray(navigator.languages) ? navigator.languages[0] : "") ||
+  "";
+
+const buildLanguageHeaders = (language) => {
+  const languages = Array.isArray(navigator.languages)
+    ? navigator.languages.filter(Boolean)
+    : [];
+  return {
+    "x-chattia-lang-hint": language || "",
+    "x-chattia-lang-list": languages.join(","),
   };
 };
 
@@ -614,6 +638,7 @@ form.addEventListener("submit", async (event) => {
           allowedOrigins,
           ...DEFAULT_REQUEST_META,
           ...getLanguageMeta(),
+          voice_language: lastVoiceLanguage || undefined,
         },
       },
       { signal: controller.signal }
