@@ -261,10 +261,12 @@ body {
   border-radius: 16px;
   padding: 10px 14px;
   background: #f9fafb;
+  flex-wrap: wrap;
 }
 
 .input-shell input {
-  flex: 1;
+  flex: 1 1 200px;
+  min-width: 0;
   border: none;
   background: transparent;
   font-size: 0.95rem;
@@ -347,7 +349,8 @@ body {
 .voice-helper {
   font-size: 0.75rem;
   color: var(--muted);
-  min-width: 160px;
+  min-width: 0;
+  flex: 1 1 140px;
 }
 
 .send-btn {
@@ -419,5 +422,23 @@ body {
 
   .bubble {
     max-width: 100%;
+  }
+
+  .input-shell {
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .voice-helper {
+    flex-basis: 100%;
+    order: 4;
+  }
+
+  #micBtn {
+    order: 2;
+  }
+
+  .send-btn {
+    order: 3;
   }
 }
