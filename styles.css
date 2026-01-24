@@ -162,6 +162,12 @@ body {
   gap: 4px;
 }
 
+.intro-panel {
+  align-self: flex-start;
+  margin: 0;
+  padding-left: 2px;
+}
+
 .intro-kicker {
   display: inline-block;
   font-size: 0.7rem;
