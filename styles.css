@@ -61,7 +61,7 @@ body {
 .chat-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 18px 24px;
   border-bottom: 1px solid rgba(124, 58, 237, 0.2);
   background: #ffffff;
@@ -69,8 +69,9 @@ body {
 
 .brand {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 
 .brand-title {
@@ -156,10 +157,9 @@ body {
   scroll-behavior: smooth;
 }
 
-.chat-intro {
-  padding: 24px;
-  border-bottom: 1px solid rgba(124, 58, 237, 0.12);
-  background: #ffffff;
+.intro-copy {
+  display: grid;
+  gap: 4px;
 }
 
 .intro-kicker {
@@ -171,14 +171,14 @@ body {
   font-weight: 600;
 }
 
-.chat-intro h2 {
-  margin: 10px 0 8px;
+.intro-copy h2 {
+  margin: 4px 0 4px;
   font-size: 1.5rem;
   font-weight: 600;
   color: var(--text);
 }
 
-.chat-intro p {
+.intro-copy p {
   margin: 0;
   color: var(--muted);
   max-width: 60ch;
@@ -273,7 +273,7 @@ body {
 #micBtn {
   border: none;
   background: transparent;
-  color: var(--muted);
+  color: #111827;
   padding: 0 8px;
   height: 36px;
   border-radius: 10px;
@@ -283,18 +283,15 @@ body {
   gap: 6px;
   cursor: pointer;
   pointer-events: auto;
+  position: relative;
   z-index: 5;
   transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
-#micBtn .mic-emoji {
-  font-size: 1rem;
-  line-height: 1;
-}
-
-#micBtn .voice-icon {
-  width: 16px;
-  height: 16px;
+#micBtn .voice-wave-icon {
+  width: 26px;
+  height: 26px;
+  display: block;
 }
 
 #micBtn:hover {
@@ -303,9 +300,30 @@ body {
 }
 
 #micBtn[aria-pressed="true"] {
+  background: rgba(17, 24, 39, 0.08);
+  color: #111827;
+  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.35);
+}
+
+#micBtn.is-listening {
+  background: rgba(17, 24, 39, 0.08);
+  color: #111827;
+  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.35);
+}
+
+#micBtn.is-listening .voice-wave-icon {
+  color: #111827;
+}
+
+#micBtn.is-listening::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
   background: var(--accent);
-  color: #fff;
-  box-shadow: 0 8px 18px rgba(16, 163, 127, 0.35);
+  box-shadow: 0 0 0 6px rgba(16, 163, 127, 0.18);
+  transform: translate(16px, -14px);
 }
 
 #micBtn:disabled {
@@ -318,7 +336,7 @@ body {
 .voice-helper {
   font-size: 0.75rem;
   color: var(--muted);
-  min-width: 130px;
+  min-width: 160px;
 }
 
 .send-btn {
@@ -384,11 +402,6 @@ body {
   .chat-header,
   .chat-body,
   .chat-footer {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
-  .chat-intro {
     padding-left: 16px;
     padding-right: 16px;
   }

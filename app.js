@@ -219,11 +219,14 @@ function getSupportedMimeType() {
 function setMicUI(isOn) {
   const btn = document.getElementById("micBtn");
   if (!btn) return;
-  const emoji = btn.querySelector(".mic-emoji");
-  if (emoji) {
-    emoji.textContent = isOn ? "⏹️" : "🎤";
-  }
+  btn.classList.toggle("is-listening", isOn);
   btn.setAttribute("aria-pressed", isOn ? "true" : "false");
+  if (voiceHelper) {
+    voiceHelper.textContent = isOn ? "Listening... click to stop." : "";
+  }
+  if (input) {
+    input.placeholder = isOn ? "Listening..." : "Message Chattia...";
+  }
 }
 
 async function playVoiceReply(text) {
@@ -321,6 +324,9 @@ async function stopMicAndTranscribe() {
     voiceReplyRequested = true;
     form?.requestSubmit();
   }
+  if (voiceHelper) {
+    voiceHelper.textContent = `Heard: “${transcript}”`;
+  }
 
   return transcript;
 }
@@ -328,6 +334,7 @@ async function stopMicAndTranscribe() {
 async function onMicClick() {
   try {
     if (!micRecording) {
+      voiceReplyRequested = true;
       await startMic();
       setTimeout(async () => {
         if (micRecording) {
@@ -356,6 +363,9 @@ async function onMicClick() {
     if (input) {
       input.placeholder =
         error?.message ? String(error.message) : "Microphone error";
+    }
+    if (voiceHelper) {
+      voiceHelper.textContent = "Microphone unavailable.";
     }
   }
 }
