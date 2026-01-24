@@ -372,7 +372,18 @@ async function onMicClick() {
 
 document.addEventListener("DOMContentLoaded", () => {
   const btn = document.getElementById("micBtn");
-  if (btn) btn.addEventListener("click", onMicClick);
+  if (!btn) return;
+  const hasMediaSupport = Boolean(
+    navigator.mediaDevices?.getUserMedia && window.MediaRecorder
+  );
+  btn.disabled = !hasMediaSupport;
+  btn.title = hasMediaSupport
+    ? "Voice reply (up to 8 seconds)"
+    : "Microphone not supported on this device";
+  if (!hasMediaSupport && voiceHelper) {
+    voiceHelper.textContent = "Microphone not supported in this browser.";
+  }
+  btn.addEventListener("click", onMicClick);
 });
 
 
