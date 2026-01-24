@@ -315,9 +315,14 @@ async function stopMicAndTranscribe() {
   if (!micRecorder) return "";
 
   const stopped = new Promise((resolve) => {
-    micRecorder.onstop = resolve;
+    micRecorder.addEventListener("stop", resolve, { once: true });
   });
 
+  if (micRecorder.state !== "inactive") {
+    try {
+      micRecorder.requestData();
+    } catch {}
+  }
   micRecorder.stop();
   await stopped;
 
@@ -331,6 +336,10 @@ async function stopMicAndTranscribe() {
   micChunks = [];
   micRecording = false;
   setMicUI(false);
+
+  if (!blob || blob.size === 0) {
+    throw new Error("No audio captured. Please try again.");
+  }
 
   if (!window.EnlaceRepo?.postVoiceSTT) {
     throw new Error("Enlace voice module is not loaded.");
