@@ -18,7 +18,8 @@ body { margin: 0; }
   /* Keep the page from fighting the chat scroller */
   body{
     padding: 0;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .chat-app{
@@ -81,12 +82,6 @@ body { margin: 0; }
   }
 
   .chat-footer{
-    padding-bottom: calc(20px + env(safe-area-inset-bottom));
-  }
-}
-
-
-  .chat-footer {
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
   }
 }
