@@ -42,6 +42,12 @@ let allowedOrigins = [...defaultConfig.allowedOrigins];
 let isStreaming = false;
 let activeController = null;
 let activeAssistantBubble = null;
+const DEFAULT_REQUEST_META = {
+  reply_format: "paragraph",
+  tone: "friendly",
+  spanish_quality: "king",
+  model_tier: "quality",
+};
 
 const deriveWorkerEndpoint = (assistantEndpoint) => {
   if (!assistantEndpoint) return "";
@@ -712,6 +718,7 @@ form.addEventListener("submit", async (event) => {
           source: "chattia-ui",
           currentUrl: window.location.href,
           allowedOrigins,
+          ...DEFAULT_REQUEST_META,
         },
       },
       { signal: controller.signal }
