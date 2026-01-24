@@ -156,6 +156,35 @@ body {
   scroll-behavior: smooth;
 }
 
+.chat-intro {
+  padding: 24px;
+  border-bottom: 1px solid rgba(124, 58, 237, 0.12);
+  background: #ffffff;
+}
+
+.intro-kicker {
+  display: inline-block;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.chat-intro h2 {
+  margin: 10px 0 8px;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chat-intro p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 60ch;
+  line-height: 1.6;
+}
+
 .message-row {
   display: flex;
   gap: 14px;
@@ -241,74 +270,45 @@ body {
   outline: none;
 }
 
-.voice-btn {
+#micBtn {
   border: none;
   background: transparent;
   color: var(--muted);
-  width: 36px;
+  padding: 0 8px;
   height: 36px;
   border-radius: 10px;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   cursor: pointer;
+  pointer-events: auto;
+  z-index: 5;
   transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.voice-btn .voice-icon {
-  width: 18px;
-  height: 18px;
+#micBtn .mic-emoji {
+  font-size: 1rem;
+  line-height: 1;
 }
 
-.voice-icon .voice-wave {
-  opacity: 0;
-  transition: opacity 0.2s ease;
+#micBtn .voice-icon {
+  width: 16px;
+  height: 16px;
 }
 
-.voice-icon .voice-bar {
-  fill: currentColor;
-  transform-origin: center;
-}
-
-.voice-btn:hover {
+#micBtn:hover {
   background: rgba(16, 163, 127, 0.12);
   color: var(--accent);
 }
 
-.voice-btn.active {
+#micBtn[aria-pressed="true"] {
   background: var(--accent);
   color: #fff;
   box-shadow: 0 8px 18px rgba(16, 163, 127, 0.35);
 }
 
-.voice-btn.active .voice-mic {
-  opacity: 0;
-}
-
-.voice-btn.active .voice-wave {
-  opacity: 1;
-}
-
-.voice-btn.active .voice-bar {
-  animation: voicePulse 0.9s ease-in-out infinite;
-}
-
-.voice-btn.active .bar-2 {
-  animation-delay: 0.1s;
-}
-
-.voice-btn.active .bar-3 {
-  animation-delay: 0.2s;
-}
-
-.voice-btn.active .bar-4 {
-  animation-delay: 0.1s;
-}
-
-.voice-btn.active .bar-5 {
-  animation-delay: 0.25s;
-}
-
-.voice-btn:disabled {
+#micBtn:disabled {
   cursor: not-allowed;
   color: #94a3b8;
   background: transparent;
@@ -319,18 +319,6 @@ body {
   font-size: 0.75rem;
   color: var(--muted);
   min-width: 130px;
-}
-
-@keyframes voicePulse {
-  0%,
-  100% {
-    transform: scaleY(0.6);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scaleY(1);
-    opacity: 1;
-  }
 }
 
 .send-btn {
@@ -396,6 +384,11 @@ body {
   .chat-header,
   .chat-body,
   .chat-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .chat-intro {
     padding-left: 16px;
     padding-right: 16px;
   }
