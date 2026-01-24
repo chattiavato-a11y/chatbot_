@@ -1,0 +1,74 @@
+@media (max-width: 640px) {
+  body {
+    padding: 16px 12px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  body::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  .chat-app {
+    width: 100%;
+    height: auto;
+    min-height: 100vh;
+    max-height: none;
+  }
+
+  .chat-header,
+  .chat-body,
+  .chat-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .chat-body {
+    padding-top: 20px;
+  }
+
+  .bubble {
+    max-width: 100%;
+  }
+
+  .input-shell {
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .input-shell input {
+    flex-basis: 100%;
+    font-size: 1rem;
+  }
+
+  .voice-helper {
+    flex-basis: 100%;
+    order: 4;
+  }
+
+  #micBtn {
+    order: 2;
+  }
+
+  .send-btn {
+    order: 3;
+    width: 100%;
+  }
+}
+
+@media (max-height: 720px) {
+  .chat-app {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .chat-body {
+    padding-bottom: 16px;
+  }
+
+  .chat-footer {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+}

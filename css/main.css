@@ -36,7 +36,8 @@ body {
   align-items: stretch;
   justify-content: center;
   padding: clamp(20px, 4vh, 36px) clamp(16px, 3vw, 32px);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .chat-app {
@@ -403,45 +404,4 @@ body {
   padding-left: 18px;
   display: grid;
   gap: 4px;
-}
-
-@media (max-width: 640px) {
-  body {
-    padding: 16px 12px;
-  }
-
-  .chat-app {
-    width: 100%;
-    height: 100%;
-    max-height: none;
-  }
-
-  .chat-header,
-  .chat-body,
-  .chat-footer {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
-  .bubble {
-    max-width: 100%;
-  }
-
-  .input-shell {
-    gap: 10px;
-    align-items: stretch;
-  }
-
-  .voice-helper {
-    flex-basis: 100%;
-    order: 4;
-  }
-
-  #micBtn {
-    order: 2;
-  }
-
-  .send-btn {
-    order: 3;
-  }
 }
