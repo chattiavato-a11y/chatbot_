@@ -444,17 +444,31 @@ const streamWorkerResponse = async (response, bubble) => {
   return fullText.trim();
 };
 
+const stringifyWorkerValue = (value) => {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  try {
+    return JSON.stringify(value);
+  } catch (error) {
+    console.error(error);
+  }
+  return String(value);
+};
+
 const readWorkerError = async (response) => {
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     try {
       const payload = await response.json();
       if (payload?.error) {
-        return payload.detail
-          ? `${payload.error}: ${payload.detail}`
-          : payload.error;
+        const errorValue = stringifyWorkerValue(payload.error);
+        const detailValue = stringifyWorkerValue(payload.detail);
+        return detailValue ? `${errorValue}: ${detailValue}` : errorValue;
       }
-      return JSON.stringify(payload);
+      if (payload?.message) {
+        return stringifyWorkerValue(payload.message);
+      }
+      return stringifyWorkerValue(payload);
     } catch (error) {
       console.error(error);
     }
@@ -542,8 +556,10 @@ form.addEventListener("submit", async (event) => {
 
     if (!response.ok) {
       const errorText = await readWorkerError(response);
-      assistantBubble.textContent =
-        errorText || `Request failed (${response.status}).`;
+      const statusLabel = response.status
+        ? `Request failed (${response.status}${response.statusText ? ` ${response.statusText}` : ""}).`
+        : "Request failed.";
+      assistantBubble.textContent = errorText || statusLabel;
       stopThinking();
       return;
     }
