@@ -51,7 +51,13 @@ const DEFAULT_REQUEST_META = {
   tone: "friendly",
   spanish_quality: "king",
   model_tier: "quality",
+  language_mode: "auto",
 };
+
+const RTL_CHARACTERS = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
+
+const getTextDirection = (text) =>
+  RTL_CHARACTERS.test(text) ? "rtl" : "ltr";
 
 const PAGE_GRADIENTS = [
   "linear-gradient(135deg, rgba(187, 247, 208, 0.68) 0%, rgba(134, 239, 172, 0.62) 45%, rgba(167, 243, 208, 0.58) 100%)",
@@ -199,6 +205,7 @@ const addMessage = (text, isUser) => {
   const bubble = document.createElement("div");
   bubble.className = `bubble ${isUser ? "user" : "assistant"}`;
   bubble.textContent = text;
+  bubble.setAttribute("dir", getTextDirection(text));
 
   const meta = document.createElement("div");
   meta.className = "meta";
@@ -249,7 +256,7 @@ function setMicUI(isOn) {
     voiceHelper.textContent = isOn ? "Listening... click to stop." : "";
   }
   if (input) {
-    input.placeholder = isOn ? "Listening..." : "Message Chattia...";
+    input.placeholder = isOn ? "Listening..." : "Message in any language...";
   }
 }
 
@@ -447,6 +454,17 @@ const buildMessages = (message) => [
   },
 ];
 
+const getLanguageMeta = () => {
+  const languages = Array.isArray(navigator.languages)
+    ? navigator.languages.filter(Boolean)
+    : [];
+  const primary = navigator.language || languages[0] || "";
+  return {
+    language_hint: primary,
+    language_list: languages,
+  };
+};
+
 const streamWorkerResponse = async (response, bubble) => {
   if (!response.body) {
     bubble.textContent = "We couldn't connect to the assistant stream.";
@@ -464,6 +482,7 @@ const streamWorkerResponse = async (response, bubble) => {
       hasChunk = true;
     }
     bubble.textContent += text;
+    bubble.setAttribute("dir", getTextDirection(bubble.textContent));
     chatLog.scrollTop = chatLog.scrollHeight;
   };
 
@@ -594,6 +613,7 @@ form.addEventListener("submit", async (event) => {
           currentUrl: window.location.href,
           allowedOrigins,
           ...DEFAULT_REQUEST_META,
+          ...getLanguageMeta(),
         },
       },
       { signal: controller.signal }
