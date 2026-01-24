@@ -1,6 +1,13 @@
 :root {
   color-scheme: light;
   --bg: #f7f7f8;
+  --page-gradient: linear-gradient(
+    140deg,
+    rgba(209, 236, 224, 0.65) 0%,
+    rgba(214, 232, 247, 0.62) 45%,
+    rgba(231, 224, 246, 0.6) 70%,
+    rgba(237, 232, 244, 0.66) 100%
+  );
   --panel: #ffffff;
   --border: #e5e7eb;
   --edge-purple: #7c3aed;
@@ -23,15 +30,7 @@ body {
   margin: 0;
   height: 100vh;
   font-family: "Inter", system-ui, -apple-system, sans-serif;
-  background:
-    linear-gradient(
-      140deg,
-      rgba(209, 236, 224, 0.65) 0%,
-      rgba(214, 232, 247, 0.62) 45%,
-      rgba(231, 224, 246, 0.6) 70%,
-      rgba(237, 232, 244, 0.66) 100%
-    ),
-    var(--bg);
+  background: var(--page-gradient), var(--bg);
   color: var(--text);
   display: flex;
   align-items: stretch;

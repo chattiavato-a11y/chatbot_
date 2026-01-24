@@ -53,6 +53,13 @@ const DEFAULT_REQUEST_META = {
   model_tier: "quality",
 };
 
+const PAGE_GRADIENTS = [
+  "linear-gradient(135deg, rgba(187, 247, 208, 0.68) 0%, rgba(134, 239, 172, 0.62) 45%, rgba(167, 243, 208, 0.58) 100%)",
+  "linear-gradient(140deg, rgba(254, 240, 138, 0.62) 0%, rgba(252, 211, 77, 0.58) 40%, rgba(253, 186, 116, 0.55) 100%)",
+  "linear-gradient(145deg, rgba(191, 219, 254, 0.62) 0%, rgba(165, 243, 252, 0.58) 45%, rgba(186, 230, 253, 0.54) 100%)",
+  "linear-gradient(135deg, rgba(221, 214, 254, 0.6) 0%, rgba(196, 181, 253, 0.56) 50%, rgba(199, 210, 254, 0.52) 100%)",
+];
+
 const deriveWorkerEndpoint = (assistantEndpoint) => {
   if (!assistantEndpoint) return "";
   try {
@@ -88,7 +95,6 @@ const isOriginAllowed = (origin, allowedList) => {
 const originStatus = document.getElementById("origin-status");
 const endpointStatus = document.getElementById("endpoint-status");
 const thinkingStatus = document.getElementById("thinking-status");
-const responseMeta = document.getElementById("response-meta");
 const voiceHelper = document.getElementById("voice-helper");
 const cancelBtn = document.getElementById("cancel-btn");
 const thinkingFrames = ["Thinking.", "Thinking..", "Thinking...", "Thinking...."];
@@ -119,9 +125,10 @@ const buildResponseMeta = (headers) => {
   return items.join(" · ");
 };
 
-const setResponseMeta = (headers, element) => {
-  if (!element) return;
-  element.textContent = buildResponseMeta(headers);
+const logResponseMeta = (headers) => {
+  const summary = buildResponseMeta(headers);
+  if (!summary) return;
+  console.info("Chattia response metadata:", summary);
 };
 
 const updateSendState = () => {
@@ -158,6 +165,19 @@ const stopThinking = () => {
     thinkingStatus.textContent = "Standing by.";
   }
 };
+
+const rotateBackgroundGradient = () => {
+  const root = document.documentElement;
+  if (!root) return;
+  let gradientIndex = 0;
+  root.style.setProperty("--page-gradient", PAGE_GRADIENTS[gradientIndex]);
+  window.setInterval(() => {
+    gradientIndex = (gradientIndex + 1) % PAGE_GRADIENTS.length;
+    root.style.setProperty("--page-gradient", PAGE_GRADIENTS[gradientIndex]);
+  }, 10000);
+};
+
+rotateBackgroundGradient();
 
 input.addEventListener("input", updateSendState);
 input.addEventListener("focus", () => {
@@ -247,7 +267,7 @@ async function playVoiceReply(text) {
     const detail = await res.text().catch(() => "");
     throw new Error(`TTS failed (${res.status}): ${detail.slice(0, 200)}`);
   }
-  setResponseMeta(res.headers, voiceHelper);
+  logResponseMeta(res.headers);
   const audioBlob = await res.blob();
   const audioUrl = URL.createObjectURL(audioBlob);
   const audio = new Audio(audioUrl);
@@ -316,7 +336,7 @@ async function stopMicAndTranscribe() {
     throw new Error(`STT failed (${res.status}): ${text.slice(0, 200)}`);
   }
 
-  setResponseMeta(res.headers, voiceHelper);
+  logResponseMeta(res.headers);
   const data = await res.json();
   const transcript = data?.transcript ? String(data.transcript) : "";
   if (!transcript) throw new Error("No transcript returned.");
@@ -589,7 +609,7 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-    setResponseMeta(response.headers, responseMeta);
+    logResponseMeta(response.headers);
     const assistantText = await streamWorkerResponse(response, assistantBubble);
     if (voiceReplyRequested && assistantText) {
       try {
