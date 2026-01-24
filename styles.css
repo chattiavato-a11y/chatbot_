@@ -278,8 +278,10 @@ body {
 
 #micBtn {
   border: none;
-  background: transparent;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
   color: #111827;
+  min-width: 42px;
   padding: 0 8px;
   height: 36px;
   border-radius: 10px;
@@ -298,11 +300,13 @@ body {
   width: 26px;
   height: 26px;
   display: block;
+  color: currentColor;
 }
 
 #micBtn:hover {
   background: rgba(16, 163, 127, 0.12);
   color: var(--accent);
+  border-color: rgba(16, 163, 127, 0.4);
 }
 
 #micBtn[aria-pressed="true"] {
@@ -335,7 +339,8 @@ body {
 #micBtn:disabled {
   cursor: not-allowed;
   color: #94a3b8;
-  background: transparent;
+  background: #f8fafc;
+  border-color: rgba(148, 163, 184, 0.45);
   box-shadow: none;
 }
 
