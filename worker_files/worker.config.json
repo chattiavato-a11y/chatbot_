@@ -10,7 +10,8 @@
   "allowedOrigins": [
     "https://www.chattia.io",
     "https://chattia.io",
-    "https://chattiavato-a11y.github.io"
+    "https://chattiavato-a11y.github.io",
+    "https://dash.cloudflare.com"
   ],
   "allowedOriginAssetIds": [
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
