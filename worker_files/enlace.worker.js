@@ -26,6 +26,7 @@
   const CONFIG_URL = resolveConfigUrl();
   let config = { ...DEFAULT_CONFIG };
   let originToAssetId = new Map();
+  let assetRegistryEntries = [];
   let configPromise = null;
 
   const normalizeOrigin = (value) => {
@@ -37,10 +38,28 @@
     }
   };
 
+  const findAssetIdForOrigin = (origin) => {
+    if (!origin) return "";
+    const normalizedOrigin = normalizeOrigin(origin);
+    const match = assetRegistryEntries.find((entry) => {
+      const sourceOrigin = normalizeOrigin(entry?.source?.origin_url);
+      const servingOrigin = normalizeOrigin(entry?.serving?.primary_url);
+      const fallbackOrigin = normalizeOrigin(entry?.serving?.fallback_url);
+      return (
+        normalizedOrigin &&
+        (normalizedOrigin === sourceOrigin ||
+          normalizedOrigin === servingOrigin ||
+          normalizedOrigin === fallbackOrigin)
+      );
+    });
+    return match?.asset_id || "";
+  };
+
   const rebuildOriginMap = () => {
     originToAssetId = new Map();
     config.allowedOrigins.forEach((origin, index) => {
-      const assetId = config.allowedOriginAssetIds[index] || "";
+      const assetId =
+        findAssetIdForOrigin(origin) || config.allowedOriginAssetIds[index] || "";
       const normalizedOrigin = normalizeOrigin(origin);
       if (normalizedOrigin && assetId) {
         originToAssetId.set(normalizedOrigin, assetId);
@@ -49,7 +68,22 @@
   };
 
   const getAssetIdForOrigin = (origin = window.location.origin) =>
-    originToAssetId.get(normalizeOrigin(origin)) || "";
+    originToAssetId.get(normalizeOrigin(origin)) ||
+    findAssetIdForOrigin(origin) ||
+    "";
+
+  const getOverrideAssetId = (origin = window.location.origin) => {
+    const directOverride = window.OPS_ASSET_ID;
+    if (directOverride) return directOverride;
+    const mapping = window.OPS_ASSET_BY_ORIGIN;
+    if (mapping && typeof mapping === "object") {
+      const normalizedOrigin = normalizeOrigin(origin);
+      if (normalizedOrigin && mapping[normalizedOrigin]) {
+        return mapping[normalizedOrigin];
+      }
+    }
+    return "";
+  };
 
   const loadAssetRegistry = async (registryUrl) => {
     const response = await fetch(registryUrl, { cache: "no-store" });
@@ -88,6 +122,7 @@
       if (data.workerEndpointAssetId) {
         const registryUrl = data.assetRegistry || config.assetRegistry;
         const assets = await loadAssetRegistry(registryUrl);
+        assetRegistryEntries = assets;
         const resolved = resolveAssetUrl(assets, data.workerEndpointAssetId);
         if (resolved) {
           config.workerEndpoint = resolved;
@@ -131,7 +166,7 @@
   const getConfig = () => ({ ...config });
 
   const buildHeaders = ({ accept, contentType, extraHeaders } = {}) => {
-    const assetId = getAssetIdForOrigin();
+    const assetId = getOverrideAssetId() || getAssetIdForOrigin();
     if (!assetId) {
       throw new Error(
         `Origin not registered: ${window.location.origin}. Add it to worker.config.json allowedOrigins + allowedOriginAssetIds.`
@@ -140,7 +175,7 @@
     const headers = new Headers();
     if (accept) headers.set("Accept", accept);
     if (contentType) headers.set("Content-Type", contentType);
-    headers.set("x-ops-asset-id", assetId);
+    headers.set("X-Ops-Asset-Id", assetId);
     if (extraHeaders) {
       Object.entries(extraHeaders).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {

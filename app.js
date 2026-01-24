@@ -2,6 +2,16 @@ const form = document.getElementById("chat-form");
 const input = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
 const chatLog = document.getElementById("chat-log");
+// --- OPS Asset Identity (Origin -> AssetId) ---
+const OPS_ASSET_BY_ORIGIN = {
+  "https://www.chattia.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
+  "https://chattia.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
+  "https://chattiavato-a11y.github.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
+};
+const OPS_ASSET_ID = OPS_ASSET_BY_ORIGIN[window.location.origin] || "";
+window.OPS_ASSET_BY_ORIGIN = OPS_ASSET_BY_ORIGIN;
+window.OPS_ASSET_ID = OPS_ASSET_ID;
+
 const defaultConfig = {
   assetRegistry: "worker_files/worker.assets.json",
   workerEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev",
