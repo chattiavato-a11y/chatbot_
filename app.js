@@ -51,7 +51,13 @@ const DEFAULT_REQUEST_META = {
   tone: "friendly",
   spanish_quality: "king",
   model_tier: "quality",
+  language_mode: "auto",
 };
+
+const RTL_CHARACTERS = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
+
+const getTextDirection = (text) =>
+  RTL_CHARACTERS.test(text) ? "rtl" : "ltr";
 
 const PAGE_GRADIENTS = [
   "linear-gradient(135deg, rgba(187, 247, 208, 0.68) 0%, rgba(134, 239, 172, 0.62) 45%, rgba(167, 243, 208, 0.58) 100%)",
@@ -199,6 +205,7 @@ const addMessage = (text, isUser) => {
   const bubble = document.createElement("div");
   bubble.className = `bubble ${isUser ? "user" : "assistant"}`;
   bubble.textContent = text;
+  bubble.setAttribute("dir", getTextDirection(text));
 
   const meta = document.createElement("div");
   meta.className = "meta";
@@ -215,15 +222,13 @@ const addMessage = (text, isUser) => {
 
 // ===== Voice / Mic (Enlace STT) =====
 
-const ENLACE_ORIGIN = defaultConfig.workerEndpoint;
-const ENLACE_VOICE_API = `${ENLACE_ORIGIN}/api/voice?mode=stt`;
-
 let micStream = null;
 let micRecorder = null;
 let micChunks = [];
 let micRecording = false;
 let voiceReplyRequested = false;
 let activeVoiceAudio = null;
+let lastVoiceLanguage = "";
 
 function getSupportedMimeType() {
   const candidates = [
@@ -249,7 +254,7 @@ function setMicUI(isOn) {
     voiceHelper.textContent = isOn ? "Listening... click to stop." : "";
   }
   if (input) {
-    input.placeholder = isOn ? "Listening..." : "Message Chattia...";
+    input.placeholder = isOn ? "Listening..." : "Message in any language...";
   }
 }
 
@@ -262,7 +267,13 @@ async function playVoiceReply(text) {
     activeVoiceAudio.pause();
     activeVoiceAudio = null;
   }
-  const res = await window.EnlaceRepo.postTTS({ text });
+  const voiceLanguage = getPreferredLanguage();
+  const res = await window.EnlaceRepo.postTTS(
+    { text, language: voiceLanguage || undefined },
+    {
+      extraHeaders: buildLanguageHeaders(voiceLanguage),
+    }
+  );
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     throw new Error(`TTS failed (${res.status}): ${detail.slice(0, 200)}`);
@@ -321,14 +332,12 @@ async function stopMicAndTranscribe() {
   micRecording = false;
   setMicUI(false);
 
-  const headers = { Accept: "application/json" };
-  if (OPS_ASSET_ID) {
-    headers["x-ops-asset-id"] = OPS_ASSET_ID;
+  if (!window.EnlaceRepo?.postVoiceSTT) {
+    throw new Error("Enlace voice module is not loaded.");
   }
-  const res = await fetch(ENLACE_VOICE_API, {
-    method: "POST",
-    headers,
-    body: blob,
+  const preferredLanguage = getPreferredLanguage();
+  const res = await window.EnlaceRepo.postVoiceSTT(blob, {
+    extraHeaders: buildLanguageHeaders(preferredLanguage),
   });
 
   if (!res.ok) {
@@ -337,6 +346,12 @@ async function stopMicAndTranscribe() {
   }
 
   logResponseMeta(res.headers);
+  const detectedLanguage = res.headers.get("x-chattia-stt-iso2");
+  if (detectedLanguage) {
+    lastVoiceLanguage = detectedLanguage;
+  } else if (!lastVoiceLanguage && preferredLanguage) {
+    lastVoiceLanguage = preferredLanguage;
+  }
   const data = await res.json();
   const transcript = data?.transcript ? String(data.transcript) : "";
   if (!transcript) throw new Error("No transcript returned.");
@@ -447,6 +462,33 @@ const buildMessages = (message) => [
   },
 ];
 
+const getLanguageMeta = () => {
+  const languages = Array.isArray(navigator.languages)
+    ? navigator.languages.filter(Boolean)
+    : [];
+  const primary = navigator.language || languages[0] || "";
+  return {
+    language_hint: primary,
+    language_list: languages,
+  };
+};
+
+const getPreferredLanguage = () =>
+  lastVoiceLanguage ||
+  navigator.language ||
+  (Array.isArray(navigator.languages) ? navigator.languages[0] : "") ||
+  "";
+
+const buildLanguageHeaders = (language) => {
+  const languages = Array.isArray(navigator.languages)
+    ? navigator.languages.filter(Boolean)
+    : [];
+  return {
+    "x-chattia-lang-hint": language || "",
+    "x-chattia-lang-list": languages.join(","),
+  };
+};
+
 const streamWorkerResponse = async (response, bubble) => {
   if (!response.body) {
     bubble.textContent = "We couldn't connect to the assistant stream.";
@@ -464,6 +506,7 @@ const streamWorkerResponse = async (response, bubble) => {
       hasChunk = true;
     }
     bubble.textContent += text;
+    bubble.setAttribute("dir", getTextDirection(bubble.textContent));
     chatLog.scrollTop = chatLog.scrollHeight;
   };
 
@@ -594,6 +637,8 @@ form.addEventListener("submit", async (event) => {
           currentUrl: window.location.href,
           allowedOrigins,
           ...DEFAULT_REQUEST_META,
+          ...getLanguageMeta(),
+          voice_language: lastVoiceLanguage || undefined,
         },
       },
       { signal: controller.signal }
