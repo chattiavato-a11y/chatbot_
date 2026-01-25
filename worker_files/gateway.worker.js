@@ -86,9 +86,23 @@ const sanitizeValue = (value, findings) => {
   return value;
 };
 
+const buildGeoContext = (request) => {
+  const cf = request.cf || {};
+  const country = cf.country || request.headers.get("CF-IPCountry") || "";
+  return {
+    country,
+    region: cf.region || "",
+    city: cf.city || "",
+    timezone: cf.timezone || "",
+    continent: cf.continent || "",
+  };
+};
+
 const enrichPayload = (payload, request, findings, requestId) => {
   const meta = payload.meta && typeof payload.meta === "object" ? payload.meta : {};
   const sanitizedMeta = sanitizeValue(meta, findings);
+  const geo = buildGeoContext(request);
+  const acceptLanguage = request.headers.get("Accept-Language") || "";
   return {
     ...payload,
     meta: {
@@ -98,6 +112,8 @@ const enrichPayload = (payload, request, findings, requestId) => {
         receivedAt: new Date().toISOString(),
         userAgent: request.headers.get("User-Agent") || "",
         ip: request.headers.get("CF-Connecting-IP") || "",
+        acceptLanguage,
+        geo,
         sanitized: findings.size > 0,
         findings: Array.from(findings),
       },
