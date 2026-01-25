@@ -382,7 +382,6 @@ async function stopMicAndTranscribe() {
 async function onMicClick() {
   try {
     if (!micRecording) {
-      voiceReplyRequested = true;
       await startMic();
       setTimeout(async () => {
         if (micRecording) {
@@ -390,6 +389,7 @@ async function onMicClick() {
             await stopMicAndTranscribe();
           } catch (error) {
             console.error(error);
+            voiceReplyRequested = false;
           }
         }
       }, 8000);
@@ -398,6 +398,7 @@ async function onMicClick() {
     }
   } catch (error) {
     micRecording = false;
+    voiceReplyRequested = false;
     setMicUI(false);
     try {
       micStream?.getTracks()?.forEach((track) => track.stop());
