@@ -43,6 +43,24 @@ const buildCorsHeaders = (origin, allowedOrigins) => {
   return headers;
 };
 
+const applySecurityHeaders = (headers) => {
+  if (!headers.has("Content-Security-Policy")) {
+    headers.set(
+      "Content-Security-Policy",
+      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    );
+  }
+  headers.set(
+    "Strict-Transport-Security",
+    "max-age=31536000; includeSubDomains; preload"
+  );
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
+  headers.set("Cross-Origin-Resource-Policy", "cross-origin");
+};
+
 const ensureRequiredHeaders = (request, requiredHeaders) =>
   requiredHeaders.every((header) => request.headers.has(header));
 
@@ -135,12 +153,14 @@ export default {
     const isVoiceStt = isVoiceSttRequest(request);
 
     if (request.method === "OPTIONS") {
+      applySecurityHeaders(corsHeaders);
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
     if (new URL(request.url).pathname === "/health") {
       const healthHeaders = new Headers(corsHeaders);
       healthHeaders.set("Content-Type", "application/json");
+      applySecurityHeaders(healthHeaders);
       return new Response(JSON.stringify({ status: "ok" }), {
         status: 200,
         headers: healthHeaders,
@@ -148,11 +168,21 @@ export default {
     }
 
     if (!env.ENLACE_URL) {
-      return new Response("ENLACE_URL is not configured.", { status: 500 });
+      const errorHeaders = new Headers(corsHeaders);
+      applySecurityHeaders(errorHeaders);
+      return new Response("ENLACE_URL is not configured.", {
+        status: 500,
+        headers: errorHeaders,
+      });
     }
 
     if (request.method !== "POST") {
-      return new Response("Method Not Allowed", { status: 405 });
+      const errorHeaders = new Headers(corsHeaders);
+      applySecurityHeaders(errorHeaders);
+      return new Response("Method Not Allowed", {
+        status: 405,
+        headers: errorHeaders,
+      });
     }
 
     const requestRequiredHeaders = getRequiredHeadersForRequest(
@@ -160,13 +190,23 @@ export default {
       requiredHeaders
     );
     if (!ensureRequiredHeaders(request, requestRequiredHeaders)) {
-      return new Response("Missing required headers.", { status: 400 });
+      const errorHeaders = new Headers(corsHeaders);
+      applySecurityHeaders(errorHeaders);
+      return new Response("Missing required headers.", {
+        status: 400,
+        headers: errorHeaders,
+      });
     }
 
     const contentType = request.headers.get("Content-Type") || "";
     const isJson = contentType.includes("application/json");
     if (!isJson && !isVoiceStt) {
-      return new Response("Unsupported content type.", { status: 415 });
+      const errorHeaders = new Headers(corsHeaders);
+      applySecurityHeaders(errorHeaders);
+      return new Response("Unsupported content type.", {
+        status: 415,
+        headers: errorHeaders,
+      });
     }
 
     const requestId = crypto.randomUUID();
@@ -176,7 +216,12 @@ export default {
     if (isVoiceStt && !isJson) {
       const rawBody = await request.arrayBuffer();
       if (rawBody.byteLength > MAX_BODY_BYTES) {
-        return new Response("Payload too large.", { status: 413 });
+        const errorHeaders = new Headers(corsHeaders);
+        applySecurityHeaders(errorHeaders);
+        return new Response("Payload too large.", {
+          status: 413,
+          headers: errorHeaders,
+        });
       }
 
       upstreamResponse = await fetch(targetUrl.toString(), {
@@ -190,14 +235,24 @@ export default {
     } else {
       const rawBody = await request.text();
       if (rawBody.length > MAX_BODY_BYTES) {
-        return new Response("Payload too large.", { status: 413 });
+        const errorHeaders = new Headers(corsHeaders);
+        applySecurityHeaders(errorHeaders);
+        return new Response("Payload too large.", {
+          status: 413,
+          headers: errorHeaders,
+        });
       }
 
       let payload;
       try {
         payload = JSON.parse(rawBody);
       } catch (error) {
-        return new Response("Invalid JSON payload.", { status: 400 });
+        const errorHeaders = new Headers(corsHeaders);
+        applySecurityHeaders(errorHeaders);
+        return new Response("Invalid JSON payload.", {
+          status: 400,
+          headers: errorHeaders,
+        });
       }
 
       const findings = new Set();
@@ -222,6 +277,7 @@ export default {
     const responseHeaders = new Headers(upstreamResponse.headers);
     corsHeaders.forEach((value, key) => responseHeaders.set(key, value));
     responseHeaders.set("X-Gateway-Request-Id", requestId);
+    applySecurityHeaders(responseHeaders);
 
     return new Response(upstreamResponse.body, {
       status: upstreamResponse.status,
