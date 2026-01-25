@@ -325,6 +325,9 @@ async function stopMicAndTranscribe() {
   }
   micRecorder.stop();
   await stopped;
+  if (micChunks.length === 0) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
 
   try {
     micStream?.getTracks()?.forEach((track) => track.stop());
@@ -370,7 +373,11 @@ async function stopMicAndTranscribe() {
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.focus();
     voiceReplyRequested = true;
-    form?.requestSubmit();
+    if (form?.requestSubmit) {
+      form.requestSubmit();
+    } else {
+      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    }
   }
   if (voiceHelper) {
     voiceHelper.textContent = `Heard: “${transcript}”`;
@@ -382,7 +389,6 @@ async function stopMicAndTranscribe() {
 async function onMicClick() {
   try {
     if (!micRecording) {
-      voiceReplyRequested = true;
       await startMic();
       setTimeout(async () => {
         if (micRecording) {
@@ -390,6 +396,7 @@ async function onMicClick() {
             await stopMicAndTranscribe();
           } catch (error) {
             console.error(error);
+            voiceReplyRequested = false;
           }
         }
       }, 8000);
@@ -398,6 +405,7 @@ async function onMicClick() {
     }
   } catch (error) {
     micRecording = false;
+    voiceReplyRequested = false;
     setMicUI(false);
     try {
       micStream?.getTracks()?.forEach((track) => track.stop());
