@@ -46,38 +46,118 @@ const TRANSLATIONS = {
     startConversation: "Start a conversation",
     introCopy:
       "Chat in any language — spoken or written. Chattia auto-detects your language and replies in kind.",
-    messagePlaceholder: "Message in any language...",
-    listeningPlaceholder: "Listening...",
-    listeningHelper: "Listening... click to stop.",
-    send: "Send",
-    standingBy: "Standing by.",
-    thinkingFrames: ["Thinking.", "Thinking..", "Thinking...", "Thinking...."],
-    voiceReplyTitle: "Voice reply (up to 8 seconds)",
-    voiceReplyAria: "Voice reply",
-    typeMessageAria: "Type your message",
-    micNotSupported: "Microphone not supported on this device",
-    micNotSupportedHelper: "Microphone not supported in this browser.",
-    micError: "Microphone error",
-    micUnavailable: "Microphone unavailable.",
+    greeting: "Hello",
+    farewell: "Goodbye",
+    chattiaIntro:
+      "Chat in any language — spoken or written. Chattia auto-detects your language and replies in kind.",
   },
   es: {
     welcome: "Bienvenido",
     startConversation: "Inicia una conversación",
     introCopy:
       "Chatea en cualquier idioma — hablado o escrito. Chattia detecta tu idioma y responde en el mismo.",
-    messagePlaceholder: "Escribe un mensaje en cualquier idioma...",
-    listeningPlaceholder: "Escuchando...",
-    listeningHelper: "Escuchando... haz clic para detener.",
-    send: "Enviar",
-    standingBy: "En espera.",
-    thinkingFrames: ["Pensando.", "Pensando..", "Pensando...", "Pensando...."],
-    voiceReplyTitle: "Respuesta por voz (hasta 8 segundos)",
-    voiceReplyAria: "Respuesta por voz",
-    typeMessageAria: "Escribe tu mensaje",
-    micNotSupported: "Micrófono no compatible en este dispositivo",
-    micNotSupportedHelper: "Micrófono no compatible en este navegador.",
-    micError: "Error del micrófono",
-    micUnavailable: "Micrófono no disponible.",
+    greeting: "Hola",
+    farewell: "Adiós",
+    chattiaIntro:
+      "Chatea en cualquier idioma — hablado o escrito. Chattia detecta tu idioma y responde en el mismo.",
+  },
+  fr: {
+    welcome: "Bienvenue",
+    startConversation: "Commencez une conversation",
+    introCopy:
+      "Discutez dans n’importe quelle langue — parlée ou écrite. Chattia détecte votre langue et répond en conséquence.",
+    greeting: "Bonjour",
+    farewell: "Au revoir",
+    chattiaIntro:
+      "Discutez dans n’importe quelle langue — parlée ou écrite. Chattia détecte votre langue et répond en conséquence.",
+  },
+  pt: {
+    welcome: "Bem-vindo",
+    startConversation: "Inicie uma conversa",
+    introCopy:
+      "Converse em qualquer idioma — falado ou escrito. Chattia detecta seu idioma e responde da mesma forma.",
+    greeting: "Olá",
+    farewell: "Tchau",
+    chattiaIntro:
+      "Converse em qualquer idioma — falado ou escrito. Chattia detecta seu idioma e responde da mesma forma.",
+  },
+  ar: {
+    welcome: "مرحبًا",
+    startConversation: "ابدأ محادثة",
+    introCopy:
+      "تحدث بأي لغة — منطوقة أو مكتوبة. يكتشف Chattia لغتك ويرد بالمثل.",
+    greeting: "مرحبًا",
+    farewell: "مع السلامة",
+    chattiaIntro:
+      "تحدث بأي لغة — منطوقة أو مكتوبة. يكتشف Chattia لغتك ويرد بالمثل.",
+  },
+  ru: {
+    welcome: "Добро пожаловать",
+    startConversation: "Начните разговор",
+    introCopy:
+      "Общайтесь на любом языке — устном или письменном. Chattia определяет ваш язык и отвечает тем же.",
+    greeting: "Здравствуйте",
+    farewell: "До свидания",
+    chattiaIntro:
+      "Общайтесь на любом языке — устном или письменном. Chattia определяет ваш язык и отвечает тем же.",
+  },
+  zh: {
+    welcome: "欢迎",
+    startConversation: "开始对话",
+    introCopy: "用任何语言交流——口语或书面语。Chattia 会自动识别你的语言并以相同语言回复。",
+    greeting: "你好",
+    farewell: "再见",
+    chattiaIntro:
+      "用任何语言交流——口语或书面语。Chattia 会自动识别你的语言并以相同语言回复。",
+  },
+  yue: {
+    welcome: "歡迎",
+    startConversation: "開始對話",
+    introCopy: "用任何語言交流——口語或書面語。Chattia 會自動識別你嘅語言並用相同語言回覆。",
+    greeting: "你好",
+    farewell: "再見",
+    chattiaIntro:
+      "用任何語言交流——口語或書面語。Chattia 會自動識別你嘅語言並用相同語言回覆。",
+  },
+  de: {
+    welcome: "Willkommen",
+    startConversation: "Starten Sie ein Gespräch",
+    introCopy:
+      "Chatten Sie in jeder Sprache — gesprochen oder geschrieben. Chattia erkennt Ihre Sprache und antwortet entsprechend.",
+    greeting: "Hallo",
+    farewell: "Auf Wiedersehen",
+    chattiaIntro:
+      "Chatten Sie in jeder Sprache — gesprochen oder geschrieben. Chattia erkennt Ihre Sprache und antwortet entsprechend.",
+  },
+  sv: {
+    welcome: "Välkommen",
+    startConversation: "Starta en konversation",
+    introCopy:
+      "Chatta på vilket språk som helst — talat eller skrivet. Chattia identifierar ditt språk och svarar på samma sätt.",
+    greeting: "Hej",
+    farewell: "Hej då",
+    chattiaIntro:
+      "Chatta på vilket språk som helst — talat eller skrivet. Chattia identifierar ditt språk och svarar på samma sätt.",
+  },
+  no: {
+    welcome: "Velkommen",
+    startConversation: "Start en samtale",
+    introCopy:
+      "Chat på hvilket som helst språk — muntlig eller skriftlig. Chattia oppdager språket ditt og svarer på samme måte.",
+    greeting: "Hei",
+    farewell: "Ha det",
+    chattiaIntro:
+      "Chat på hvilket som helst språk — muntlig eller skriftlig. Chattia oppdager språket ditt og svarer på samme måte.",
+  },
+  fi: {
+    welcome: "Tervetuloa",
+    startConversation: "Aloita keskustelu",
+    introCopy:
+      "Keskustele millä tahansa kielellä — puhuttuna tai kirjoitettuna. Chattia tunnistaa kielesi ja vastaa samalla kielellä.",
+    greeting: "Hei",
+    farewell: "Näkemiin",
+    chattiaIntro:
+      "Keskustele millä tahansa kielellä — puhuttuna tai kirjoitettuna. Chattia tunnistaa kielesi ja vastaa samalla kielellä.",
   },
 };
 
@@ -184,7 +264,7 @@ const endpointStatus = document.getElementById("endpoint-status");
 const thinkingStatus = document.getElementById("thinking-status");
 const voiceHelper = document.getElementById("voice-helper");
 const cancelBtn = document.getElementById("cancel-btn");
-const getThinkingFrames = () => t("thinkingFrames");
+const thinkingFrames = ["Thinking.", "Thinking..", "Thinking...", "Thinking...."];
 let thinkingInterval = null;
 let thinkingIndex = 0;
 let activeThinkingBubble = null;
@@ -223,8 +303,7 @@ const updateSendState = () => {
 };
 
 const updateThinkingText = () => {
-  const frames = getThinkingFrames();
-  const text = frames[thinkingIndex % frames.length];
+  const text = thinkingFrames[thinkingIndex % thinkingFrames.length];
   thinkingIndex += 1;
   if (thinkingStatus) {
     thinkingStatus.textContent = text;
@@ -250,7 +329,7 @@ const stopThinking = () => {
   }
   activeThinkingBubble = null;
   if (thinkingStatus) {
-    thinkingStatus.textContent = t("standingBy");
+    thinkingStatus.textContent = "Standing by.";
   }
 };
 
@@ -334,10 +413,10 @@ function setMicUI(isOn) {
   btn.classList.toggle("is-listening", isOn);
   btn.setAttribute("aria-pressed", isOn ? "true" : "false");
   if (voiceHelper) {
-    voiceHelper.textContent = isOn ? t("listeningHelper") : "";
+    voiceHelper.textContent = isOn ? "Listening... click to stop." : "";
   }
   if (input) {
-    input.placeholder = isOn ? t("listeningPlaceholder") : t("messagePlaceholder");
+    input.placeholder = isOn ? "Listening..." : "Message in any language...";
   }
 }
 
@@ -377,7 +456,7 @@ async function playVoiceReply(text) {
 
 async function startMic() {
   if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error(t("micNotSupportedHelper"));
+    throw new Error("Microphone not supported in this browser.");
   }
   micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -501,10 +580,10 @@ async function onMicClick() {
 
     if (input) {
       input.placeholder =
-        error?.message ? String(error.message) : t("micError");
+        error?.message ? String(error.message) : "Microphone error";
     }
     if (voiceHelper) {
-      voiceHelper.textContent = t("micUnavailable");
+      voiceHelper.textContent = "Microphone unavailable.";
     }
   }
 }
@@ -516,9 +595,11 @@ document.addEventListener("DOMContentLoaded", () => {
     navigator.mediaDevices?.getUserMedia && window.MediaRecorder
   );
   btn.disabled = !hasMediaSupport;
-  btn.title = hasMediaSupport ? t("voiceReplyTitle") : t("micNotSupported");
+  btn.title = hasMediaSupport
+    ? "Voice reply (up to 8 seconds)"
+    : "Microphone not supported on this device";
   if (!hasMediaSupport && voiceHelper) {
-    voiceHelper.textContent = t("micNotSupportedHelper");
+    voiceHelper.textContent = "Microphone not supported in this browser.";
   }
   btn.addEventListener("click", onMicClick);
 });
@@ -700,7 +781,7 @@ form.addEventListener("submit", async (event) => {
   updateSendState();
   input.blur();
 
-  const assistantBubble = addMessage(getThinkingFrames()[0] || "Thinking.", false);
+  const assistantBubble = addMessage(thinkingFrames[0], false);
   startThinking(assistantBubble);
 
   const endpoint = getActiveEndpoint();
