@@ -40,6 +40,47 @@ const defaultConfig = {
 
 };
 
+const TRANSLATIONS = {
+  en: {
+    welcome: "Welcome",
+    startConversation: "Start a conversation",
+    introCopy:
+      "Chat in any language — spoken or written. Chattia auto-detects your language and replies in kind.",
+    messagePlaceholder: "Message in any language...",
+    listeningPlaceholder: "Listening...",
+    listeningHelper: "Listening... click to stop.",
+    send: "Send",
+    standingBy: "Standing by.",
+    thinkingFrames: ["Thinking.", "Thinking..", "Thinking...", "Thinking...."],
+    voiceReplyTitle: "Voice reply (up to 8 seconds)",
+    voiceReplyAria: "Voice reply",
+    typeMessageAria: "Type your message",
+    micNotSupported: "Microphone not supported on this device",
+    micNotSupportedHelper: "Microphone not supported in this browser.",
+    micError: "Microphone error",
+    micUnavailable: "Microphone unavailable.",
+  },
+  es: {
+    welcome: "Bienvenido",
+    startConversation: "Inicia una conversación",
+    introCopy:
+      "Chatea en cualquier idioma — hablado o escrito. Chattia detecta tu idioma y responde en el mismo.",
+    messagePlaceholder: "Escribe un mensaje en cualquier idioma...",
+    listeningPlaceholder: "Escuchando...",
+    listeningHelper: "Escuchando... haz clic para detener.",
+    send: "Enviar",
+    standingBy: "En espera.",
+    thinkingFrames: ["Pensando.", "Pensando..", "Pensando...", "Pensando...."],
+    voiceReplyTitle: "Respuesta por voz (hasta 8 segundos)",
+    voiceReplyAria: "Respuesta por voz",
+    typeMessageAria: "Escribe tu mensaje",
+    micNotSupported: "Micrófono no compatible en este dispositivo",
+    micNotSupportedHelper: "Micrófono no compatible en este navegador.",
+    micError: "Error del micrófono",
+    micUnavailable: "Micrófono no disponible.",
+  },
+};
+
 let workerEndpoint = defaultConfig.workerEndpoint;
 let gatewayEndpoint = defaultConfig.gatewayEndpoint;
 let allowedOrigins = [...defaultConfig.allowedOrigins];
@@ -58,6 +99,46 @@ const RTL_CHARACTERS = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
 
 const getTextDirection = (text) =>
   RTL_CHARACTERS.test(text) ? "rtl" : "ltr";
+
+const normalizeLocale = (value) =>
+  value ? String(value).toLowerCase().split("-")[0] : "";
+
+const getPreferredLocale = () => {
+  const languages = Array.isArray(navigator.languages)
+    ? navigator.languages.filter(Boolean)
+    : [];
+  const primary = navigator.language || languages[0] || "en";
+  const normalized = normalizeLocale(primary);
+  return TRANSLATIONS[normalized] ? normalized : "en";
+};
+
+let currentLocale = getPreferredLocale();
+
+const t = (key) =>
+  TRANSLATIONS[currentLocale]?.[key] ?? TRANSLATIONS.en[key] ?? "";
+
+const applyTranslations = () => {
+  document.documentElement.lang = currentLocale;
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.getAttribute("data-i18n");
+    if (!key) return;
+    const value = t(key);
+    if (value) {
+      el.textContent = value;
+    }
+  });
+  document.querySelectorAll("[data-i18n-attr]").forEach((el) => {
+    const raw = el.getAttribute("data-i18n-attr") || "";
+    raw.split(",").forEach((pair) => {
+      const [attr, key] = pair.split(":").map((part) => part.trim());
+      if (!attr || !key) return;
+      const value = t(key);
+      if (value) {
+        el.setAttribute(attr, value);
+      }
+    });
+  });
+};
 
 const PAGE_GRADIENTS = [
   "linear-gradient(135deg, rgba(187, 247, 208, 0.68) 0%, rgba(134, 239, 172, 0.62) 45%, rgba(167, 243, 208, 0.58) 100%)",
@@ -103,7 +184,7 @@ const endpointStatus = document.getElementById("endpoint-status");
 const thinkingStatus = document.getElementById("thinking-status");
 const voiceHelper = document.getElementById("voice-helper");
 const cancelBtn = document.getElementById("cancel-btn");
-const thinkingFrames = ["Thinking.", "Thinking..", "Thinking...", "Thinking...."];
+const getThinkingFrames = () => t("thinkingFrames");
 let thinkingInterval = null;
 let thinkingIndex = 0;
 let activeThinkingBubble = null;
@@ -142,7 +223,8 @@ const updateSendState = () => {
 };
 
 const updateThinkingText = () => {
-  const text = thinkingFrames[thinkingIndex % thinkingFrames.length];
+  const frames = getThinkingFrames();
+  const text = frames[thinkingIndex % frames.length];
   thinkingIndex += 1;
   if (thinkingStatus) {
     thinkingStatus.textContent = text;
@@ -168,7 +250,7 @@ const stopThinking = () => {
   }
   activeThinkingBubble = null;
   if (thinkingStatus) {
-    thinkingStatus.textContent = "Standing by.";
+    thinkingStatus.textContent = t("standingBy");
   }
 };
 
@@ -184,6 +266,7 @@ const rotateBackgroundGradient = () => {
 };
 
 rotateBackgroundGradient();
+applyTranslations();
 
 input.addEventListener("input", updateSendState);
 input.addEventListener("focus", () => {
@@ -251,10 +334,10 @@ function setMicUI(isOn) {
   btn.classList.toggle("is-listening", isOn);
   btn.setAttribute("aria-pressed", isOn ? "true" : "false");
   if (voiceHelper) {
-    voiceHelper.textContent = isOn ? "Listening... click to stop." : "";
+    voiceHelper.textContent = isOn ? t("listeningHelper") : "";
   }
   if (input) {
-    input.placeholder = isOn ? "Listening..." : "Message in any language...";
+    input.placeholder = isOn ? t("listeningPlaceholder") : t("messagePlaceholder");
   }
 }
 
@@ -294,7 +377,7 @@ async function playVoiceReply(text) {
 
 async function startMic() {
   if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error("Microphone not supported in this browser.");
+    throw new Error(t("micNotSupportedHelper"));
   }
   micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -418,10 +501,10 @@ async function onMicClick() {
 
     if (input) {
       input.placeholder =
-        error?.message ? String(error.message) : "Microphone error";
+        error?.message ? String(error.message) : t("micError");
     }
     if (voiceHelper) {
-      voiceHelper.textContent = "Microphone unavailable.";
+      voiceHelper.textContent = t("micUnavailable");
     }
   }
 }
@@ -433,11 +516,9 @@ document.addEventListener("DOMContentLoaded", () => {
     navigator.mediaDevices?.getUserMedia && window.MediaRecorder
   );
   btn.disabled = !hasMediaSupport;
-  btn.title = hasMediaSupport
-    ? "Voice reply (up to 8 seconds)"
-    : "Microphone not supported on this device";
+  btn.title = hasMediaSupport ? t("voiceReplyTitle") : t("micNotSupported");
   if (!hasMediaSupport && voiceHelper) {
-    voiceHelper.textContent = "Microphone not supported in this browser.";
+    voiceHelper.textContent = t("micNotSupportedHelper");
   }
   btn.addEventListener("click", onMicClick);
 });
@@ -619,7 +700,7 @@ form.addEventListener("submit", async (event) => {
   updateSendState();
   input.blur();
 
-  const assistantBubble = addMessage("Thinking.", false);
+  const assistantBubble = addMessage(getThinkingFrames()[0] || "Thinking.", false);
   startThinking(assistantBubble);
 
   const endpoint = getActiveEndpoint();

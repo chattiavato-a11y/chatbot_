@@ -35,18 +35,20 @@
       </div>
       <div class="header-actions" aria-live="polite">
         <div class="status-stack">
-          <span id="thinking-status" class="status-line">Standing by.</span>
+          <span id="thinking-status" class="status-line" data-i18n="standingBy">Standing by.</span>
         </div>
       </div>
     </header>
 
     <section class="chat-body" id="chat-log" aria-live="polite">
       <div class="intro-copy intro-panel" aria-label="Chat introduction">
-        <span class="intro-kicker">Welcome</span>
-        <h2>Start a conversation</h2>
+        <span class="intro-kicker" data-i18n="welcome">Welcome</span>
+        <h2 data-i18n="startConversation">Start a conversation</h2>
         <p>
-          Chat in any language — spoken or written. Chattia auto-detects your language
-          and replies in kind.
+          <span data-i18n="introCopy">
+            Chat in any language — spoken or written. Chattia auto-detects your language
+            and replies in kind.
+          </span>
         </p>
       </div>
     </section>
@@ -59,10 +61,17 @@
           placeholder="Message in any language..."
           maxlength="256"
           aria-label="Type your message"
+          data-i18n-attr="placeholder:messagePlaceholder,aria-label:typeMessageAria"
           required
         />
         <span id="voice-helper" class="voice-helper" aria-live="polite"></span>
-        <button id="micBtn" type="button" aria-label="Voice reply" aria-pressed="false">
+        <button
+          id="micBtn"
+          type="button"
+          aria-label="Voice reply"
+          aria-pressed="false"
+          data-i18n-attr="aria-label:voiceReplyAria"
+        >
           <svg class="voice-wave-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
             <rect x="4" y="6" width="40" height="36" rx="10" fill="currentColor" />
             <g stroke="#ffffff" stroke-linecap="round" stroke-width="2.6">
@@ -74,7 +83,9 @@
             </g>
           </svg>
         </button>
-        <button class="send-btn" type="submit" id="send-btn" disabled>Send</button>
+        <button class="send-btn" type="submit" id="send-btn" disabled data-i18n="send">
+          Send
+        </button>
       </form>
     </footer>
   </main>
