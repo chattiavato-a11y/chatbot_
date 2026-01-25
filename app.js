@@ -40,6 +40,127 @@ const defaultConfig = {
 
 };
 
+const TRANSLATIONS = {
+  en: {
+    welcome: "Welcome",
+    startConversation: "Start a conversation",
+    introCopy:
+      "Chat in any language — spoken or written. Chattia auto-detects your language and replies in kind.",
+    greeting: "Hello",
+    farewell: "Goodbye",
+    chattiaIntro:
+      "Chat in any language — spoken or written. Chattia auto-detects your language and replies in kind.",
+  },
+  es: {
+    welcome: "Bienvenido",
+    startConversation: "Inicia una conversación",
+    introCopy:
+      "Chatea en cualquier idioma — hablado o escrito. Chattia detecta tu idioma y responde en el mismo.",
+    greeting: "Hola",
+    farewell: "Adiós",
+    chattiaIntro:
+      "Chatea en cualquier idioma — hablado o escrito. Chattia detecta tu idioma y responde en el mismo.",
+  },
+  fr: {
+    welcome: "Bienvenue",
+    startConversation: "Commencez une conversation",
+    introCopy:
+      "Discutez dans n’importe quelle langue — parlée ou écrite. Chattia détecte votre langue et répond en conséquence.",
+    greeting: "Bonjour",
+    farewell: "Au revoir",
+    chattiaIntro:
+      "Discutez dans n’importe quelle langue — parlée ou écrite. Chattia détecte votre langue et répond en conséquence.",
+  },
+  pt: {
+    welcome: "Bem-vindo",
+    startConversation: "Inicie uma conversa",
+    introCopy:
+      "Converse em qualquer idioma — falado ou escrito. Chattia detecta seu idioma e responde da mesma forma.",
+    greeting: "Olá",
+    farewell: "Tchau",
+    chattiaIntro:
+      "Converse em qualquer idioma — falado ou escrito. Chattia detecta seu idioma e responde da mesma forma.",
+  },
+  ar: {
+    welcome: "مرحبًا",
+    startConversation: "ابدأ محادثة",
+    introCopy:
+      "تحدث بأي لغة — منطوقة أو مكتوبة. يكتشف Chattia لغتك ويرد بالمثل.",
+    greeting: "مرحبًا",
+    farewell: "مع السلامة",
+    chattiaIntro:
+      "تحدث بأي لغة — منطوقة أو مكتوبة. يكتشف Chattia لغتك ويرد بالمثل.",
+  },
+  ru: {
+    welcome: "Добро пожаловать",
+    startConversation: "Начните разговор",
+    introCopy:
+      "Общайтесь на любом языке — устном или письменном. Chattia определяет ваш язык и отвечает тем же.",
+    greeting: "Здравствуйте",
+    farewell: "До свидания",
+    chattiaIntro:
+      "Общайтесь на любом языке — устном или письменном. Chattia определяет ваш язык и отвечает тем же.",
+  },
+  zh: {
+    welcome: "欢迎",
+    startConversation: "开始对话",
+    introCopy: "用任何语言交流——口语或书面语。Chattia 会自动识别你的语言并以相同语言回复。",
+    greeting: "你好",
+    farewell: "再见",
+    chattiaIntro:
+      "用任何语言交流——口语或书面语。Chattia 会自动识别你的语言并以相同语言回复。",
+  },
+  yue: {
+    welcome: "歡迎",
+    startConversation: "開始對話",
+    introCopy: "用任何語言交流——口語或書面語。Chattia 會自動識別你嘅語言並用相同語言回覆。",
+    greeting: "你好",
+    farewell: "再見",
+    chattiaIntro:
+      "用任何語言交流——口語或書面語。Chattia 會自動識別你嘅語言並用相同語言回覆。",
+  },
+  de: {
+    welcome: "Willkommen",
+    startConversation: "Starten Sie ein Gespräch",
+    introCopy:
+      "Chatten Sie in jeder Sprache — gesprochen oder geschrieben. Chattia erkennt Ihre Sprache und antwortet entsprechend.",
+    greeting: "Hallo",
+    farewell: "Auf Wiedersehen",
+    chattiaIntro:
+      "Chatten Sie in jeder Sprache — gesprochen oder geschrieben. Chattia erkennt Ihre Sprache und antwortet entsprechend.",
+  },
+  sv: {
+    welcome: "Välkommen",
+    startConversation: "Starta en konversation",
+    introCopy:
+      "Chatta på vilket språk som helst — talat eller skrivet. Chattia identifierar ditt språk och svarar på samma sätt.",
+    greeting: "Hej",
+    farewell: "Hej då",
+    chattiaIntro:
+      "Chatta på vilket språk som helst — talat eller skrivet. Chattia identifierar ditt språk och svarar på samma sätt.",
+  },
+  no: {
+    welcome: "Velkommen",
+    startConversation: "Start en samtale",
+    introCopy:
+      "Chat på hvilket som helst språk — muntlig eller skriftlig. Chattia oppdager språket ditt og svarer på samme måte.",
+    greeting: "Hei",
+    farewell: "Ha det",
+    chattiaIntro:
+      "Chat på hvilket som helst språk — muntlig eller skriftlig. Chattia oppdager språket ditt og svarer på samme måte.",
+  },
+  fi: {
+    welcome: "Tervetuloa",
+    startConversation: "Aloita keskustelu",
+    introCopy:
+      "Keskustele millä tahansa kielellä — puhuttuna tai kirjoitettuna. Chattia tunnistaa kielesi ja vastaa samalla kielellä.",
+    greeting: "Hei",
+    farewell: "Näkemiin",
+    chattiaIntro:
+      "Keskustele millä tahansa kielellä — puhuttuna tai kirjoitettuna. Chattia tunnistaa kielesi ja vastaa samalla kielellä.",
+  },
+};
+
 let workerEndpoint = defaultConfig.workerEndpoint;
 let gatewayEndpoint = defaultConfig.gatewayEndpoint;
 let allowedOrigins = [...defaultConfig.allowedOrigins];
@@ -58,6 +179,46 @@ const RTL_CHARACTERS = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
 
 const getTextDirection = (text) =>
   RTL_CHARACTERS.test(text) ? "rtl" : "ltr";
+
+const normalizeLocale = (value) =>
+  value ? String(value).toLowerCase().split("-")[0] : "";
+
+const getPreferredLocale = () => {
+  const languages = Array.isArray(navigator.languages)
+    ? navigator.languages.filter(Boolean)
+    : [];
+  const primary = navigator.language || languages[0] || "en";
+  const normalized = normalizeLocale(primary);
+  return TRANSLATIONS[normalized] ? normalized : "en";
+};
+
+let currentLocale = getPreferredLocale();
+
+const t = (key) =>
+  TRANSLATIONS[currentLocale]?.[key] ?? TRANSLATIONS.en[key] ?? "";
+
+const applyTranslations = () => {
+  document.documentElement.lang = currentLocale;
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.getAttribute("data-i18n");
+    if (!key) return;
+    const value = t(key);
+    if (value) {
+      el.textContent = value;
+    }
+  });
+  document.querySelectorAll("[data-i18n-attr]").forEach((el) => {
+    const raw = el.getAttribute("data-i18n-attr") || "";
+    raw.split(",").forEach((pair) => {
+      const [attr, key] = pair.split(":").map((part) => part.trim());
+      if (!attr || !key) return;
+      const value = t(key);
+      if (value) {
+        el.setAttribute(attr, value);
+      }
+    });
+  });
+};
 
 const PAGE_GRADIENTS = [
   "linear-gradient(135deg, rgba(187, 247, 208, 0.68) 0%, rgba(134, 239, 172, 0.62) 45%, rgba(167, 243, 208, 0.58) 100%)",
@@ -184,6 +345,7 @@ const rotateBackgroundGradient = () => {
 };
 
 rotateBackgroundGradient();
+applyTranslations();
 
 input.addEventListener("input", updateSendState);
 input.addEventListener("focus", () => {
@@ -619,7 +781,7 @@ form.addEventListener("submit", async (event) => {
   updateSendState();
   input.blur();
 
-  const assistantBubble = addMessage("Thinking.", false);
+  const assistantBubble = addMessage(thinkingFrames[0], false);
   startThinking(assistantBubble);
 
   const endpoint = getActiveEndpoint();

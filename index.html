@@ -42,11 +42,13 @@
 
     <section class="chat-body" id="chat-log" aria-live="polite">
       <div class="intro-copy intro-panel" aria-label="Chat introduction">
-        <span class="intro-kicker">Welcome</span>
-        <h2>Start a conversation</h2>
+        <span class="intro-kicker" data-i18n="welcome">Welcome</span>
+        <h2 data-i18n="startConversation">Start a conversation</h2>
         <p>
-          Chat in any language — spoken or written. Chattia auto-detects your language
-          and replies in kind.
+          <span data-i18n="introCopy">
+            Chat in any language — spoken or written. Chattia auto-detects your language
+            and replies in kind.
+          </span>
         </p>
       </div>
     </section>
@@ -74,7 +76,9 @@
             </g>
           </svg>
         </button>
-        <button class="send-btn" type="submit" id="send-btn" disabled>Send</button>
+        <button class="send-btn" type="submit" id="send-btn" disabled>
+          Send
+        </button>
       </form>
     </footer>
   </main>
