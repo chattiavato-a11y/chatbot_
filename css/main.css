@@ -352,7 +352,7 @@ body {
   font-size: 0.75rem;
   color: var(--muted);
   min-width: 0;
-  flex: 1 1 140px;
+  flex: 0 1 auto;
 }
 
 .send-btn {
