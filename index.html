@@ -55,15 +55,17 @@
 
     <footer class="chat-footer">
       <form id="chat-form" class="input-shell" autocomplete="off">
-        <input
-          id="msgInput"
-          type="text"
-          placeholder="Message in any language..."
-          maxlength="256"
-          aria-label="Type your message"
-          required
-        />
-        <span id="voice-helper" class="voice-helper" aria-live="polite"></span>
+        <div class="input-stack">
+          <input
+            id="msgInput"
+            type="text"
+            placeholder="Message in any language..."
+            maxlength="256"
+            aria-label="Type your message"
+            required
+          />
+          <span id="voice-helper" class="voice-helper" aria-live="polite"></span>
+        </div>
         <button id="micBtn" type="button" aria-label="Voice reply" aria-pressed="false">
           <svg class="voice-wave-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
             <rect x="4" y="6" width="40" height="36" rx="10" fill="currentColor" />

@@ -266,9 +266,16 @@ body {
   flex-wrap: wrap;
 }
 
-.input-shell input {
+.input-stack {
+  display: flex;
   flex: 1 1 280px;
+  flex-direction: column;
+  gap: 4px;
   min-width: 0;
+}
+
+.input-shell input {
+  width: 100%;
   border: none;
   background: transparent;
   font-size: 0.95rem;
@@ -353,6 +360,10 @@ body {
   color: var(--muted);
   min-width: 0;
   flex: 0 1 auto;
+}
+
+.voice-helper:empty {
+  display: none;
 }
 
 .send-btn {
