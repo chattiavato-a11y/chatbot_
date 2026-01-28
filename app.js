@@ -391,6 +391,15 @@ let micRecording = false;
 let voiceReplyRequested = false;
 let activeVoiceAudio = null;
 let lastVoiceLanguage = "";
+let micAudioContext = null;
+let micAnalyser = null;
+let micSource = null;
+let micSilenceTimeoutId = null;
+let micMaxTimeoutId = null;
+
+const MIC_MAX_DURATION_MS = 30000;
+const MIC_SILENCE_DURATION_MS = 1200;
+const MIC_SILENCE_THRESHOLD_DB = -50;
 
 function getSupportedMimeType() {
   const candidates = [
@@ -471,6 +480,16 @@ async function startMic() {
   micRecorder.start(250);
   micRecording = true;
   setMicUI(true);
+  startSilenceDetection();
+  micMaxTimeoutId = window.setTimeout(async () => {
+    if (!micRecording) return;
+    try {
+      await stopMicAndTranscribe();
+    } catch (error) {
+      console.error(error);
+      voiceReplyRequested = false;
+    }
+  }, MIC_MAX_DURATION_MS);
 }
 
 async function stopMicAndTranscribe() {
@@ -501,6 +520,11 @@ async function stopMicAndTranscribe() {
   micChunks = [];
   micRecording = false;
   setMicUI(false);
+  stopSilenceDetection();
+  if (micMaxTimeoutId) {
+    clearTimeout(micMaxTimeoutId);
+    micMaxTimeoutId = null;
+  }
 
   if (!blob || blob.size === 0) {
     throw new Error("No audio captured. Please try again.");
@@ -548,20 +572,72 @@ async function stopMicAndTranscribe() {
   return transcript;
 }
 
-async function onMicClick() {
-  try {
-    if (!micRecording) {
-      await startMic();
-      setTimeout(async () => {
-        if (micRecording) {
+function startSilenceDetection() {
+  if (!micStream || micAudioContext) return;
+  micAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+  micAnalyser = micAudioContext.createAnalyser();
+  micAnalyser.fftSize = 2048;
+  micSource = micAudioContext.createMediaStreamSource(micStream);
+  micSource.connect(micAnalyser);
+  const bufferLength = micAnalyser.fftSize;
+  const dataArray = new Float32Array(bufferLength);
+
+  const checkSilence = () => {
+    if (!micRecording || !micAnalyser) return;
+    micAnalyser.getFloatTimeDomainData(dataArray);
+    let sumSquares = 0;
+    for (let i = 0; i < bufferLength; i += 1) {
+      const value = dataArray[i];
+      sumSquares += value * value;
+    }
+    const rms = Math.sqrt(sumSquares / bufferLength);
+    const db = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+
+    if (db < MIC_SILENCE_THRESHOLD_DB) {
+      if (!micSilenceTimeoutId) {
+        micSilenceTimeoutId = window.setTimeout(async () => {
+          if (!micRecording) return;
           try {
             await stopMicAndTranscribe();
           } catch (error) {
             console.error(error);
             voiceReplyRequested = false;
           }
-        }
-      }, 8000);
+        }, MIC_SILENCE_DURATION_MS);
+      }
+    } else if (micSilenceTimeoutId) {
+      clearTimeout(micSilenceTimeoutId);
+      micSilenceTimeoutId = null;
+    }
+
+    requestAnimationFrame(checkSilence);
+  };
+
+  requestAnimationFrame(checkSilence);
+}
+
+function stopSilenceDetection() {
+  if (micSilenceTimeoutId) {
+    clearTimeout(micSilenceTimeoutId);
+    micSilenceTimeoutId = null;
+  }
+  if (micSource) {
+    try {
+      micSource.disconnect();
+    } catch {}
+  }
+  if (micAudioContext) {
+    micAudioContext.close().catch(() => {});
+  }
+  micAudioContext = null;
+  micAnalyser = null;
+  micSource = null;
+}
+
+async function onMicClick() {
+  try {
+    if (!micRecording) {
+      await startMic();
     } else {
       await stopMicAndTranscribe();
     }
@@ -569,6 +645,11 @@ async function onMicClick() {
     micRecording = false;
     voiceReplyRequested = false;
     setMicUI(false);
+    stopSilenceDetection();
+    if (micMaxTimeoutId) {
+      clearTimeout(micMaxTimeoutId);
+      micMaxTimeoutId = null;
+    }
     try {
       micStream?.getTracks()?.forEach((track) => track.stop());
     } catch {}
@@ -596,7 +677,7 @@ document.addEventListener("DOMContentLoaded", () => {
   );
   btn.disabled = !hasMediaSupport;
   btn.title = hasMediaSupport
-    ? "Voice reply (up to 8 seconds)"
+    ? "Voice reply (up to 30 seconds)"
     : "Microphone not supported on this device";
   if (!hasMediaSupport && voiceHelper) {
     voiceHelper.textContent = "Microphone not supported in this browser.";
