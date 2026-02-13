@@ -43,6 +43,9 @@ const buildCorsHeaders = (origin, allowedOrigins) => {
   return headers;
 };
 
+const isOriginAllowed = (origin, allowedOrigins) =>
+  Boolean(origin && allowedOrigins.includes(origin));
+
 const applySecurityHeaders = (headers) => {
   if (!headers.has("Content-Security-Policy")) {
     headers.set(
@@ -80,8 +83,10 @@ const isVoiceSttRequest = (request) => {
 const sanitizeString = (value, findings) => {
   let sanitized = value.replace(/[\u0000-\u001F\u007F]/g, "");
   SECURITY_PATTERNS.forEach(({ id, pattern }) => {
+    pattern.lastIndex = 0;
     if (pattern.test(sanitized)) {
       findings.add(id);
+      pattern.lastIndex = 0;
       sanitized = sanitized.replace(pattern, "[redacted]");
     }
   });
@@ -164,6 +169,15 @@ export default {
       return new Response(JSON.stringify({ status: "ok" }), {
         status: 200,
         headers: healthHeaders,
+      });
+    }
+
+    if (!isOriginAllowed(origin, allowedOrigins)) {
+      const errorHeaders = new Headers(corsHeaders);
+      applySecurityHeaders(errorHeaders);
+      return new Response("Origin not allowed.", {
+        status: 403,
+        headers: errorHeaders,
       });
     }
 
