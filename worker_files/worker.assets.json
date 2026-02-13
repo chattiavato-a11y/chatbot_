@@ -12,7 +12,7 @@
         "version": "v1"
       },
       "integrity": {
-        "sha512": "f51538a8ca591407476cbd85e8e5c27f039c3acac78281198ebf010373401ad91c10f689661e5e4a2ac5820156d6aa43a756e8499c8262f67ce8193784014c12"
+        "sha512": "2c2a24b3f4f01ad9bd1847359c14e0f2793d7ce8f384151288ab5e9331ba6e694070182c8f434c7d21494c320d7705c754da5cb1d9c9aa97ba5011a961c5f128"
       },
       "serving": {
         "primary_url": "https://enlace.grabem-holdem-nuts-right.workers.dev",
