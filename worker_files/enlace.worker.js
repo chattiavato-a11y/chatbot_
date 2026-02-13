@@ -513,9 +513,9 @@ function extractJsonObjectsFromBuffer(buffer) {
     if (inStr) {
       if (esc) {
         esc = false;
-      } else if (ch === "\") {
-        esc = true;
-      } else if (ch === '"') {
+      } else if (ch === "\\") {
+      esc = true;
+    } else if (ch === '"') {
         inStr = false;
       }
       continue;
