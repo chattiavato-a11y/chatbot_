@@ -1,69 +1,98 @@
 # Security Deep-Dive Findings
 
-Date: 2026-02-13
-Scope: `index.html`, `app.js`, `_headers`, `worker_files/*.js`, `worker_files/*.json`, `csp.config.json`, `SECURITY.md`.
+Date: 2026-02-14  
+Scope: `index.html`, `app.js`, `_headers`, `worker_files/*.js`, `worker_files/*.json`, `worker.config.json`, `security/*`.
 
-## High-impact findings
+## Confirmed hardening improvements (validated in-repo)
 
-1. **CSP/runtime mismatch in frontend (fixed)**
-   - `index.html` had an inline Firebase `<script type="module">` that conflicts with the site CSP (`script-src 'self'`) and also imported from `gstatic`, which is not allowed by the configured CSP.
-   - This created a policy/code mismatch and unnecessary client-side attack surface.
-   - Status: removed inline Firebase block from `index.html`.
+1. **No Cloudflare dashboard placeholder URL remains in code or config**
+   - Verified that `https://dash.cloudflare.com` is absent from tracked files.
+   - This removes accidental deployment/config confusion caused by placeholder dashboard references.
 
-2. **Gateway origin trust gap (fixed)**
-   - The gateway validated CORS headers but did not strictly deny non-allowed origins for non-preflight requests.
-   - A direct server-to-server request could bypass browser CORS protections and still reach the upstream if required headers were spoofed.
-   - Status: explicit origin allowlist enforcement now returns `403 Origin not allowed`.
+2. **No repo-level multilingual model-selection chain logic is present**
+   - The edge worker still defines fixed model constants for guard/STT/TTS execution, but no dynamic multilingual model-router or model-selection chain logic is implemented in this repo.
+   - This aligns with keeping model selection in the Brain/Cloudflare runtime boundary.
 
-3. **Sanitizer reliability bug due to global regex state (fixed)**
-   - The gateway sanitizer reused global regexes (`/g`) with `.test()`. In JavaScript, global regexes keep `lastIndex`, which can cause skipped matches across calls.
-   - This made malicious pattern detection inconsistent.
-   - Status: reset `pattern.lastIndex = 0` before both `.test()` and `.replace()`.
+3. **Removed features are not present in repository code paths**
+   - No implementation for:
+     - forced output language detection,
+     - embeddings intent guardrail,
+     - preferred Brain model auto-selection.
+   - Verified by targeted string scans across frontend and worker code.
 
-## Additional risks and weaknesses
+## Current high-risk and medium-risk gaps (deep dive)
 
-4. **Over-reliance on regex sanitization**
-   - `worker_files/enlace.worker.js` and `worker_files/gateway.worker.js` both sanitize payloads via regex. This helps, but regex-only sanitization is bypass-prone for complex payloads and encoding tricks.
+1. **ENLACE origin/asset trust can be spoofed outside browser CORS context (high)**
+   - ENLACE trusts `Origin` + `x-ops-asset-id` matching for admission.
+   - These headers are application-level values and can be forged by non-browser clients.
+   - Recommendation:
+     - Add gateway→ENLACE request signing (HMAC with timestamp + nonce) and replay window checks.
+     - Enforce signature verification in ENLACE before processing chat/voice routes.
 
-5. **Potential sensitive metadata forwarding**
-   - Gateway enriches metadata with IP (`CF-Connecting-IP`) and user-agent and forwards upstream. This is operationally useful but may increase privacy/compliance obligations.
+2. **Gateway→ENLACE hop is not cryptographically authenticated (high)**
+   - A hop header exists (`x-chattia-hop`), but comments already note it is not a secret.
+   - Without signed service-to-service auth, ENLACE cannot strongly distinguish trusted gateway traffic from crafted direct calls.
+   - Recommendation:
+     - Add mTLS-equivalent trust at edge where possible, or signed bearer assertions scoped to gateway service identity.
 
-6. **Security policy documentation is placeholder-level**
-   - `SECURITY.md` is mostly template text and lacks concrete vulnerability reporting channels/SLA details.
+3. **PII over-collection in ENLACE communication metadata (medium/high compliance risk)**
+   - Gateway enriches forwarded payload with `CF-Connecting-IP`, `User-Agent`, `Accept-Language`, and geo fields.
+   - This may exceed data minimization needs for basic chat fulfillment and increases GDPR/CCPA/PCI audit exposure.
+   - Recommendation:
+     - Minimize by default (hash/truncate IP, remove city/region unless justified).
+     - Add explicit retention + purpose documentation and configurable telemetry levels.
 
-7. **Static header policy drift risk**
-   - Security headers are declared in `_headers`, while additional security behavior exists in worker code. Divergence between these layers can cause silent breakage or weakened controls over time.
+4. **Language fingerprinting leakage from client to ENLACE (medium)**
+   - Frontend sends `language_list` and custom language headers (`x-chattia-lang-list`) derived from `navigator.languages`.
+   - Full language vectors can be highly identifying when combined with UA/IP.
+   - Recommendation:
+     - Send only a single normalized language hint when strictly needed.
+     - Gate extended language metadata behind explicit user consent.
 
-## What was checked for malicious code patterns
+5. **Regex-only sanitization as primary control (medium)**
+   - Both gateway and ENLACE rely heavily on regex mutation/redaction.
+   - This remains bypass-prone against obfuscation/encoding and does not provide schema-level semantic safety.
+   - Recommendation:
+     - Add strict JSON schema validation per endpoint.
+     - Allowlist accepted fields/types/lengths; reject unknown keys for privileged metadata blocks.
 
-- Dangerous DOM/code execution patterns (`eval`, `new Function`, `innerHTML`, `document.write`).
-- Script injection markers (`<script`, inline handlers, `javascript:` protocol, data-URL HTML payloads).
-- Command/SQL-style chaining markers and template-injection markers in gateway sanitization.
-- Open proxy/upstream forwarding behavior and origin enforcement logic.
-- Secrets-in-repo scan for common token/key signatures.
+6. **No explicit rate limiting / abuse throttling visible at repo layer (medium)**
+   - Message length and payload caps exist, but no per-IP/per-origin quotas are implemented in code.
+   - Recommendation:
+     - Add rate limiting with burst + sustained quotas and anomaly counters on `/api/chat` and `/api/voice`.
 
-## Recommended next steps
+7. **Security policy process documentation still missing in this repo (medium)**
+   - There is no concrete vulnerability intake/SLA/PGP disclosure process file in current tracked scope.
+   - Recommendation:
+     - Add operational `SECURITY.md` with contacts, triage timelines, severity rubric, and coordinated disclosure workflow.
 
-1. Add unit tests for sanitizer behavior and origin enforcement in gateway worker.
-2. Add signed config integrity verification in the client (asset + config signature validation).
-3. Replace template `SECURITY.md` with real intake/contact/SLA and disclosure workflow.
-4. Introduce structured allowlist validation for all forwarded fields (schema-level checks).
-5. Add CI security checks (Semgrep + secret scanning + dependency auditing).
+## ENLACE communication hardening backlog (actionable)
 
-## Tiny-ML integrity guard (new)
+1. **Authenticate every gateway→ENLACE call**
+   - Required headers: `x-chattia-sig`, `x-chattia-ts`, `x-chattia-nonce`, `x-chattia-key-id`.
+   - Signature input: method + path + canonical query + body hash + timestamp + nonce.
+   - Reject stale timestamps and replayed nonces.
 
-A lightweight repository-level guard was added at `security/tiny-ml-guard.mjs` with a baseline file at `security/integrity.baseline.json`.
+2. **Constrain ENLACE ingress path**
+   - Ensure ENLACE only accepts direct traffic from the gateway service identity, not generic internet clients.
+   - If direct public exposure is required, split public endpoints from privileged internal endpoints.
 
-- It computes SHA-256 hashes for repo files and compares against baseline integrity state.
-- It applies a tiny weighted heuristic model ("Tiny ML") over changed files to detect high-risk patterns such as dynamic eval, string-based timers, script injection markers, and redirect payloads (`location=`, meta refresh, `top.location`).
-- It **blocks** with a non-zero exit code when the risk score crosses threshold, enabling CI/CD to reject malicious or unauthorized redirect-introducing changes.
-- Optional strict mode (`--strict-integrity`) fails on any integrity drift (added/removed/changed files).
+3. **Minimize and classify forwarded metadata**
+   - Classify each field as: required / optional / prohibited.
+   - Remove default forwarding of raw IP + rich geo where not mandatory.
 
-Usage:
+4. **Harden request contract validation**
+   - Adopt per-route schema validation (chat, voice STT, TTS).
+   - Deny unknown meta keys under `meta.gateway` and reject malformed nested objects.
+
+5. **Add auditable controls**
+   - Log signature verification result, replay detection, and rate-limit actions with request IDs.
+   - Define retention periods and redaction policy for security telemetry.
+
+## Verification commands executed
 
 ```bash
-node security/tiny-ml-guard.mjs --write-baseline
-node security/tiny-ml-guard.mjs
-node security/tiny-ml-guard.mjs --strict-integrity
+rg -n "https://dash.cloudflare.com|dash.cloudflare.com" .
+rg -n "multilingual model-selection chain|forced output language detection|embeddings intent guardrail|preferred Brain model auto-selection" .
+rg -n "language_hint|language_list|x-chattia-lang-list|CF-Connecting-IP|Accept-Language|x-chattia-hop" app.js worker_files/gateway.worker.js worker_files/enlace.worker.js
 ```
-
