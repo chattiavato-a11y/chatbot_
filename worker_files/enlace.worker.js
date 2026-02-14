@@ -11,10 +11,6 @@
  * - Also applies a zero-width non-whitespace prefix when a delta line starts with a space,
  *   so even if UI mistakenly .trim()'s per chunk, the space won't be eaten.
  *
- * UPDATE:
- * - Multi-language detection now matches Brain (heuristics + optional model fallback).
- * - Whisper STT (runWhisper) unchanged, shared pattern.
- *
  * UPDATE (EDGE ENFORCEMENT):
  * - If Brain ever outputs "Author: Gabriel Anangono" or "Gabriel Anangono",
  *   Enlace will STRIP it unless the user explicitly asked who created/authored/built it.
@@ -43,13 +39,6 @@ const TTS_EN      = "@cf/deepgram/aura-2-en";
 const TTS_ES      = "@cf/deepgram/aura-2-es";
 const TTS_FALLBACK= "@cf/myshell-ai/melotts";
 
-const MODEL_CHAT_FAST = "@cf/meta/llama-3.2-3b-instruct"; // used only for language-classifier fallback
-const MODEL_CHAT_FALLBACK = "@cf/google/gemma-3-12b-it";
-const MODEL_CHAT_SPANISH_QUALITY = "@cf/meta/llama-3.1-70b-instruct";
-
-// optional (only used if you call them via meta flags)
-const MODEL_TRANSLATE = "@cf/meta/m2m100-1.2b";
-const MODEL_EMBED = "@cf/baai/bge-m3";
 
 // -------------------------
 // Limits (ENLACE)
@@ -108,10 +97,6 @@ function corsHeaders(origin) {
       "x-chattia-stt-iso2",
       "x-chattia-voice-timeout-sec",
       "x-chattia-tts-iso2",
-      "x-chattia-lang-iso2",
-      "x-chattia-model",
-      "x-chattia-translated",
-      "x-chattia-embeddings",
       "x-chattia-asset-verified",
     ].join(", ")
   );
@@ -276,113 +261,6 @@ function stripAuthorIfNotAsked(text, allow) {
 }
 
 // -------------------------
-// Language (multi-language) — aligned to Brain
-// -------------------------
-function normalizeIso2(code) {
-  const s = safeTextOnly(code || "").toLowerCase();
-  if (!s) return "";
-  const two = s.includes("-") ? s.split("-")[0] : s;
-  return (two || "").slice(0, 2);
-}
-
-function hasRange(text, a, b) {
-  for (let i = 0; i < text.length; i++) {
-    const c = text.charCodeAt(i);
-    if (c >= a && c <= b) return true;
-  }
-  return false;
-}
-
-function detectLangIso2Heuristic(text) {
-  const t0 = String(text || "");
-  if (!t0) return "";
-
-  // Script-based quick wins
-  if (hasRange(t0, 0x3040, 0x30ff)) return "ja"; // Hiragana/Katakana
-  if (hasRange(t0, 0xac00, 0xd7af)) return "ko"; // Hangul
-  if (hasRange(t0, 0x4e00, 0x9fff)) return "zh"; // CJK
-  if (hasRange(t0, 0x0400, 0x04ff)) return "ru"; // Cyrillic
-  if (hasRange(t0, 0x0600, 0x06ff)) return "ar"; // Arabic
-  if (hasRange(t0, 0x0590, 0x05ff)) return "he"; // Hebrew
-  if (hasRange(t0, 0x0370, 0x03ff)) return "el"; // Greek
-  if (hasRange(t0, 0x0900, 0x097f)) return "hi"; // Devanagari
-  if (hasRange(t0, 0x0e00, 0x0e7f)) return "th"; // Thai
-
-  const t = t0.toLowerCase();
-
-  // Spanish
-  if (/[ñáéíóúü¿¡]/i.test(t)) return "es";
-  const esHits = [
-    "hola","gracias","por favor","buenos","buenas","necesito","ayuda","quiero","donde","qué","cuánto","porque"
-  ].filter((w) => t.includes(w)).length;
-  if (esHits >= 2) return "es";
-
-  // Portuguese
-  if (/[ãõç]/i.test(t)) return "pt";
-  const ptHits = ["olá","ola","obrigado","obrigada","por favor","você","vocês","não","nao","tudo bem"].filter((w) => t.includes(w)).length;
-  if (ptHits >= 2) return "pt";
-
-  // French
-  const frHits = ["bonjour","salut","merci","s'il","s’il","vous","au revoir","ça va","comment","aujourd"].filter((w) => t.includes(w)).length;
-  if (frHits >= 2 || /[àâçéèêëîïôûùüÿœ]/i.test(t)) return "fr";
-
-  // German
-  if (/[äöüß]/i.test(t)) return "de";
-  const deHits = ["hallo","danke","bitte","und","ich","nicht","wie geht","heute"].filter((w) => t.includes(w)).length;
-  if (deHits >= 2) return "de";
-
-  // Italian
-  const itHits = ["ciao","grazie","per favore","come va","oggi","buongiorno","buonasera"].filter((w) => t.includes(w)).length;
-  if (itHits >= 2) return "it";
-
-  // Indonesian
-  const idHits = ["halo","terima kasih","tolong","selamat","bagaimana","hari ini"].filter((w) => t.includes(w)).length;
-  if (idHits >= 2) return "id";
-
-  return "";
-}
-
-async function detectLangIso2ViaModel(env, text) {
-  // Uses MODEL_CHAT_FAST to classify language when heuristics fail.
-  const sample = sanitizeContent(String(text || "")).slice(0, 240);
-  if (sample.length < 8) return "und";
-
-  try {
-    const out = await env.AI.run(MODEL_CHAT_FAST, {
-      stream: false,
-      max_tokens: 6,
-      messages: [
-        { role: "system", content: "Return ONLY the ISO 639-1 language code (two letters). If unsure, return 'und'. No extra text." },
-        { role: "user", content: `Text:\n${sample}` },
-      ],
-    });
-
-    const raw = String(out?.response || out?.result?.response || out?.text || out || "").trim().toLowerCase();
-    const m = raw.match(/\b([a-z]{2}|und)\b/);
-    return m ? m[1] : "und";
-  } catch {
-    return "und";
-  }
-}
-
-async function detectLangIso2(env, messages, metaSafe) {
-  // 1) explicit meta wins (if provided)
-  const metaLang = normalizeIso2(metaSafe?.lang_iso2 || "");
-  if (metaLang && metaLang !== "und" && metaLang !== "auto") return metaLang;
-
-  // 2) heuristic
-  const lastUser = lastUserText(messages);
-  const heur = detectLangIso2Heuristic(lastUser);
-  if (heur) return heur;
-
-  // 3) model classifier fallback
-  const modelGuess = await detectLangIso2ViaModel(env, lastUser);
-  if (modelGuess && modelGuess !== "und") return modelGuess;
-
-  return "und";
-}
-
-// -------------------------
 // Guard parsing + meta sanitize
 // -------------------------
 function parseGuardResult(res) {
@@ -402,17 +280,10 @@ function sanitizeMeta(metaIn) {
   const meta = (metaIn && typeof metaIn === "object") ? metaIn : {};
   const out = {};
 
-  const lang = normalizeIso2(meta.lang_iso2 || "");
-  const spanishQuality = safeTextOnly(meta.spanish_quality || "");
-  const model = safeTextOnly(meta.model || "");
-  const translateTo = normalizeIso2(meta.translate_to || "");
-
-  if (lang) out.lang_iso2 = lang;
-  if (spanishQuality) out.spanish_quality = spanishQuality;
-  if (model) out.model = model;
-  if (translateTo) out.translate_to = translateTo;
-
-  if (typeof meta.want_embeddings === "boolean") out.want_embeddings = meta.want_embeddings;
+  const timeoutSec = Number(meta.voice_timeout_sec);
+  if (Number.isFinite(timeoutSec) && timeoutSec > 0 && timeoutSec <= 300) {
+    out.voice_timeout_sec = Math.floor(timeoutSec);
+  }
 
   return out;
 }
@@ -465,7 +336,7 @@ async function callBrain(env, payload) {
 }
 
 function forwardBrainHeaders(outHeaders, brainResp) {
-  const pass = ["x-chattia-lang-iso2", "x-chattia-model", "x-chattia-translated", "x-chattia-embeddings"];
+  const pass = ["x-chattia-asset-verified"];
   for (const k of pass) {
     const v = brainResp.headers.get(k);
     if (v) outHeaders.set(k, v);
@@ -736,7 +607,7 @@ function usage(path) {
       route: "/api/tts",
       method: "POST",
       required_headers: ["content-type", "accept", "x-ops-asset-id"],
-      body_json: { text: "Hello", lang_iso2: "en" },
+      body_json: { text: "Hello" },
       allowed_origins: Array.from(ALLOWED_ORIGINS),
     };
   }
@@ -847,12 +718,6 @@ export default {
 
       const metaSafe = sanitizeMeta(body.meta);
 
-      // Detect language (multi-language) — aligned to Brain
-      const langIso2 = await detectLangIso2(env, messages, metaSafe);
-      if (!metaSafe.lang_iso2 || metaSafe.lang_iso2 === "auto" || metaSafe.lang_iso2 === "und") {
-        metaSafe.lang_iso2 = langIso2;
-      }
-
       // Guard at edge
       let guardRes;
       try { guardRes = await env.AI.run(MODEL_GUARD, { messages }); }
@@ -894,13 +759,13 @@ export default {
       if (!text) return json(400, { error: "text required" }, baseExtra);
       if (looksMalicious(text)) return json(403, { error: "Blocked by security sanitizer" }, baseExtra);
 
-      const langIso2 = normalizeIso2(body?.lang_iso2 || "en") || "en";
+      const requestedLang = safeTextOnly(body?.lang_iso2 || "en").slice(0, 2) || "en";
 
       const extra = new Headers(baseExtra);
-      extra.set("x-chattia-tts-iso2", langIso2);
+      extra.set("x-chattia-tts-iso2", requestedLang);
 
       try {
-        const out = await ttsAny(env, text, langIso2);
+        const out = await ttsAny(env, text, requestedLang);
         const h = new Headers(extra);
         h.set("content-type", out.ct || "audio/mpeg");
         securityHeaders().forEach((v, k) => h.set(k, v));
@@ -960,15 +825,11 @@ export default {
       if (!transcript) return json(400, { error: "No transcription produced" }, baseExtra);
       if (looksMalicious(transcript)) return json(403, { error: "Blocked by security sanitizer" }, baseExtra);
 
-      // Detect STT language (multi-language) — aligned to Brain
-      const langIso2 = await detectLangIso2(env, [{ role: "user", content: transcript }], metaSafe);
-
       const extra = new Headers(baseExtra);
-      extra.set("x-chattia-stt-iso2", langIso2 || "und");
       extra.set("x-chattia-voice-timeout-sec", "120");
 
       if (mode === "stt") {
-        return json(200, { transcript, lang_iso2: langIso2 || "und", voice_timeout_sec: 120 }, extra);
+        return json(200, { transcript, voice_timeout_sec: 120 }, extra);
       }
 
       const messages = priorMessages.length
@@ -977,10 +838,6 @@ export default {
 
       // EDGE: allow author only if explicitly asked (includes transcript now)
       const allowAuthor = userExplicitlyAskedAuthor(messages);
-
-      if (!metaSafe.lang_iso2 || metaSafe.lang_iso2 === "auto" || metaSafe.lang_iso2 === "und") {
-        metaSafe.lang_iso2 = langIso2 || "und";
-      }
 
       // Guard at edge
       let guardRes;

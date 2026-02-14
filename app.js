@@ -170,9 +170,6 @@ let activeAssistantBubble = null;
 const DEFAULT_REQUEST_META = {
   reply_format: "paragraph",
   tone: "friendly",
-  spanish_quality: "king",
-  model_tier: "quality",
-  language_mode: "auto",
 };
 
 const RTL_CHARACTERS = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
@@ -277,8 +274,6 @@ const setStatusLine = (element, text, isWarning = false) => {
 const buildResponseMeta = (headers) => {
   if (!headers) return "";
   const values = [
-    { key: "x-chattia-lang-iso2", label: "lang" },
-    { key: "x-chattia-model", label: "model" },
     { key: "x-chattia-stt-iso2", label: "stt" },
     { key: "x-chattia-voice-timeout-sec", label: "voice timeout" },
     { key: "x-chattia-tts-iso2", label: "tts" },
