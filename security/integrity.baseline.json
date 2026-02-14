@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "generatedAt": "2026-02-14T04:21:47.118Z",
+  "files": {
+    "CNAME": "234940c9b5ff20a5572216bee51cba099f4a3d199ef20ed81cbdce778f0fcea7",
+    "SECURITY_AUDIT.md": "08af27d758e82b97c06fe73aab88a367115f62d02f719bdb57602478265e0cd5",
+    "_headers": "c61969f911c3063edc56f41108d18664e303d50b491d20f2a7e466ec9edc8123",
+    "app.js": "9cb148c4a1f8093d7622265adef8632b79ed24f19ab9f410116db4b363a36b90",
+    "csp.config.json": "77f5d360a0dd52e206ba719410fa8cf21b36191af13b358d7637c9e91dd0ee1d",
+    "css/adapt_screens.css": "da197cf120582b46b0eae504f3fda6c49f7e51ce4ffefcbff6a5c50703521ff7",
+    "css/main.css": "229d0e657a08926c1125107a513d663aae58e7fe8d2703d6efa5b6f159119d9b",
+    "index.html": "9f1117a01fe84b716d5aa07ed65e5213103591f5e1ed7cc764c917b8df4d4d71",
+    "security/tiny-ml-guard.mjs": "9e2c6be8ea584fa5d805a524aa2dd848488d228641665a72afa2dfcb4624dc06",
+    "worker.config.json": "f0fa2d67f9ae0ade6d163cf5b78be14571f13e0a90317efa7862d36d80d326cc",
+    "worker_files/enlace.worker.js": "21311fd623b026d4820b38915ad3d5412fb788e970cecfe6ce11daf900860ca6",
+    "worker_files/gateway.worker.js": "b90b5a5af5d75b5f2de3bd645bdf250b85480b17024035f86c8034ae45a03fc8",
+    "worker_files/gateway.worker.toml": "0813884dbac91985d4cdc5499449f3e723657b83e0a6c2c9238a0498388a5e0b",
+    "worker_files/registry.schema.json": "a4d0782185c24cfa1d8ed6536e0a26ba6f657f968c10041db152e63a8372ca73",
+    "worker_files/registry.worker.config.json": "ca4dceeeae52e159e3236a6e587aefddd65ca419f720b17141aed23e4963be85",
+    "worker_files/worker.assets.json": "90f5070f5bb9296edc7b3a803bf08b4f09b3b755cfa6a46fe702ff4138cdd462",
+    "worker_files/worker.config.json": "960058d4c8dc4c0bef4be547fe9a5fe09b16ead3975df72e12754ecdf0b4a257"
+  }
+}

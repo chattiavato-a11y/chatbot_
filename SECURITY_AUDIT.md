@@ -49,3 +49,21 @@ Scope: `index.html`, `app.js`, `_headers`, `worker_files/*.js`, `worker_files/*.
 3. Replace template `SECURITY.md` with real intake/contact/SLA and disclosure workflow.
 4. Introduce structured allowlist validation for all forwarded fields (schema-level checks).
 5. Add CI security checks (Semgrep + secret scanning + dependency auditing).
+
+## Tiny-ML integrity guard (new)
+
+A lightweight repository-level guard was added at `security/tiny-ml-guard.mjs` with a baseline file at `security/integrity.baseline.json`.
+
+- It computes SHA-256 hashes for repo files and compares against baseline integrity state.
+- It applies a tiny weighted heuristic model ("Tiny ML") over changed files to detect high-risk patterns such as dynamic eval, string-based timers, script injection markers, and redirect payloads (`location=`, meta refresh, `top.location`).
+- It **blocks** with a non-zero exit code when the risk score crosses threshold, enabling CI/CD to reject malicious or unauthorized redirect-introducing changes.
+- Optional strict mode (`--strict-integrity`) fails on any integrity drift (added/removed/changed files).
+
+Usage:
+
+```bash
+node security/tiny-ml-guard.mjs --write-baseline
+node security/tiny-ml-guard.mjs
+node security/tiny-ml-guard.mjs --strict-integrity
+```
+
