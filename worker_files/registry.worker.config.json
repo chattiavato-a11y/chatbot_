@@ -24,8 +24,7 @@
     "allowed_origins": [
       "https://chattiavato-a11y.github.io",
       "https://www.chattia.io",
-      "https://chattia.io",
-      "https://dash.cloudflare.com"
+      "https://chattia.io"
     ],
     "required_headers": ["Content-Type", "Accept"]
   },
