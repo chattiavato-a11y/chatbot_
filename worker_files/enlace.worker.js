@@ -180,21 +180,26 @@ function stripDangerousMarkup(text) {
 
 function looksMalicious(text) {
   const t = String(text || "").toLowerCase();
-  const bad = [
+  const badSubstrings = [
     "<script",
     "document.cookie",
     "localstorage.",
     "sessionstorage.",
     "onerror=",
     "onload=",
-    "eval(",
-    "new function",
     "javascript:",
     "vbscript:",
     "data:text/html",
     "base64,",
   ];
-  for (const p of bad) if (t.includes(p)) return true;
+  for (const p of badSubstrings) if (t.includes(p)) return true;
+
+  const badPatterns = [
+    /\be\s*v\s*a\s*l\s*\(/i,
+    /\bnew\s+f\s*u\s*n\s*c\s*t\s*i\s*o\s*n\b/i,
+  ];
+  for (const pattern of badPatterns) if (pattern.test(t)) return true;
+
   return false;
 }
 
