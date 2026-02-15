@@ -7,18 +7,34 @@
   "gatewayEndpoint": "",
   "workerEndpointAssetId": "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
   "gatewayEndpointAssetId": "",
+
   "allowedOrigins": [
     "https://www.chattia.io",
     "https://chattia.io",
-    "https://chattiavato-a11y.github.io",
-    "https://enlace.grabem-holdem-nuts-right.workers.dev"
+    "https://chattiavato-a11y.github.io"
   ],
   "allowedOriginAssetIds": [
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
-    "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
-    "",
-    "asset_01J7Y2D4XABCD3EFGHJKMNPRTA"
+    "asset_01J7Y2D4XABCD3EFGHJKMNPRTD"
   ],
-  "requiredHeaders": ["Content-Type", "Accept", "X-Ops-Asset-Id"]
+
+  "requiredHeaders": ["Content-Type", "Accept", "X-Ops-Asset-Id"],
+
+  "optionalHeaders": [
+    "X-Ops-Src-Sha512-B64",
+    "X-Chattia-Lang-Hint",
+    "X-Chattia-Lang-List",
+    "CF-Turnstile-Response"
+  ],
+
+  "repoIdentity": {
+    "header": "X-Ops-Src-Sha512-B64",
+    "sha512_b64": "0ktRDMTkZ5fTzYCBvfX2cc7XM6N/6DZTmsFwRS0dfc9/ZV8GlSrdGGrqoX35oedn"
+  },
+
+  "cache": {
+    "ttlSeconds": 300,
+    "staleWhileRevalidateSeconds": 600
+  }
 }
