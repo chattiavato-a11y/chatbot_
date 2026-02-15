@@ -1,364 +1,396 @@
-/* File: worker_files/enlace.worker.js
- *
- * Repo Gateway Module (Browser-side) — EnlaceRepo
- * - Loads worker config from repo
- * - Enforces Origin -> AssetID header (x-ops-asset-id)
- * - Adds repo/source integrity fingerprint header (x-ops-src-sha512-b64)
- * - Provides: init(), getConfig(), postChat(), postVoiceSTT(), postTTS()
- *
- * NOTE on ASSET_ID_REPO secret:
- * - Browser JS cannot safely read GitHub “secrets” at runtime (it would leak publicly).
- * - This module uses the public fingerprint header: x-ops-src-sha512-b64.
- * - If you want a true secret-backed repo identity, that must be produced server-side
- *   (e.g., via GitHub Actions writing a signed token file) — we’ll do that in the YAML later.
- */
+/* ================================
+   FILE: worker_files/enlace.worker.js
+   PURPOSE:
+   - Repo-side client module that app.js uses via window.EnlaceRepo
+   - Loads worker_files/worker.config.json
+   - Enforces OPS asset identity + optional repo source integrity id
+   - Adds “tiny ML” integrity double-check (post-sanitizer) before sending to CF Worker
+   - Provides: init(), getConfig(), postChat(), postVoiceSTT(), postTTS()
+================================== */
 
 (() => {
   "use strict";
 
-  // ---- Public repo/source fingerprint (matches Worker allowlist)
-  const OPS_SRC_SHA512_B64 =
-    "0ktRDMTkZ5fTzYCBvfX2cc7XM6N/6DZTmsFwRS0dfc9/ZV8GlSrdGGrqoX35oedn";
-
-  // ---- Fallback mapping (will be overridden by worker.config.json if present)
-  const FALLBACK_ORIGIN_ASSET_ID = {
-    "https://www.chattia.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
-    "https://chattia.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
-    "https://chattiavato-a11y.github.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
-    "https://enlace.grabem-holdem-nuts-right.workers.dev":
-      "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
-  };
-
-  // ---- Defaults (safe fallback)
-  const DEFAULT_CONFIG = {
-    assetRegistry: "worker_files/worker.assets.json",
-    workerEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev",
-    assistantEndpoint:
-      "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat",
-    voiceEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev/api/voice",
-    ttsEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev/api/tts",
-    gatewayEndpoint: "",
-    workerEndpointAssetId: "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
-    gatewayEndpointAssetId: "",
-    allowedOrigins: [
-      "https://www.chattia.io",
-      "https://chattia.io",
-      "https://chattiavato-a11y.github.io",
-      "https://enlace.grabem-holdem-nuts-right.workers.dev",
-    ],
-    allowedOriginAssetIds: [
-      "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
-      "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
-      "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
-      "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
-    ],
-    requiredHeaders: ["Content-Type", "Accept", "X-Ops-Asset-Id"],
-  };
-
-  // ---- Internal state
-  let _config = { ...DEFAULT_CONFIG };
-  let _originAssetId = { ...FALLBACK_ORIGIN_ASSET_ID };
-  let _loaded = false;
+  const CONFIG_PATH_DEFAULT = "worker_files/worker.config.json";
 
   // -------------------------
-  // Utilities
+  // Local state
   // -------------------------
-  const safeString = (v) => (typeof v === "string" ? v : v == null ? "" : String(v));
+  let _config = null;
+  let _originAssetMap = new Map();
+
+  // -------------------------
+  // Small helpers
+  // -------------------------
+  const safeText = (v) => {
+    const s = String(v ?? "");
+    let out = "";
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      const ok = c === 9 || c === 10 || c === 13 || (c >= 32 && c <= 126) || c >= 160;
+      if (ok) out += s[i];
+    }
+    return out.trim();
+  };
 
   const normalizeOrigin = (value) => {
-    const s = safeString(value).trim();
-    if (!s) return "";
+    if (!value) return "";
     try {
-      return new URL(s).origin.toLowerCase();
+      return new URL(String(value), window.location.origin).origin.toLowerCase();
     } catch {
-      return s.replace(/\/$/, "").toLowerCase();
+      return String(value).trim().replace(/\/$/, "").toLowerCase();
     }
   };
 
-  const normalizeIso2 = (value) => {
-    const s = safeString(value).toLowerCase().trim();
-    if (!s) return "";
-    const base = s.includes("-") ? s.split("-")[0] : s;
-    return base.slice(0, 2);
+  const isHttpsUrl = (value) => {
+    try {
+      const u = new URL(String(value));
+      return u.protocol === "https:";
+    } catch {
+      return false;
+    }
   };
 
-  const coalesceEndpoint = (config, key, fallback) => {
-    const v = safeString(config?.[key]).trim();
-    return v ? v.replace(/\/$/, "") : fallback;
+  const looksLikeAssetId = (value) => /^asset_[0-9A-HJKMNP-TV-Z]{26}$/.test(String(value || ""));
+
+  // base64-ish (URL-safe not required) and allow no padding
+  const looksLikeSha512B64 = (value) => /^[A-Za-z0-9+/=]{32,256}$/.test(String(value || ""));
+
+  // -------------------------
+  // Basic sanitizer (client-side)
+  // -------------------------
+  const stripDangerousMarkup = (text) => {
+    let t = String(text ?? "");
+    t = t.replace(/\u0000/g, "");
+    t = t.replace(/\r\n?/g, "\n");
+
+    // strip script/style blocks
+    t = t.replace(/<\s*(script|style)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "");
+
+    // strip high-risk tags (best-effort)
+    t = t.replace(/<\s*(iframe|object|embed|link|meta|base|form)\b[^>]*>/gi, "");
+    t = t.replace(/<\s*\/\s*(iframe|object|embed|link|meta|base|form)\s*>/gi, "");
+
+    // strip dangerous schemes
+    t = t.replace(/\bjavascript\s*:/gi, "");
+    t = t.replace(/\bvbscript\s*:/gi, "");
+    t = t.replace(/\bdata\s*:\s*text\/html\b/gi, "");
+
+    // inline handlers (best-effort)
+    t = t.replace(/\bon\w+\s*=\s*["'][\s\S]*?["']/gi, "");
+    t = t.replace(/\bon\w+\s*=\s*[^\s>]+/gi, "");
+
+    return t.trim();
   };
 
-  const buildOriginAssetMapFromConfig = (cfg) => {
-    const out = {};
-    const origins = Array.isArray(cfg?.allowedOrigins) ? cfg.allowedOrigins : [];
-    const ids = Array.isArray(cfg?.allowedOriginAssetIds) ? cfg.allowedOriginAssetIds : [];
+  const sanitizeForSend = (text) => safeText(stripDangerousMarkup(text));
 
+  // -------------------------
+  // Tiny ML integrity check (lightweight heuristic model)
+  // - “double check after sanitizer”
+  // - Not a remote model; deterministic scoring
+  // -------------------------
+  function tinyMlIntegrityScore(text) {
+    const t = String(text || "").toLowerCase();
+
+    // features (binary)
+    const f = {
+      has_script: t.includes("<script"),
+      has_eval: t.includes("eval(") || t.includes("new function"),
+      has_js_scheme: t.includes("javascript:") || t.includes("vbscript:"),
+      has_html_data: t.includes("data:text/html"),
+      has_cookie: t.includes("document.cookie"),
+      has_storage: t.includes("localstorage.") || t.includes("sessionstorage."),
+      has_onhandler: t.includes("onerror=") || t.includes("onload="),
+      has_base64: t.includes("base64,"),
+      long_text: t.length > 1200,
+      many_angles: (t.match(/[<>]/g) || []).length > 12,
+    };
+
+    // logistic-ish weighting (hand-tuned)
+    let z = -2.2;
+    z += f.has_script ? 2.2 : 0;
+    z += f.has_eval ? 1.7 : 0;
+    z += f.has_js_scheme ? 1.4 : 0;
+    z += f.has_html_data ? 1.4 : 0;
+    z += f.has_cookie ? 1.2 : 0;
+    z += f.has_storage ? 0.9 : 0;
+    z += f.has_onhandler ? 1.0 : 0;
+    z += f.has_base64 ? 0.7 : 0;
+    z += f.long_text ? 0.4 : 0;
+    z += f.many_angles ? 0.6 : 0;
+
+    const score = 1 / (1 + Math.exp(-z)); // 0..1
+    return { score, features: f };
+  }
+
+  function assertTinyMlSafe(text, where = "payload") {
+    const { score } = tinyMlIntegrityScore(text);
+    // threshold chosen to block only strong signals
+    if (score >= 0.75) {
+      throw new Error(`Blocked by client integrity check (${where}).`);
+    }
+  }
+
+  // -------------------------
+  // Config loading + validation
+  // -------------------------
+  function buildOriginAssetMap(cfg) {
+    const map = new Map();
+    const origins = Array.isArray(cfg.allowedOrigins) ? cfg.allowedOrigins : [];
+    const ids = Array.isArray(cfg.allowedOriginAssetIds) ? cfg.allowedOriginAssetIds : [];
     for (let i = 0; i < origins.length; i++) {
       const o = normalizeOrigin(origins[i]);
-      const id = safeString(ids[i]).trim();
-      if (o && id) out[o] = id;
+      const id = String(ids[i] || "").trim();
+      if (o && looksLikeAssetId(id)) map.set(o, id);
+    }
+    return map;
+  }
+
+  function validateConfig(cfg) {
+    if (!cfg || typeof cfg !== "object") return { ok: false, error: "Config is not an object." };
+
+    // endpoints
+    const endpoints = [
+      cfg.workerEndpoint,
+      cfg.assistantEndpoint,
+      cfg.voiceEndpoint,
+      cfg.ttsEndpoint,
+      cfg.gatewayEndpoint,
+    ].filter(Boolean);
+
+    for (const ep of endpoints) {
+      if (!isHttpsUrl(ep)) return { ok: false, error: `Endpoint is not https: ${ep}` };
     }
 
-    // keep fallback entries if config is partial
-    for (const [o, id] of Object.entries(FALLBACK_ORIGIN_ASSET_ID)) {
-      const no = normalizeOrigin(o);
-      if (!out[no] && id) out[no] = id;
+    // required headers contract
+    const required = Array.isArray(cfg.requiredHeaders) ? cfg.requiredHeaders : [];
+    const requiredLower = required.map((h) => String(h).toLowerCase());
+    if (!requiredLower.includes("x-ops-asset-id")) {
+      return { ok: false, error: "requiredHeaders must include X-Ops-Asset-Id." };
     }
 
-    return out;
-  };
-
-  const getAssetIdForCurrentOrigin = () => {
-    // Prefer any asset id already computed by app.js (if present)
-    const existing = safeString(window.OPS_ASSET_ID).trim();
-    if (existing) return existing;
-
-    const origin = normalizeOrigin(window.location.origin);
-    return safeString(_originAssetId[origin]).trim();
-  };
-
-  const mergeHeaders = (base, extra) => {
-    const h = new Headers();
-    // base first
-    if (base && typeof base === "object") {
-      if (base instanceof Headers) {
-        base.forEach((v, k) => h.set(k, v));
-      } else {
-        Object.entries(base).forEach(([k, v]) => {
-          const val = safeString(v);
-          if (k && val) h.set(k, val);
-        });
-      }
-    }
-    // then extra overrides
-    if (extra && typeof extra === "object") {
-      if (extra instanceof Headers) {
-        extra.forEach((v, k) => h.set(k, v));
-      } else {
-        Object.entries(extra).forEach(([k, v]) => {
-          const val = safeString(v);
-          if (k && val) h.set(k, val);
-        });
-      }
-    }
-    return h;
-  };
-
-  const buildCommonHeaders = (overrides) => {
-    const assetId = getAssetIdForCurrentOrigin();
-    const base = {
-      "x-ops-asset-id": assetId,
-      "x-ops-src-sha512-b64": OPS_SRC_SHA512_B64,
-    };
-    return mergeHeaders(base, overrides);
-  };
-
-  const sanitizeOutgoingText = (text) => {
-    // Client-side lightweight safety — Worker still enforces real sanitizer.
-    const t = safeString(text).replace(/\u0000/g, "").trim();
-    if (!t) return { ok: false, value: "", reason: "empty" };
-    const lower = t.toLowerCase();
-    const bad = [
-      "<script",
-      "javascript:",
-      "vbscript:",
-      "data:text/html",
-      "document.cookie",
-      "localstorage.",
-      "sessionstorage.",
-      "onerror=",
-      "onload=",
-      "eval(",
-      "new function",
-    ];
-    if (bad.some((p) => lower.includes(p))) {
-      return { ok: false, value: "", reason: "blocked_pattern" };
-    }
-    return { ok: true, value: t, reason: "" };
-  };
-
-  // -------------------------
-  // Config loader
-  // -------------------------
-  async function init() {
-    if (_loaded) return;
-
-    // try both repo config locations (module lives in /worker_files/)
-    const baseUrl = new URL(import.meta.url);
-    const candidates = [
-      new URL("./worker.config.json", baseUrl).toString(),   // /worker_files/worker.config.json
-      new URL("../worker.config.json", baseUrl).toString(),  // /worker.config.json
-      new URL("./worker_files/worker.config.json", window.location.href).toString(),
-      new URL("./worker.config.json", window.location.href).toString(),
-    ];
-
-    let cfg = null;
-
-    for (const url of candidates) {
-      try {
-        const res = await fetch(url, { method: "GET", cache: "no-store" });
-        if (!res.ok) continue;
-        const json = await res.json().catch(() => null);
-        if (json && typeof json === "object") {
-          cfg = json;
-          break;
-        }
-      } catch {
-        // keep trying
-      }
+    // repo identity (optional but expected by your flow)
+    const repoId = cfg.repoIdentity?.sha512_b64;
+    if (repoId && !looksLikeSha512B64(repoId)) {
+      return { ok: false, error: "repoIdentity.sha512_b64 does not look like base64." };
     }
 
-    if (cfg) {
-      // Merge config safely
-      _config = {
-        ...DEFAULT_CONFIG,
-        ...cfg,
-        allowedOrigins: Array.isArray(cfg.allowedOrigins) ? cfg.allowedOrigins : DEFAULT_CONFIG.allowedOrigins,
-        allowedOriginAssetIds: Array.isArray(cfg.allowedOriginAssetIds)
-          ? cfg.allowedOriginAssetIds
-          : DEFAULT_CONFIG.allowedOriginAssetIds,
-        requiredHeaders: Array.isArray(cfg.requiredHeaders) ? cfg.requiredHeaders : DEFAULT_CONFIG.requiredHeaders,
-      };
-      _originAssetId = buildOriginAssetMapFromConfig(_config);
+    // mapping
+    const map = buildOriginAssetMap(cfg);
+    if (map.size === 0) return { ok: false, error: "No allowedOrigins/allowedOriginAssetIds mapping." };
 
-      // Normalize endpoints
-      _config.workerEndpoint = coalesceEndpoint(_config, "workerEndpoint", DEFAULT_CONFIG.workerEndpoint);
-      _config.assistantEndpoint = safeString(_config.assistantEndpoint).trim()
-        ? safeString(_config.assistantEndpoint).trim()
-        : `${_config.workerEndpoint}/api/chat`;
-      _config.voiceEndpoint = safeString(_config.voiceEndpoint).trim()
-        ? safeString(_config.voiceEndpoint).trim()
-        : `${_config.workerEndpoint}/api/voice`;
-      _config.ttsEndpoint = safeString(_config.ttsEndpoint).trim()
-        ? safeString(_config.ttsEndpoint).trim()
-        : `${_config.workerEndpoint}/api/tts`;
+    return { ok: true, error: "" };
+  }
+
+  async function loadJson(url) {
+    const res = await fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      mode: "cors",
+    });
+    if (!res.ok) throw new Error(`Config fetch failed (${res.status}).`);
+    return res.json();
+  }
+
+  async function init(options = {}) {
+    const cfgPath = safeText(options.configPath || CONFIG_PATH_DEFAULT) || CONFIG_PATH_DEFAULT;
+    const cfgUrl = new URL(cfgPath, window.location.href).toString();
+
+    const cfg = await loadJson(cfgUrl);
+    const verdict = validateConfig(cfg);
+    if (!verdict.ok) throw new Error(verdict.error);
+
+    _config = cfg;
+    _originAssetMap = buildOriginAssetMap(cfg);
+
+    // warn (don’t hard-fail) if current origin not in allowlist
+    const curOrigin = normalizeOrigin(window.location.origin);
+    if (!_originAssetMap.has(curOrigin)) {
+      console.warn(`Origin not in allowedOrigins: ${curOrigin}`);
     }
 
-    _loaded = true;
+    return true;
   }
 
   function getConfig() {
-    return { ..._config };
+    return _config || {};
   }
 
   // -------------------------
-  // Gateway calls
+  // Header builder (matches CF Worker contract)
   // -------------------------
-  async function postChat(payload, options = {}) {
-    await init();
+  function buildOpsHeaders({ accept, contentType, extraHeaders } = {}) {
+    if (!_config) throw new Error("EnlaceRepo not initialized. Call EnlaceRepo.init().");
 
-    const endpoint = safeString(_config.assistantEndpoint).trim();
-    if (!endpoint) throw new Error("assistantEndpoint missing in config.");
+    const origin = normalizeOrigin(window.location.origin);
+    const assetId =
+      _originAssetMap.get(origin) ||
+      // fallback to globals (if app.js already set them)
+      safeText(window.OPS_ASSET_ID || "");
 
-    const messages = Array.isArray(payload?.messages) ? payload.messages : [];
-    // lightly sanitize last user message (Worker still does real sanitize)
-    const last = messages.length ? messages[messages.length - 1] : null;
-    if (last && safeString(last.role).toLowerCase() === "user") {
-      const s = sanitizeOutgoingText(last.content);
-      if (!s.ok) throw new Error("Blocked suspicious content (client-side).");
-      last.content = s.value;
+    if (!looksLikeAssetId(assetId)) {
+      throw new Error("Missing/invalid OPS asset id for this origin.");
     }
 
-    const headers = buildCommonHeaders(
-      mergeHeaders(
-        {
-          "content-type": "application/json; charset=utf-8",
-          accept: "text/event-stream",
-        },
-        options.extraHeaders
-      )
-    );
+    const h = new Headers();
+
+    // required
+    h.set("Accept", accept || "application/json");
+    h.set("X-Ops-Asset-Id", assetId);
+
+    if (contentType) h.set("Content-Type", contentType);
+
+    // optional repo identity header (your ID)
+    const repoHeaderName = safeText(_config.repoIdentity?.header || "X-Ops-Src-Sha512-B64");
+    const repoId = safeText(_config.repoIdentity?.sha512_b64 || "");
+    if (repoId) h.set(repoHeaderName, repoId);
+
+    // caller-provided extra headers (language hints, turnstile, etc.)
+    if (extraHeaders && typeof extraHeaders === "object") {
+      for (const [k, v] of Object.entries(extraHeaders)) {
+        const key = safeText(k);
+        if (!key) continue;
+        const val = safeText(v);
+        if (val) h.set(key, val);
+      }
+    }
+
+    return h;
+  }
+
+  function activeEndpoint() {
+    if (!_config) return "";
+    return safeText(_config.gatewayEndpoint || "") || safeText(_config.workerEndpoint || "");
+  }
+
+  function endpointFor(path) {
+    const base = activeEndpoint();
+    if (!base) return "";
+    try {
+      const u = new URL(base);
+      u.pathname = `${u.pathname.replace(/\/$/, "")}/${String(path || "").replace(/^\//, "")}`;
+      u.search = "";
+      u.hash = "";
+      return u.toString();
+    } catch {
+      return "";
+    }
+  }
+
+  // -------------------------
+  // Network methods used by app.js
+  // -------------------------
+  async function postChat(body, options = {}) {
+    const endpoint =
+      safeText(_config?.gatewayEndpoint || "") ||
+      safeText(_config?.assistantEndpoint || "") ||
+      endpointFor("/api/chat");
+
+    if (!endpoint) throw new Error("Chat endpoint not configured.");
+
+    // client-side sanitize + integrity double-check
+    const messages = Array.isArray(body?.messages) ? body.messages : [];
+    const last = messages.length ? String(messages[messages.length - 1]?.content || "") : "";
+    const cleaned = sanitizeForSend(last);
+    assertTinyMlSafe(cleaned, "chat.message");
+
+    // NOTE: Do NOT mutate the entire messages array aggressively here;
+    // the CF Worker already sanitizes/guards. We only gate obvious malicious input.
+    const payload = {
+      ...(body && typeof body === "object" ? body : {}),
+    };
+
+    const headers = buildOpsHeaders({
+      accept: "text/event-stream",
+      contentType: "application/json; charset=utf-8",
+      extraHeaders: options.extraHeaders,
+    });
 
     return fetch(endpoint, {
       method: "POST",
-      mode: "cors",
-      cache: "no-store",
       headers,
-      body: JSON.stringify(payload ?? {}),
+      body: JSON.stringify(payload),
       signal: options.signal,
+      mode: "cors",
+      credentials: "omit",
+      redirect: "error",
+      cache: "no-store",
+      referrerPolicy: "strict-origin-when-cross-origin",
     });
   }
 
   async function postTTS(body, options = {}) {
-    await init();
+    const endpoint = safeText(_config?.ttsEndpoint || "") || endpointFor("/api/tts");
+    if (!endpoint) throw new Error("TTS endpoint not configured.");
 
-    const endpoint = safeString(_config.ttsEndpoint).trim();
-    if (!endpoint) throw new Error("ttsEndpoint missing in config.");
+    const text = sanitizeForSend(body?.text || "");
+    if (!text) throw new Error("TTS text is required.");
+    assertTinyMlSafe(text, "tts.text");
 
-    const text = safeString(body?.text);
-    const s = sanitizeOutgoingText(text);
-    if (!s.ok) throw new Error("TTS text blocked or empty (client-side).");
+    const payload = {
+      text,
+      lang_iso2: safeText(body?.language || body?.lang_iso2 || "en").slice(0, 8),
+    };
 
-    // app.js may send { text, language } — Worker expects { text, lang_iso2 }
-    const langIso2 =
-      normalizeIso2(body?.lang_iso2) ||
-      normalizeIso2(body?.language) ||
-      normalizeIso2(body?.lang) ||
-      "en";
-
-    const payload = { text: s.value, lang_iso2: langIso2 };
-
-    const headers = buildCommonHeaders(
-      mergeHeaders(
-        {
-          "content-type": "application/json; charset=utf-8",
-          accept: "audio/mpeg,application/octet-stream;q=0.9,*/*;q=0.8",
-        },
-        options.extraHeaders
-      )
-    );
+    const headers = buildOpsHeaders({
+      accept: "audio/*",
+      contentType: "application/json; charset=utf-8",
+      extraHeaders: options.extraHeaders,
+    });
 
     return fetch(endpoint, {
       method: "POST",
-      mode: "cors",
-      cache: "no-store",
       headers,
       body: JSON.stringify(payload),
       signal: options.signal,
+      mode: "cors",
+      credentials: "omit",
+      redirect: "error",
+      cache: "no-store",
+      referrerPolicy: "strict-origin-when-cross-origin",
     });
   }
 
   async function postVoiceSTT(audioBlob, options = {}) {
-    await init();
+    const base = safeText(_config?.voiceEndpoint || "") || endpointFor("/api/voice");
+    if (!base) throw new Error("Voice endpoint not configured.");
 
-    const base = safeString(_config.voiceEndpoint).trim();
-    if (!base) throw new Error("voiceEndpoint missing in config.");
+    const u = new URL(base);
+    // STT mode (matches CF Worker /api/voice?mode=stt)
+    u.searchParams.set("mode", "stt");
 
-    const url = new URL(base, window.location.origin);
-    if (!url.searchParams.get("mode")) url.searchParams.set("mode", "stt");
+    const contentType = safeText(audioBlob?.type || "audio/webm");
 
-    // Blob required
-    if (!(audioBlob instanceof Blob)) {
-      throw new Error("postVoiceSTT expects a Blob.");
-    }
+    const headers = buildOpsHeaders({
+      accept: "application/json",
+      contentType,
+      extraHeaders: options.extraHeaders,
+    });
 
-    const ct = safeString(audioBlob.type).trim() || "audio/webm";
-
-    const headers = buildCommonHeaders(
-      mergeHeaders(
-        {
-          accept: "application/json",
-          "content-type": ct,
-        },
-        options.extraHeaders
-      )
-    );
-
-    return fetch(url.toString(), {
+    return fetch(u.toString(), {
       method: "POST",
-      mode: "cors",
-      cache: "no-store",
       headers,
       body: audioBlob,
       signal: options.signal,
+      mode: "cors",
+      credentials: "omit",
+      redirect: "error",
+      cache: "no-store",
+      referrerPolicy: "strict-origin-when-cross-origin",
     });
   }
 
-  // ---- Expose on window for app.js
-  window.EnlaceRepo = {
+  // -------------------------
+  // Expose module
+  // -------------------------
+  window.EnlaceRepo = Object.freeze({
     init,
     getConfig,
     postChat,
-    postTTS,
     postVoiceSTT,
-  };
+    postTTS,
+  });
 })();
