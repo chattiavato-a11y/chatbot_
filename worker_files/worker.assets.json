@@ -24,10 +24,9 @@
         "allowed_origins": [
           "https://www.chattia.io",
           "https://chattia.io",
-          "https://chattiavato-a11y.github.io",
-          "https://enlace.grabem-holdem-nuts-right.workers.dev"
+          "https://chattiavato-a11y.github.io"
         ],
-        "required_headers": ["Content-Type", "Accept"]
+        "required_headers": ["Accept", "X-Ops-Asset-Id"]
       },
       "audit": {
         "created_at": "2026-02-01T00:00:00Z",
@@ -63,7 +62,7 @@
       "policy": {
         "retention_days": 365,
         "allowed_origins": ["https://www.chattia.io"],
-        "required_headers": ["Content-Type", "Accept"]
+        "required_headers": ["Accept"]
       },
       "audit": {
         "created_at": "2026-02-01T00:00:00Z",
@@ -99,7 +98,7 @@
       "policy": {
         "retention_days": 365,
         "allowed_origins": ["https://chattia.io"],
-        "required_headers": ["Content-Type", "Accept"]
+        "required_headers": ["Accept"]
       },
       "audit": {
         "created_at": "2026-02-01T00:00:00Z",
@@ -135,7 +134,7 @@
       "policy": {
         "retention_days": 365,
         "allowed_origins": ["https://chattiavato-a11y.github.io"],
-        "required_headers": ["Content-Type", "Accept"]
+        "required_headers": ["Accept"]
       },
       "audit": {
         "created_at": "2026-02-01T00:00:00Z",
