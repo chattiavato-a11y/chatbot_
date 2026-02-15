@@ -1,0 +1,119 @@
+/* screen_adapt.css
+   Device-agnostic responsive layer.
+   accurately: link, reference, trigger, action, event, function
+*/
+
+:root {
+  --screen-space-xs: 8px;
+  --screen-space-sm: 12px;
+  --screen-space-md: 16px;
+  --screen-space-lg: 24px;
+}
+
+/* link + reference: loaded after main.css to override layout safely */
+.chat-app {
+  width: min(960px, 100%);
+  min-height: min(900px, 100dvh);
+}
+
+/* trigger: compact tablets + landscape phones */
+@media (max-width: 900px) {
+  .chat-app {
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 16px;
+  }
+
+  .chat-header,
+  .chat-body,
+  .chat-footer {
+    padding-left: var(--screen-space-md);
+    padding-right: var(--screen-space-md);
+  }
+
+  .intro-copy h2 {
+    font-size: clamp(1.15rem, 2.6vw, 1.4rem);
+  }
+}
+
+/* action + event: small screens and touch-first behavior */
+@media (max-width: 640px) {
+  body {
+    padding: 0;
+  }
+
+  .chat-app {
+    border-radius: 0;
+    border-width: 0;
+    box-shadow: none;
+  }
+
+  .chat-body {
+    padding-top: var(--screen-space-lg);
+    padding-bottom: var(--screen-space-sm);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .input-shell {
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .input-stack,
+  .input-shell input,
+  .send-btn,
+  #micBtn,
+  .voice-helper {
+    width: 100%;
+  }
+
+  #micBtn {
+    min-height: 44px;
+  }
+
+  .send-btn {
+    min-height: 44px;
+  }
+}
+
+/* function: typography and spacing scale for very small phones */
+@media (max-width: 380px) {
+  .chat-header {
+    padding-top: var(--screen-space-sm);
+    padding-bottom: var(--screen-space-sm);
+  }
+
+  .brand h1 {
+    font-size: 1rem;
+  }
+
+  .chat-body {
+    gap: 16px;
+  }
+
+  .bubble {
+    max-width: 100%;
+    font-size: 0.95rem;
+  }
+}
+
+/* large desktops */
+@media (min-width: 1280px) {
+  .chat-app {
+    width: min(1040px, 88vw);
+  }
+}
+
+/* reduced motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
