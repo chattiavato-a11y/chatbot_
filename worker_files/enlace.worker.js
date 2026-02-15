@@ -1,866 +1,364 @@
-/**
- * enlace — FIXED (aligned to Brain) (no vars, no secrets)
- * + ASSET-ID ENFORCED (Origin -> AssetID)
- * + Clean/scan/sanitize BEFORE Guard + Brain
- * + Guard at Enlace
- * + Forward Brain headers
- * + Convert Brain streaming (raw JSON OR SSE) -> SSE text deltas (UI-friendly)
+/* File: worker_files/enlace.worker.js
  *
- * IMPORTANT FIX:
- * - SSE framing uses "data:" (NO space) and preserves leading spaces in deltas.
- * - Also applies a zero-width non-whitespace prefix when a delta line starts with a space,
- *   so even if UI mistakenly .trim()'s per chunk, the space won't be eaten.
+ * Repo Gateway Module (Browser-side) — EnlaceRepo
+ * - Loads worker config from repo
+ * - Enforces Origin -> AssetID header (x-ops-asset-id)
+ * - Adds repo/source integrity fingerprint header (x-ops-src-sha512-b64)
+ * - Provides: init(), getConfig(), postChat(), postVoiceSTT(), postTTS()
  *
- * UPDATE (EDGE ENFORCEMENT):
- * - If Brain ever outputs "Author: Gabriel Anangono" or "Gabriel Anangono",
- *   Enlace will STRIP it unless the user explicitly asked who created/authored/built it.
+ * NOTE on ASSET_ID_REPO secret:
+ * - Browser JS cannot safely read GitHub “secrets” at runtime (it would leak publicly).
+ * - This module uses the public fingerprint header: x-ops-src-sha512-b64.
+ * - If you want a true secret-backed repo identity, that must be produced server-side
+ *   (e.g., via GitHub Actions writing a signed token file) — we’ll do that in the YAML later.
  */
 
-// -------------------------
-// Allowed Origins + Asset IDs (Origin -> AssetID)
-// -------------------------
-const ORIGIN_ASSET_ID = new Map([
-  ["https://www.chattia.io", "asset_01J7Y2D4XABCD3EFGHJKMNPRTB"],
-  ["https://chattia.io", "asset_01J7Y2D4XABCD3EFGHJKMNPRTC"],
-  ["https://chattiavato-a11y.github.io", "asset_01J7Y2D4XABCD3EFGHJKMNPRTD"],
-]);
-const ALLOWED_ORIGINS = new Set(Array.from(ORIGIN_ASSET_ID.keys()));
+(() => {
+  "use strict";
 
-// Internal hop header (NOT a secret; just a guardrail)
-const HOP_HDR = "x-chattia-hop";
-const HOP_VAL = "enlace";
+  // ---- Public repo/source fingerprint (matches Worker allowlist)
+  const OPS_SRC_SHA512_B64 =
+    "0ktRDMTkZ5fTzYCBvfX2cc7XM6N/6DZTmsFwRS0dfc9/ZV8GlSrdGGrqoX35oedn";
 
-// -------------------------
-// Models (ENLACE)
-// -------------------------
-const MODEL_GUARD = "@cf/meta/llama-guard-3-8b";
-const MODEL_STT   = "@cf/openai/whisper-large-v3-turbo";
-const TTS_EN      = "@cf/deepgram/aura-2-en";
-const TTS_ES      = "@cf/deepgram/aura-2-es";
-const TTS_FALLBACK= "@cf/myshell-ai/melotts";
+  // ---- Fallback mapping (will be overridden by worker.config.json if present)
+  const FALLBACK_ORIGIN_ASSET_ID = {
+    "https://www.chattia.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
+    "https://chattia.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
+    "https://chattiavato-a11y.github.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
+    "https://enlace.grabem-holdem-nuts-right.workers.dev":
+      "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
+  };
 
+  // ---- Defaults (safe fallback)
+  const DEFAULT_CONFIG = {
+    assetRegistry: "worker_files/worker.assets.json",
+    workerEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev",
+    assistantEndpoint:
+      "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat",
+    voiceEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev/api/voice",
+    ttsEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev/api/tts",
+    gatewayEndpoint: "",
+    workerEndpointAssetId: "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
+    gatewayEndpointAssetId: "",
+    allowedOrigins: [
+      "https://www.chattia.io",
+      "https://chattia.io",
+      "https://chattiavato-a11y.github.io",
+      "https://enlace.grabem-holdem-nuts-right.workers.dev",
+    ],
+    allowedOriginAssetIds: [
+      "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
+      "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
+      "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
+      "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
+    ],
+    requiredHeaders: ["Content-Type", "Accept", "X-Ops-Asset-Id"],
+  };
 
-// -------------------------
-// Limits (ENLACE)
-// -------------------------
-const MAX_BODY_CHARS = 8_000;
-const MAX_MESSAGES = 30;
-const MAX_MESSAGE_CHARS = 1_000;
-const MAX_AUDIO_BYTES = 12 * 1024 * 1024;
+  // ---- Internal state
+  let _config = { ...DEFAULT_CONFIG };
+  let _originAssetId = { ...FALLBACK_ORIGIN_ASSET_ID };
+  let _loaded = false;
 
-// -------------------------
-// Security headers
-// -------------------------
-function securityHeaders() {
-  const h = new Headers();
-  h.set("X-Content-Type-Options", "nosniff");
-  h.set("X-Frame-Options", "DENY");
-  h.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  h.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-  h.set("Cache-Control", "no-store, no-transform");
-  h.set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
-  h.set("X-Permitted-Cross-Domain-Policies", "none");
-  h.set("X-DNS-Prefetch-Control", "off");
-  return h;
-}
+  // -------------------------
+  // Utilities
+  // -------------------------
+  const safeString = (v) => (typeof v === "string" ? v : v == null ? "" : String(v));
 
-// -------------------------
-// CORS
-// -------------------------
-function isAllowedOrigin(origin) {
-  return !!origin && origin !== "null" && ALLOWED_ORIGINS.has(origin);
-}
+  const normalizeOrigin = (value) => {
+    const s = safeString(value).trim();
+    if (!s) return "";
+    try {
+      return new URL(s).origin.toLowerCase();
+    } catch {
+      return s.replace(/\/$/, "").toLowerCase();
+    }
+  };
 
-function corsHeaders(origin) {
-  const h = new Headers();
+  const normalizeIso2 = (value) => {
+    const s = safeString(value).toLowerCase().trim();
+    if (!s) return "";
+    const base = s.includes("-") ? s.split("-")[0] : s;
+    return base.slice(0, 2);
+  };
 
-  if (isAllowedOrigin(origin)) {
-    h.set("Access-Control-Allow-Origin", origin);
-    h.set("Vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
-  }
+  const coalesceEndpoint = (config, key, fallback) => {
+    const v = safeString(config?.[key]).trim();
+    return v ? v.replace(/\/$/, "") : fallback;
+  };
 
-  h.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  h.set(
-    "Access-Control-Allow-Headers",
-    [
-      "content-type",
-      "accept",
-      "x-ops-asset-id",
-      "x-ops-src-sha512-b64",
-      "cf-turnstile-response",
-    ].join(", ")
-  );
+  const buildOriginAssetMapFromConfig = (cfg) => {
+    const out = {};
+    const origins = Array.isArray(cfg?.allowedOrigins) ? cfg.allowedOrigins : [];
+    const ids = Array.isArray(cfg?.allowedOriginAssetIds) ? cfg.allowedOriginAssetIds : [];
 
-  h.set(
-    "Access-Control-Expose-Headers",
-    [
-      "x-chattia-stt-iso2",
-      "x-chattia-voice-timeout-sec",
-      "x-chattia-tts-iso2",
-      "x-chattia-asset-verified",
-    ].join(", ")
-  );
-
-  h.set("Access-Control-Max-Age", "86400");
-  return h;
-}
-
-// -------------------------
-// Response helpers
-// -------------------------
-function json(status, obj, extra) {
-  const h = new Headers(extra || {});
-  h.set("content-type", "application/json; charset=utf-8");
-  securityHeaders().forEach((v, k) => h.set(k, v));
-  return new Response(JSON.stringify(obj), { status, headers: h });
-}
-
-function sse(stream, extra) {
-  const h = new Headers(extra || {});
-  h.set("content-type", "text/event-stream; charset=utf-8");
-  h.set("cache-control", "no-cache, no-transform");
-  securityHeaders().forEach((v, k) => h.set(k, v));
-  return new Response(stream, { status: 200, headers: h });
-}
-
-// -------------------------
-// Clean / scan / sanitize
-// -------------------------
-function safeTextOnly(s) {
-  s = String(s || "");
-  let out = "";
-  for (let i = 0; i < s.length; i++) {
-    const c = s.charCodeAt(i);
-    if (c === 0) continue;
-    const ok = c === 9 || c === 10 || c === 13 || (c >= 32 && c <= 126) || c >= 160;
-    if (ok) out += s[i];
-  }
-  return out.trim();
-}
-
-function stripDangerousMarkup(text) {
-  let t = String(text || "");
-  t = t.replace(/\u0000/g, "");
-  t = t.replace(/\r\n?/g, "\n");
-
-  // Remove script/style blocks
-  t = t.replace(/<\s*(script|style)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "");
-
-  // Remove high-risk tags
-  t = t.replace(/<\s*(iframe|object|embed|link|meta|base|form)\b[^>]*>/gi, "");
-  t = t.replace(/<\s*\/\s*(iframe|object|embed|link|meta|base|form)\s*>/gi, "");
-
-  // Remove dangerous schemes
-  t = t.replace(/\bjavascript\s*:/gi, "");
-  t = t.replace(/\bvbscript\s*:/gi, "");
-  t = t.replace(/\bdata\s*:\s*text\/html\b/gi, "");
-
-  // Remove inline handlers (best-effort)
-  t = t.replace(/\bon\w+\s*=\s*["'][\s\S]*?["']/gi, "");
-  t = t.replace(/\bon\w+\s*=\s*[^\s>]+/gi, "");
-
-  if (t.length > MAX_MESSAGE_CHARS) t = t.slice(0, MAX_MESSAGE_CHARS);
-  return t.trim();
-}
-
-function looksMalicious(text) {
-  const t = String(text || "").toLowerCase();
-  const badSubstrings = [
-    "<script",
-    "document.cookie",
-    "localstorage.",
-    "sessionstorage.",
-    "onerror=",
-    "onload=",
-    "javascript:",
-    "vbscript:",
-    "data:text/html",
-    "base64,",
-  ];
-  for (const p of badSubstrings) if (t.includes(p)) return true;
-
-  const badPatterns = [
-    /\be\s*v\s*a\s*l\s*\(/i,
-    /\bnew\s+f\s*u\s*n\s*c\s*t\s*i\s*o\s*n\b/i,
-  ];
-  for (const pattern of badPatterns) if (pattern.test(t)) return true;
-
-  return false;
-}
-
-function sanitizeContent(text) {
-  const cleaned = stripDangerousMarkup(safeTextOnly(text));
-  return safeTextOnly(cleaned);
-}
-
-function normalizeMessages(input) {
-  if (!Array.isArray(input)) return [];
-  const out = [];
-  for (const m of input.slice(-MAX_MESSAGES)) {
-    if (!m || typeof m !== "object") continue;
-    const role = String(m.role || "").toLowerCase();
-    if (role !== "user" && role !== "assistant") continue;
-
-    let content = typeof m.content === "string" ? m.content : "";
-    content = sanitizeContent(content);
-    if (!content) continue;
-
-    if (content.length > MAX_MESSAGE_CHARS) content = content.slice(0, MAX_MESSAGE_CHARS);
-
-    if (looksMalicious(content)) {
-      out.push({ role, content: "[REDACTED: blocked suspicious content]" });
-      continue;
+    for (let i = 0; i < origins.length; i++) {
+      const o = normalizeOrigin(origins[i]);
+      const id = safeString(ids[i]).trim();
+      if (o && id) out[o] = id;
     }
 
-    out.push({ role, content });
-  }
-  return out;
-}
+    // keep fallback entries if config is partial
+    for (const [o, id] of Object.entries(FALLBACK_ORIGIN_ASSET_ID)) {
+      const no = normalizeOrigin(o);
+      if (!out[no] && id) out[no] = id;
+    }
 
-function lastUserText(messages) {
-  return [...messages].reverse().find((m) => m.role === "user")?.content || "";
-}
+    return out;
+  };
 
-// -------------------------
-// EDGE ENFORCEMENT: Author mention gating
-// -------------------------
-function userExplicitlyAskedAuthor(messages) {
-  const q = (Array.isArray(messages) ? messages : [])
-    .filter((m) => String(m?.role || "").toLowerCase() === "user")
-    .map((m) => String(m?.content || ""))
-    .join("\n")
-    .toLowerCase();
+  const getAssetIdForCurrentOrigin = () => {
+    // Prefer any asset id already computed by app.js (if present)
+    const existing = safeString(window.OPS_ASSET_ID).trim();
+    if (existing) return existing;
 
-  if (!q) return false;
+    const origin = normalizeOrigin(window.location.origin);
+    return safeString(_originAssetId[origin]).trim();
+  };
 
-  // Explicit author/creator intent (multi-language, light)
-  const intent =
-    /\b(author|creator|created by|built by|made by|who made|who created|who built|who authored)\b/.test(q) ||
-    /\b(autor|creador|creado por|hecho por|quien hizo|quién hizo|quien creo|quién creó|quien creó)\b/.test(q) ||
-    /\b(auteur|créateur|cree par|créé par|qui a créé)\b/.test(q) ||
-    /\b(autore|creatore|creato da|chi ha creato)\b/.test(q) ||
-    /\b(autor|criador|criado por|feito por|quem criou)\b/.test(q) ||
-    /\b(autor|erstellt von|wer hat|entwickelt von)\b/.test(q);
-
-  // Or explicitly referencing the name + a question vibe
-  const namePlusQuestion =
-    /\bgabriel\s+anangono\b/.test(q) && /\b(who|quien|quién|autor|author|creator|creador|created|built|hizo|creó|creo)\b/.test(q);
-
-  return intent || namePlusQuestion;
-}
-
-function stripAuthorIfNotAsked(text, allow) {
-  if (allow) return String(text ?? "");
-  let t = String(text ?? "");
-
-  // Remove ONLY this attribution (do not rewrite other content)
-  t = t.replace(/\bAuthor:\s*Gabriel\s+Anangono\.?\b/gi, "");
-  t = t.replace(/\bGabriel\s+Anangono\b/gi, "");
-
-  return t;
-}
-
-// -------------------------
-// Guard parsing + meta sanitize
-// -------------------------
-function parseGuardResult(res) {
-  const r = res?.response ?? res?.result?.response ?? res?.result ?? res;
-  if (r && typeof r === "object" && typeof r.safe === "boolean") {
-    return { safe: r.safe, categories: Array.isArray(r.categories) ? r.categories : [] };
-  }
-  if (typeof r === "string") {
-    const lower = r.toLowerCase();
-    if (lower.includes("unsafe")) return { safe: false, categories: [] };
-    if (lower.includes("safe")) return { safe: true, categories: [] };
-  }
-  return { safe: false, categories: ["GUARD_UNPARSEABLE"] };
-}
-
-function sanitizeMeta(metaIn) {
-  const meta = (metaIn && typeof metaIn === "object") ? metaIn : {};
-  const out = {};
-
-  const timeoutSec = Number(meta.voice_timeout_sec);
-  if (Number.isFinite(timeoutSec) && timeoutSec > 0 && timeoutSec <= 300) {
-    out.voice_timeout_sec = Math.floor(timeoutSec);
-  }
-
-  return out;
-}
-
-// -------------------------
-// Asset identity enforcement
-// -------------------------
-function expectedAssetIdForOrigin(origin) {
-  return ORIGIN_ASSET_ID.get(origin) || "";
-}
-
-function verifyAssetIdentity(origin, request) {
-  const got = safeTextOnly(request.headers.get("x-ops-asset-id") || "");
-  const expected = expectedAssetIdForOrigin(origin);
-  return { ok: !!expected && got === expected, got, expected };
-}
-
-// -------------------------
-// Voice helpers (Whisper STT) — shared pattern
-// -------------------------
-async function runWhisper(env, audioU8) {
-  try {
-    return await env.AI.run(MODEL_STT, { audio: audioU8.buffer });
-  } catch {
-    return await env.AI.run(MODEL_STT, { audio: Array.from(audioU8) });
-  }
-}
-
-function base64ToBytes(b64) {
-  const bin = atob(String(b64 || ""));
-  const u8 = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i) & 255;
-  return u8;
-}
-
-// -------------------------
-// Brain call
-// -------------------------
-async function callBrain(env, payload) {
-  if (!env?.brain || typeof env.brain.fetch !== "function") throw new Error("Missing Service Binding: env.brain");
-  return env.brain.fetch("https://service/api/chat", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "text/event-stream",
-      [HOP_HDR]: HOP_VAL,
-    },
-    body: JSON.stringify(payload),
-  });
-}
-
-function forwardBrainHeaders(outHeaders, brainResp) {
-  const pass = ["x-chattia-asset-verified"];
-  for (const k of pass) {
-    const v = brainResp.headers.get(k);
-    if (v) outHeaders.set(k, v);
-  }
-}
-
-// -------------------------
-// FIX: Brain stream -> SSE text deltas
-// -------------------------
-function protectLeadingSpace(s) {
-  // If UI incorrectly does .trim() per chunk, this prevents loss of leading spaces.
-  // \u200B is NOT whitespace for trim(), but is invisible.
-  if (!s) return s;
-  const c0 = s[0];
-  if (c0 === " " || c0 === "\t") return "\u200B" + s;
-  return s;
-}
-
-function sseDataFrame(text) {
-  // IMPORTANT: "data:" (NO trailing space) to preserve leading spaces from model deltas.
-  const s = String(text ?? "");
-  const lines = s.split("\n");
-  let out = "";
-  for (const line of lines) out += "data:" + protectLeadingSpace(line) + "\n";
-  out += "\n";
-  return out;
-}
-
-function extractJsonObjectsFromBuffer(buffer) {
-  // Balanced-brace extractor (handles strings + escapes) for raw concatenated JSON objects.
-  const out = [];
-  let start = -1;
-  let depth = 0;
-  let inStr = false;
-  let esc = false;
-
-  for (let i = 0; i < buffer.length; i++) {
-    const ch = buffer[i];
-
-    if (start === -1) {
-      if (ch === "{") {
-        start = i;
-        depth = 1;
-        inStr = false;
-        esc = false;
+  const mergeHeaders = (base, extra) => {
+    const h = new Headers();
+    // base first
+    if (base && typeof base === "object") {
+      if (base instanceof Headers) {
+        base.forEach((v, k) => h.set(k, v));
+      } else {
+        Object.entries(base).forEach(([k, v]) => {
+          const val = safeString(v);
+          if (k && val) h.set(k, val);
+        });
       }
-      continue;
     }
-
-    if (inStr) {
-      if (esc) {
-        esc = false;
-      } else if (ch === "\\") {
-      esc = true;
-    } else if (ch === '"') {
-        inStr = false;
+    // then extra overrides
+    if (extra && typeof extra === "object") {
+      if (extra instanceof Headers) {
+        extra.forEach((v, k) => h.set(k, v));
+      } else {
+        Object.entries(extra).forEach(([k, v]) => {
+          const val = safeString(v);
+          if (k && val) h.set(k, val);
+        });
       }
-      continue;
+    }
+    return h;
+  };
+
+  const buildCommonHeaders = (overrides) => {
+    const assetId = getAssetIdForCurrentOrigin();
+    const base = {
+      "x-ops-asset-id": assetId,
+      "x-ops-src-sha512-b64": OPS_SRC_SHA512_B64,
+    };
+    return mergeHeaders(base, overrides);
+  };
+
+  const sanitizeOutgoingText = (text) => {
+    // Client-side lightweight safety — Worker still enforces real sanitizer.
+    const t = safeString(text).replace(/\u0000/g, "").trim();
+    if (!t) return { ok: false, value: "", reason: "empty" };
+    const lower = t.toLowerCase();
+    const bad = [
+      "<script",
+      "javascript:",
+      "vbscript:",
+      "data:text/html",
+      "document.cookie",
+      "localstorage.",
+      "sessionstorage.",
+      "onerror=",
+      "onload=",
+      "eval(",
+      "new function",
+    ];
+    if (bad.some((p) => lower.includes(p))) {
+      return { ok: false, value: "", reason: "blocked_pattern" };
+    }
+    return { ok: true, value: t, reason: "" };
+  };
+
+  // -------------------------
+  // Config loader
+  // -------------------------
+  async function init() {
+    if (_loaded) return;
+
+    // try both repo config locations (module lives in /worker_files/)
+    const baseUrl = new URL(import.meta.url);
+    const candidates = [
+      new URL("./worker.config.json", baseUrl).toString(),   // /worker_files/worker.config.json
+      new URL("../worker.config.json", baseUrl).toString(),  // /worker.config.json
+      new URL("./worker_files/worker.config.json", window.location.href).toString(),
+      new URL("./worker.config.json", window.location.href).toString(),
+    ];
+
+    let cfg = null;
+
+    for (const url of candidates) {
+      try {
+        const res = await fetch(url, { method: "GET", cache: "no-store" });
+        if (!res.ok) continue;
+        const json = await res.json().catch(() => null);
+        if (json && typeof json === "object") {
+          cfg = json;
+          break;
+        }
+      } catch {
+        // keep trying
+      }
     }
 
-    if (ch === '"') {
-      inStr = true;
-      continue;
-    }
-    if (ch === "{") depth++;
-    if (ch === "}") depth--;
+    if (cfg) {
+      // Merge config safely
+      _config = {
+        ...DEFAULT_CONFIG,
+        ...cfg,
+        allowedOrigins: Array.isArray(cfg.allowedOrigins) ? cfg.allowedOrigins : DEFAULT_CONFIG.allowedOrigins,
+        allowedOriginAssetIds: Array.isArray(cfg.allowedOriginAssetIds)
+          ? cfg.allowedOriginAssetIds
+          : DEFAULT_CONFIG.allowedOriginAssetIds,
+        requiredHeaders: Array.isArray(cfg.requiredHeaders) ? cfg.requiredHeaders : DEFAULT_CONFIG.requiredHeaders,
+      };
+      _originAssetId = buildOriginAssetMapFromConfig(_config);
 
-    if (depth === 0) {
-      const jsonStr = buffer.slice(start, i + 1);
-      out.push(jsonStr);
-      start = -1;
+      // Normalize endpoints
+      _config.workerEndpoint = coalesceEndpoint(_config, "workerEndpoint", DEFAULT_CONFIG.workerEndpoint);
+      _config.assistantEndpoint = safeString(_config.assistantEndpoint).trim()
+        ? safeString(_config.assistantEndpoint).trim()
+        : `${_config.workerEndpoint}/api/chat`;
+      _config.voiceEndpoint = safeString(_config.voiceEndpoint).trim()
+        ? safeString(_config.voiceEndpoint).trim()
+        : `${_config.workerEndpoint}/api/voice`;
+      _config.ttsEndpoint = safeString(_config.ttsEndpoint).trim()
+        ? safeString(_config.ttsEndpoint).trim()
+        : `${_config.workerEndpoint}/api/tts`;
     }
+
+    _loaded = true;
   }
 
-  const rest = (start === -1) ? "" : buffer.slice(start);
-  return { chunks: out, rest };
-}
-
-function extractSSEBlocks(buffer) {
-  // Pull complete SSE event blocks separated by \n\n
-  const blocks = [];
-  let idx;
-  while ((idx = buffer.indexOf("\n\n")) !== -1) {
-    blocks.push(buffer.slice(0, idx));
-    buffer = buffer.slice(idx + 2);
-  }
-  return { blocks, rest: buffer };
-}
-
-function parseSSEBlockToData(block) {
-  // Returns {event, data} where data is joined multi-line data.
-  const lines = String(block || "").split("\n");
-  let evt = "";
-  const dataLines = [];
-
-  for (const line of lines) {
-    if (!line) continue;
-    if (line.startsWith("event:")) {
-      evt = line.slice(6); // keep possible leading spaces after "event:"
-      continue;
-    }
-    if (line.startsWith("data:")) {
-      dataLines.push(line.slice(5)); // DO NOT trim
-      continue;
-    }
+  function getConfig() {
+    return { ..._config };
   }
 
-  return { event: evt, data: dataLines.join("\n") };
-}
+  // -------------------------
+  // Gateway calls
+  // -------------------------
+  async function postChat(payload, options = {}) {
+    await init();
 
-function getDeltaFromObj(obj) {
-  // Workers AI token chunks commonly: { response: "..." } (sometimes nested)
-  if (!obj) return "";
-  if (typeof obj.response === "string") return obj.response;
+    const endpoint = safeString(_config.assistantEndpoint).trim();
+    if (!endpoint) throw new Error("assistantEndpoint missing in config.");
 
-  // some shapes can be nested
-  if (obj.result && typeof obj.result.response === "string") return obj.result.response;
-  if (obj.response && obj.response.response && typeof obj.response.response === "string") return obj.response.response;
+    const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+    // lightly sanitize last user message (Worker still does real sanitize)
+    const last = messages.length ? messages[messages.length - 1] : null;
+    if (last && safeString(last.role).toLowerCase() === "user") {
+      const s = sanitizeOutgoingText(last.content);
+      if (!s.ok) throw new Error("Blocked suspicious content (client-side).");
+      last.content = s.value;
+    }
 
-  return "";
-}
+    const headers = buildCommonHeaders(
+      mergeHeaders(
+        {
+          "content-type": "application/json; charset=utf-8",
+          accept: "text/event-stream",
+        },
+        options.extraHeaders
+      )
+    );
 
-// UPDATED SIGNATURE: allowAuthor
-function bridgeBrainToSSE(brainBody, allowAuthor) {
-  const decoder = new TextDecoder();
-  const encoder = new TextEncoder();
-
-  if (!brainBody) {
-    return new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode(sseDataFrame("")));
-        controller.close();
-      },
+    return fetch(endpoint, {
+      method: "POST",
+      mode: "cors",
+      cache: "no-store",
+      headers,
+      body: JSON.stringify(payload ?? {}),
+      signal: options.signal,
     });
   }
 
-  return new ReadableStream({
-    async start(controller) {
-      const reader = brainBody.getReader();
-      let buf = "";
+  async function postTTS(body, options = {}) {
+    await init();
 
-      try {
-        // hello comment (keeps some proxies happy)
-        controller.enqueue(encoder.encode(": ok\n\n"));
+    const endpoint = safeString(_config.ttsEndpoint).trim();
+    if (!endpoint) throw new Error("ttsEndpoint missing in config.");
 
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
+    const text = safeString(body?.text);
+    const s = sanitizeOutgoingText(text);
+    if (!s.ok) throw new Error("TTS text blocked or empty (client-side).");
 
-          buf += decoder.decode(value, { stream: true });
+    // app.js may send { text, language } — Worker expects { text, lang_iso2 }
+    const langIso2 =
+      normalizeIso2(body?.lang_iso2) ||
+      normalizeIso2(body?.language) ||
+      normalizeIso2(body?.lang) ||
+      "en";
 
-          // 1) If it looks like SSE from Brain, parse SSE blocks first
-          const looksLikeSSE = /(^|\n)data:/.test(buf) && buf.includes("\n\n");
-          if (looksLikeSSE) {
-            const { blocks, rest } = extractSSEBlocks(buf);
-            buf = rest;
+    const payload = { text: s.value, lang_iso2: langIso2 };
 
-            for (const block of blocks) {
-              const { data } = parseSSEBlockToData(block);
-              if (!data) continue;
-
-              const dataTrim = data.trim();
-              if (dataTrim === "[DONE]") {
-                controller.enqueue(encoder.encode("event: done\ndata: [DONE]\n\n"));
-                controller.close();
-                return;
-              }
-
-              // data may be JSON or plain text
-              const d0 = dataTrim[0];
-              if (d0 === "{" || d0 === "[") {
-                try {
-                  const obj = JSON.parse(dataTrim);
-                  const delta = getDeltaFromObj(obj);
-                  const safeDelta = stripAuthorIfNotAsked(delta, allowAuthor);
-                  if (safeDelta) controller.enqueue(encoder.encode(sseDataFrame(safeDelta)));
-                } catch {
-                  const safeData = stripAuthorIfNotAsked(data, allowAuthor);
-                  if (safeData) controller.enqueue(encoder.encode(sseDataFrame(safeData)));
-                }
-              } else {
-                const safeData = stripAuthorIfNotAsked(data, allowAuthor);
-                if (safeData) controller.enqueue(encoder.encode(sseDataFrame(safeData)));
-              }
-            }
-
-            continue;
-          }
-
-          // 2) Otherwise parse raw concatenated JSON objects
-          if (buf.length > 1_000_000 && !buf.includes("{")) buf = buf.slice(-100_000);
-
-          const { chunks, rest } = extractJsonObjectsFromBuffer(buf);
-          buf = rest;
-
-          for (const s of chunks) {
-            let obj;
-            try { obj = JSON.parse(s); } catch { continue; }
-
-            const delta = getDeltaFromObj(obj);
-            const safeDelta = stripAuthorIfNotAsked(delta, allowAuthor);
-            if (safeDelta) controller.enqueue(encoder.encode(sseDataFrame(safeDelta)));
-          }
-        }
-
-        // flush any remaining decode tail
-        const tail = decoder.decode();
-        if (tail) buf += tail;
-
-        controller.enqueue(encoder.encode("event: done\ndata: [DONE]\n\n"));
-      } catch {
-        controller.enqueue(encoder.encode("event: error\ndata: stream_error\n\n"));
-      } finally {
-        try { reader.releaseLock(); } catch {}
-        try { controller.close(); } catch {}
-      }
-    },
-  });
-}
-
-// -------------------------
-// TTS
-// -------------------------
-async function ttsAny(env, text, langIso2) {
-  const iso2 = normalizeIso2(langIso2 || "en") || "en";
-  const preferred = iso2 === "es" ? TTS_ES : TTS_EN;
-
-  try {
-    const raw = await env.AI.run(
-      preferred,
-      { text, encoding: "mp3", container: "none" },
-      { returnRawResponse: true }
-    );
-    const ct = raw?.headers?.get?.("content-type") || "";
-    if (raw?.body && ct.toLowerCase().includes("audio")) return { body: raw.body, ct };
-  } catch {}
-
-  try {
-    const out = await env.AI.run(preferred, { text, encoding: "mp3", container: "none" });
-    const b64 = out?.audio || out?.result?.audio || out?.response?.audio || "";
-    if (typeof b64 === "string" && b64.length > 16) return { body: base64ToBytes(b64), ct: "audio/mpeg" };
-  } catch {}
-
-  const out2 = await env.AI.run(TTS_FALLBACK, { prompt: text, lang: iso2 });
-  const b64 = out2?.audio || out2?.result?.audio || "";
-  if (typeof b64 === "string" && b64.length > 16) return { body: base64ToBytes(b64), ct: "audio/mpeg" };
-
-  throw new Error("TTS failed");
-}
-
-// -------------------------
-// Usage JSON for GET
-// -------------------------
-function usage(path) {
-  if (path === "/api/chat") {
-    return {
-      ok: true,
-      route: "/api/chat",
-      method: "POST",
-      required_headers: ["content-type", "accept", "x-ops-asset-id"],
-      body_json: { messages: [{ role: "user", content: "Hello" }], meta: {} },
-      allowed_origins: Array.from(ALLOWED_ORIGINS),
-    };
-  }
-  if (path === "/api/tts") {
-    return {
-      ok: true,
-      route: "/api/tts",
-      method: "POST",
-      required_headers: ["content-type", "accept", "x-ops-asset-id"],
-      body_json: { text: "Hello" },
-      allowed_origins: Array.from(ALLOWED_ORIGINS),
-    };
-  }
-  if (path === "/api/voice") {
-    return {
-      ok: true,
-      route: "/api/voice?mode=stt | /api/voice?mode=chat",
-      method: "POST",
-      required_headers: ["accept", "x-ops-asset-id"],
-      body_binary: "audio/webm (or wav/mp3/etc)",
-      allowed_origins: Array.from(ALLOWED_ORIGINS),
-    };
-  }
-  return { ok: true };
-}
-
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    const origin = request.headers.get("Origin") || "";
-
-    const isChat  = url.pathname === "/api/chat";
-    const isVoice = url.pathname === "/api/voice";
-    const isTts   = url.pathname === "/api/tts";
-
-    // Preflight
-    if (request.method === "OPTIONS") {
-      const h = corsHeaders(origin);
-      securityHeaders().forEach((v, k) => h.set(k, v));
-      return new Response(null, { status: 204, headers: h });
-    }
-
-    // Health
-    if (url.pathname === "/" || url.pathname === "/health") {
-      const h = corsHeaders(origin);
-      securityHeaders().forEach((v, k) => h.set(k, v));
-      return new Response("enlace: ok", { status: 200, headers: h });
-    }
-
-    // Helpful GET usage
-    if (request.method === "GET" && (isChat || isVoice || isTts)) {
-      const extra = corsHeaders(origin);
-      return json(200, usage(url.pathname), extra);
-    }
-
-    // Only these routes exist
-    if (!isChat && !isVoice && !isTts) {
-      return json(404, { error: "Not found" }, corsHeaders(origin));
-    }
-
-    // POST only for real work
-    if (request.method !== "POST") {
-      return json(405, { error: "Method not allowed" }, corsHeaders(origin));
-    }
-
-    // Strict CORS for POST
-    if (!isAllowedOrigin(origin)) {
-      return json(
-        403,
-        { error: "Origin not allowed", saw_origin: origin || "(none)", allowed: Array.from(ALLOWED_ORIGINS) },
-        corsHeaders(origin)
-      );
-    }
-
-    // Must have AI
-    if (!env?.AI || typeof env.AI.run !== "function") {
-      return json(500, { error: "Missing AI binding (env.AI)" }, corsHeaders(origin));
-    }
-
-    // Enforce asset identity (Origin -> expected asset id)
-    const assetCheck = verifyAssetIdentity(origin, request);
-    if (!assetCheck.ok) {
-      return json(
-        403,
+    const headers = buildCommonHeaders(
+      mergeHeaders(
         {
-          error: "Invalid asset identity",
-          detail: "x-ops-asset-id must match the calling Origin.",
-          origin,
-          got_asset_id: assetCheck.got || "(none)",
-          expected_asset_id: assetCheck.expected || "(missing mapping)",
+          "content-type": "application/json; charset=utf-8",
+          accept: "audio/mpeg,application/octet-stream;q=0.9,*/*;q=0.8",
         },
-        corsHeaders(origin)
-      );
+        options.extraHeaders
+      )
+    );
+
+    return fetch(endpoint, {
+      method: "POST",
+      mode: "cors",
+      cache: "no-store",
+      headers,
+      body: JSON.stringify(payload),
+      signal: options.signal,
+    });
+  }
+
+  async function postVoiceSTT(audioBlob, options = {}) {
+    await init();
+
+    const base = safeString(_config.voiceEndpoint).trim();
+    if (!base) throw new Error("voiceEndpoint missing in config.");
+
+    const url = new URL(base, window.location.origin);
+    if (!url.searchParams.get("mode")) url.searchParams.set("mode", "stt");
+
+    // Blob required
+    if (!(audioBlob instanceof Blob)) {
+      throw new Error("postVoiceSTT expects a Blob.");
     }
 
-    // Base response headers for successful paths
-    const baseExtra = corsHeaders(origin);
-    baseExtra.set("x-chattia-asset-verified", "1");
+    const ct = safeString(audioBlob.type).trim() || "audio/webm";
 
-    // -----------------------
-    // /api/chat -> Guard -> Brain -> SSE (TEXT DELTAS)
-    // -----------------------
-    if (isChat) {
-      const ct = (request.headers.get("content-type") || "").toLowerCase();
-      if (!ct.includes("application/json")) return json(415, { error: "content-type must be application/json" }, baseExtra);
+    const headers = buildCommonHeaders(
+      mergeHeaders(
+        {
+          accept: "application/json",
+          "content-type": ct,
+        },
+        options.extraHeaders
+      )
+    );
 
-      const raw = await request.text().catch(() => "");
-      if (!raw || raw.length > MAX_BODY_CHARS) return json(413, { error: "Request too large" }, baseExtra);
+    return fetch(url.toString(), {
+      method: "POST",
+      mode: "cors",
+      cache: "no-store",
+      headers,
+      body: audioBlob,
+      signal: options.signal,
+    });
+  }
 
-      let body;
-      try { body = JSON.parse(raw); } catch { return json(400, { error: "Invalid JSON" }, baseExtra); }
-
-      const messages = normalizeMessages(body.messages);
-      if (!messages.length) return json(400, { error: "messages[] required" }, baseExtra);
-
-      // EDGE: allow author only if explicitly asked
-      const allowAuthor = userExplicitlyAskedAuthor(messages);
-
-      const metaSafe = sanitizeMeta(body.meta);
-
-      // Guard at edge
-      let guardRes;
-      try { guardRes = await env.AI.run(MODEL_GUARD, { messages }); }
-      catch { return json(502, { error: "Safety check unavailable" }, baseExtra); }
-
-      const verdict = parseGuardResult(guardRes);
-      if (!verdict.safe) return json(403, { error: "Blocked by safety filter", categories: verdict.categories }, baseExtra);
-
-      // Call Brain
-      let brainResp;
-      try { brainResp = await callBrain(env, { messages, meta: metaSafe }); }
-      catch (e) { return json(502, { error: "Brain unreachable", detail: String(e?.message || e) }, baseExtra); }
-
-      if (!brainResp.ok) {
-        const t = await brainResp.text().catch(() => "");
-        return json(502, { error: "Brain error", status: brainResp.status, detail: t.slice(0, 2000) }, baseExtra);
-      }
-
-      const extra = new Headers(baseExtra);
-      forwardBrainHeaders(extra, brainResp);
-
-      return sse(bridgeBrainToSSE(brainResp.body, allowAuthor), extra);
-    }
-
-    // -----------------------
-    // /api/tts -> audio
-    // -----------------------
-    if (isTts) {
-      const ct = (request.headers.get("content-type") || "").toLowerCase();
-      if (!ct.includes("application/json")) return json(415, { error: "content-type must be application/json" }, baseExtra);
-
-      const raw = await request.text().catch(() => "");
-      if (!raw || raw.length > MAX_BODY_CHARS) return json(413, { error: "Request too large" }, baseExtra);
-
-      let body;
-      try { body = JSON.parse(raw); } catch { return json(400, { error: "Invalid JSON" }, baseExtra); }
-
-      const text = sanitizeContent(body?.text || "");
-      if (!text) return json(400, { error: "text required" }, baseExtra);
-      if (looksMalicious(text)) return json(403, { error: "Blocked by security sanitizer" }, baseExtra);
-
-      const requestedLang = safeTextOnly(body?.lang_iso2 || "en").slice(0, 2) || "en";
-
-      const extra = new Headers(baseExtra);
-      extra.set("x-chattia-tts-iso2", requestedLang);
-
-      try {
-        const out = await ttsAny(env, text, requestedLang);
-        const h = new Headers(extra);
-        h.set("content-type", out.ct || "audio/mpeg");
-        securityHeaders().forEach((v, k) => h.set(k, v));
-        return new Response(out.body, { status: 200, headers: h });
-      } catch (e) {
-        return json(502, { error: "TTS unavailable", detail: String(e?.message || e) }, extra);
-      }
-    }
-
-    // -----------------------
-    // /api/voice -> STT JSON (mode=stt) OR Guard -> Brain -> SSE (TEXT DELTAS)
-    // -----------------------
-    if (isVoice) {
-      const mode = String(url.searchParams.get("mode") || "stt").toLowerCase();
-      const ct = (request.headers.get("content-type") || "").toLowerCase();
-
-      let audioU8 = null;
-      let priorMessages = [];
-      let metaSafe = {};
-
-      if (ct.includes("application/json")) {
-        const raw = await request.text().catch(() => "");
-        if (!raw || raw.length > MAX_BODY_CHARS) return json(413, { error: "Request too large" }, baseExtra);
-
-        let body;
-        try { body = JSON.parse(raw); } catch { return json(400, { error: "Invalid JSON" }, baseExtra); }
-
-        priorMessages = normalizeMessages(body.messages);
-        metaSafe = sanitizeMeta(body.meta);
-
-        if (typeof body.audio_b64 === "string" && body.audio_b64.length) {
-          const bytes = base64ToBytes(body.audio_b64);
-          if (bytes.byteLength > MAX_AUDIO_BYTES) return json(413, { error: "Audio too large" }, baseExtra);
-          audioU8 = bytes;
-        } else if (Array.isArray(body.audio) && body.audio.length) {
-          if (body.audio.length > MAX_AUDIO_BYTES) return json(413, { error: "Audio too large" }, baseExtra);
-          const u8 = new Uint8Array(body.audio.length);
-          for (let i = 0; i < body.audio.length; i++) u8[i] = Number(body.audio[i]) & 255;
-          audioU8 = u8;
-        } else {
-          return json(400, { error: "Missing audio (audio_b64 or audio[])" }, baseExtra);
-        }
-      } else {
-        const buf = await request.arrayBuffer().catch(() => null);
-        if (!buf || buf.byteLength < 16) return json(400, { error: "Empty audio" }, baseExtra);
-        if (buf.byteLength > MAX_AUDIO_BYTES) return json(413, { error: "Audio too large" }, baseExtra);
-        audioU8 = new Uint8Array(buf);
-      }
-
-      // Whisper STT
-      let sttOut;
-      try { sttOut = await runWhisper(env, audioU8); }
-      catch (e) { return json(502, { error: "Whisper unavailable", detail: String(e?.message || e) }, baseExtra); }
-
-      const transcriptRaw = sttOut?.text || sttOut?.result?.text || sttOut?.response?.text || "";
-      const transcript = sanitizeContent(transcriptRaw);
-      if (!transcript) return json(400, { error: "No transcription produced" }, baseExtra);
-      if (looksMalicious(transcript)) return json(403, { error: "Blocked by security sanitizer" }, baseExtra);
-
-      const extra = new Headers(baseExtra);
-      extra.set("x-chattia-voice-timeout-sec", "120");
-
-      if (mode === "stt") {
-        return json(200, { transcript, voice_timeout_sec: 120 }, extra);
-      }
-
-      const messages = priorMessages.length
-        ? [...priorMessages, { role: "user", content: transcript }]
-        : [{ role: "user", content: transcript }];
-
-      // EDGE: allow author only if explicitly asked (includes transcript now)
-      const allowAuthor = userExplicitlyAskedAuthor(messages);
-
-      // Guard at edge
-      let guardRes;
-      try { guardRes = await env.AI.run(MODEL_GUARD, { messages }); }
-      catch { return json(502, { error: "Safety check unavailable" }, extra); }
-
-      const verdict = parseGuardResult(guardRes);
-      if (!verdict.safe) return json(403, { error: "Blocked by safety filter", categories: verdict.categories }, extra);
-
-      // Call Brain
-      let brainResp;
-      try { brainResp = await callBrain(env, { messages, meta: metaSafe }); }
-      catch (e) { return json(502, { error: "Brain unreachable", detail: String(e?.message || e) }, extra); }
-
-      if (!brainResp.ok) {
-        const t = await brainResp.text().catch(() => "");
-        return json(502, { error: "Brain error", status: brainResp.status, detail: t.slice(0, 2000) }, extra);
-      }
-
-      forwardBrainHeaders(extra, brainResp);
-      return sse(bridgeBrainToSSE(brainResp.body, allowAuthor), extra);
-    }
-
-    return json(500, { error: "Unhandled route" }, baseExtra);
-  },
-};
+  // ---- Expose on window for app.js
+  window.EnlaceRepo = {
+    init,
+    getConfig,
+    postChat,
+    postTTS,
+    postVoiceSTT,
+  };
+})();
