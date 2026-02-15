@@ -4,24 +4,34 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Chattia</title>
+
   <!-- Security headers are delivered via HTTP response headers in _headers. -->
   <meta name="description" content="Chattia delivers secure, human-centered concierge chat experiences with compliance-first design, fast performance, and AI-ready guidance." />
   <meta name="robots" content="index, follow" />
   <meta name="theme-color" content="#10a37f" />
   <link rel="canonical" href="https://chattia.io/" />
+
   <meta property="og:title" content="Chattia — Secure Concierge Chat UI" />
   <meta property="og:description" content="A compliance-first chat interface optimized for Core Web Vitals, security headers, and SEO-ready metadata." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://chattia.io/" />
+
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Chattia — Secure Concierge Chat UI" />
   <meta name="twitter:description" content="A compliant, performance-ready chat UI with CSP, CORS, and Core Web Vitals targets." />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" integrity="sha384-K5EqGsh0IDpTzs9sOw3mL5+ZbdoldYLVpEj46TA37y2gfudWisq74pKFqxrnWAv+" crossorigin="anonymous" />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    crossorigin="anonymous"
+  />
+
   <link rel="stylesheet" href="css/main.css" />
   <link rel="stylesheet" href="css/adapt_screens.css" />
 </head>
+
 <body>
   <main class="chat-app" aria-label="Chattia chat interface">
     <header class="chat-header">
@@ -30,9 +40,12 @@
           <h1>Chattia</h1>
         </div>
       </div>
+
       <div class="header-actions" aria-live="polite">
         <div class="status-stack">
           <span id="thinking-status" class="status-line">Standing by.</span>
+          <span id="origin-status" class="status-line"></span>
+          <span id="endpoint-status" class="status-line"></span>
         </div>
       </div>
     </header>
@@ -63,6 +76,7 @@
           />
           <span id="voice-helper" class="voice-helper" aria-live="polite"></span>
         </div>
+
         <button id="micBtn" type="button" aria-label="Voice reply" aria-pressed="false">
           <svg class="voice-wave-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
             <rect x="4" y="6" width="40" height="36" rx="10" fill="currentColor" />
@@ -75,12 +89,14 @@
             </g>
           </svg>
         </button>
+
         <button class="send-btn" type="submit" id="send-btn" disabled>
           Send
         </button>
       </form>
     </footer>
   </main>
+
   <script type="module" defer src="worker_files/enlace.worker.js"></script>
   <script type="module" defer src="app.js"></script>
 </body>
