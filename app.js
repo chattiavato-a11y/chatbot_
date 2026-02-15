@@ -1,19 +1,23 @@
+/* File: app.js
+ *
+ * Chattia UI controller
+ * - Uses window.EnlaceRepo (repo gateway module) for all network calls
+ * - Keeps Origin -> AssetID mapping consistent with worker_files/worker.config.json
+ * - Sends language hints for voice/TTS via extraHeaders (EnlaceRepo also sends x-ops-src-sha512-b64)
+ *
+ * CSP-safe: no inline scripts, no eval/new Function, no string-timers.
+ */
+
+"use strict";
+
 const form = document.getElementById("chat-form");
 const input = document.getElementById("msgInput");
 const sendBtn = document.getElementById("send-btn");
 const chatLog = document.getElementById("chat-log");
-// --- OPS Asset Identity (Origin -> AssetId) ---
-const OPS_ASSET_BY_ORIGIN = {
-  "https://www.chattia.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
-  "https://chattia.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
-  "https://chattiavato-a11y.github.io": "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
-  "https://enlace.grabem-holdem-nuts-right.workers.dev":
-    "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
-};
-const OPS_ASSET_ID = OPS_ASSET_BY_ORIGIN[window.location.origin] || "";
-window.OPS_ASSET_BY_ORIGIN = OPS_ASSET_BY_ORIGIN;
-window.OPS_ASSET_ID = OPS_ASSET_ID;
 
+// -------------------------
+// Defaults (fallback)
+// -------------------------
 const defaultConfig = {
   assetRegistry: "worker_files/worker.assets.json",
   workerEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev",
@@ -23,23 +27,23 @@ const defaultConfig = {
   gatewayEndpoint: "",
   workerEndpointAssetId: "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
   gatewayEndpointAssetId: "",
-
   allowedOrigins: [
     "https://www.chattia.io",
     "https://chattia.io",
     "https://chattiavato-a11y.github.io",
     "https://enlace.grabem-holdem-nuts-right.workers.dev",
   ],
-
   allowedOriginAssetIds: [
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
     "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
   ],
-
 };
 
+// -------------------------
+// Local UI Translations
+// -------------------------
 const TRANSLATIONS = {
   en: {
     welcome: "Welcome",
@@ -104,7 +108,8 @@ const TRANSLATIONS = {
   zh: {
     welcome: "欢迎",
     startConversation: "开始对话",
-    introCopy: "用任何语言交流——口语或书面语。Chattia 会自动识别你的语言并以相同语言回复。",
+    introCopy:
+      "用任何语言交流——口语或书面语。Chattia 会自动识别你的语言并以相同语言回复。",
     greeting: "你好",
     farewell: "再见",
     chattiaIntro:
@@ -113,7 +118,8 @@ const TRANSLATIONS = {
   yue: {
     welcome: "歡迎",
     startConversation: "開始對話",
-    introCopy: "用任何語言交流——口語或書面語。Chattia 會自動識別你嘅語言並用相同語言回覆。",
+    introCopy:
+      "用任何語言交流——口語或書面語。Chattia 會自動識別你嘅語言並用相同語言回覆。",
     greeting: "你好",
     farewell: "再見",
     chattiaIntro:
@@ -161,21 +167,11 @@ const TRANSLATIONS = {
   },
 };
 
-let workerEndpoint = defaultConfig.workerEndpoint;
-let gatewayEndpoint = defaultConfig.gatewayEndpoint;
-let allowedOrigins = [...defaultConfig.allowedOrigins];
-let isStreaming = false;
-let activeController = null;
-let activeAssistantBubble = null;
-const DEFAULT_REQUEST_META = {
-  reply_format: "paragraph",
-  tone: "friendly",
-};
-
+// -------------------------
+// Language + direction helpers
+// -------------------------
 const RTL_CHARACTERS = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
-
-const getTextDirection = (text) =>
-  RTL_CHARACTERS.test(text) ? "rtl" : "ltr";
+const getTextDirection = (text) => (RTL_CHARACTERS.test(text) ? "rtl" : "ltr");
 
 const normalizeLocale = (value) =>
   value ? String(value).toLowerCase().split("-")[0] : "";
@@ -200,9 +196,7 @@ const applyTranslations = () => {
     const key = el.getAttribute("data-i18n");
     if (!key) return;
     const value = t(key);
-    if (value) {
-      el.textContent = value;
-    }
+    if (value) el.textContent = value;
   });
   document.querySelectorAll("[data-i18n-attr]").forEach((el) => {
     const raw = el.getAttribute("data-i18n-attr") || "";
@@ -210,123 +204,20 @@ const applyTranslations = () => {
       const [attr, key] = pair.split(":").map((part) => part.trim());
       if (!attr || !key) return;
       const value = t(key);
-      if (value) {
-        el.setAttribute(attr, value);
-      }
+      if (value) el.setAttribute(attr, value);
     });
   });
 };
 
+// -------------------------
+// Background gradient rotation
+// -------------------------
 const PAGE_GRADIENTS = [
   "linear-gradient(135deg, rgba(187, 247, 208, 0.68) 0%, rgba(134, 239, 172, 0.62) 45%, rgba(167, 243, 208, 0.58) 100%)",
   "linear-gradient(140deg, rgba(254, 240, 138, 0.62) 0%, rgba(252, 211, 77, 0.58) 40%, rgba(253, 186, 116, 0.55) 100%)",
   "linear-gradient(145deg, rgba(191, 219, 254, 0.62) 0%, rgba(165, 243, 252, 0.58) 45%, rgba(186, 230, 253, 0.54) 100%)",
   "linear-gradient(135deg, rgba(221, 214, 254, 0.6) 0%, rgba(196, 181, 253, 0.56) 50%, rgba(199, 210, 254, 0.52) 100%)",
 ];
-
-const deriveWorkerEndpoint = (assistantEndpoint) => {
-  if (!assistantEndpoint) return "";
-  try {
-    const url = new URL(assistantEndpoint, window.location.origin);
-    if (url.pathname.endsWith("/api/chat")) {
-      url.pathname = url.pathname.replace(/\/api\/chat\/?$/, "");
-    }
-    url.search = "";
-    url.hash = "";
-    return url.toString().replace(/\/$/, "");
-  } catch (error) {
-    console.warn("Unable to parse assistant endpoint.", error);
-  }
-  return "";
-};
-
-const normalizeOrigin = (value) => {
-  if (!value) return "";
-  try {
-    return new URL(String(value), window.location.origin).origin.toLowerCase();
-  } catch (error) {
-    return String(value).trim().replace(/\/$/, "").toLowerCase();
-  }
-};
-
-const isOriginAllowed = (origin, allowedList) => {
-  const normalizedOrigin = normalizeOrigin(origin);
-  return allowedList.some(
-    (allowedOrigin) => normalizeOrigin(allowedOrigin) === normalizedOrigin
-  );
-};
-
-const originStatus = document.getElementById("origin-status");
-const endpointStatus = document.getElementById("endpoint-status");
-const thinkingStatus = document.getElementById("thinking-status");
-const voiceHelper = document.getElementById("voice-helper");
-const cancelBtn = document.getElementById("cancel-btn");
-const thinkingFrames = ["Thinking.", "Thinking..", "Thinking...", "Thinking...."];
-let thinkingInterval = null;
-let thinkingIndex = 0;
-let activeThinkingBubble = null;
-const setStatusLine = (element, text, isWarning = false) => {
-  if (!element) return;
-  element.textContent = text;
-  element.classList.toggle("warning", isWarning);
-};
-
-const buildResponseMeta = (headers) => {
-  if (!headers) return "";
-  const values = [
-    { key: "x-chattia-stt-iso2", label: "stt" },
-    { key: "x-chattia-voice-timeout-sec", label: "voice timeout" },
-    { key: "x-chattia-tts-iso2", label: "tts" },
-  ];
-  const items = values
-    .map(({ key, label }) => {
-      const value = headers.get(key);
-      return value ? `${label}: ${value}` : "";
-    })
-    .filter(Boolean);
-  return items.join(" · ");
-};
-
-const logResponseMeta = (headers) => {
-  const summary = buildResponseMeta(headers);
-  if (!summary) return;
-  console.info("Chattia response metadata:", summary);
-};
-
-const updateSendState = () => {
-  sendBtn.disabled = isStreaming || input.value.trim().length === 0;
-};
-
-const updateThinkingText = () => {
-  const text = thinkingFrames[thinkingIndex % thinkingFrames.length];
-  thinkingIndex += 1;
-  if (thinkingStatus) {
-    thinkingStatus.textContent = text;
-  }
-  if (activeThinkingBubble) {
-    activeThinkingBubble.textContent = text;
-  }
-};
-
-const startThinking = (bubble) => {
-  activeThinkingBubble = bubble ?? activeThinkingBubble;
-  thinkingIndex = 0;
-  updateThinkingText();
-  if (!thinkingInterval) {
-    thinkingInterval = setInterval(updateThinkingText, 500);
-  }
-};
-
-const stopThinking = () => {
-  if (thinkingInterval) {
-    clearInterval(thinkingInterval);
-    thinkingInterval = null;
-  }
-  activeThinkingBubble = null;
-  if (thinkingStatus) {
-    thinkingStatus.textContent = "Standing by.";
-  }
-};
 
 const rotateBackgroundGradient = () => {
   const root = document.documentElement;
@@ -339,13 +230,105 @@ const rotateBackgroundGradient = () => {
   }, 10000);
 };
 
-rotateBackgroundGradient();
-applyTranslations();
+// -------------------------
+// Config + Asset Identity (Origin -> AssetID)
+// -------------------------
+const normalizeOrigin = (value) => {
+  if (!value) return "";
+  try {
+    return new URL(String(value), window.location.origin).origin.toLowerCase();
+  } catch {
+    return String(value).trim().replace(/\/$/, "").toLowerCase();
+  }
+};
 
-input.addEventListener("input", updateSendState);
-input.addEventListener("focus", () => {
-  chatLog.scrollTop = chatLog.scrollHeight;
-});
+const buildOriginAssetMap = (allowedOrigins, allowedOriginAssetIds) => {
+  const map = {};
+  const origins = Array.isArray(allowedOrigins) ? allowedOrigins : [];
+  const ids = Array.isArray(allowedOriginAssetIds) ? allowedOriginAssetIds : [];
+
+  for (let i = 0; i < origins.length; i++) {
+    const origin = normalizeOrigin(origins[i]);
+    const id = typeof ids[i] === "string" ? ids[i].trim() : "";
+    if (origin && id) map[origin] = id;
+  }
+  return map;
+};
+
+// fallback mapping (in case config fails to load)
+let OPS_ASSET_BY_ORIGIN = buildOriginAssetMap(
+  defaultConfig.allowedOrigins,
+  defaultConfig.allowedOriginAssetIds
+);
+
+const getOpsAssetId = () => OPS_ASSET_BY_ORIGIN[normalizeOrigin(window.location.origin)] || "";
+
+window.OPS_ASSET_BY_ORIGIN = OPS_ASSET_BY_ORIGIN;
+window.OPS_ASSET_ID = getOpsAssetId();
+
+// -------------------------
+// Runtime endpoints
+// -------------------------
+let workerEndpoint = defaultConfig.workerEndpoint;
+let gatewayEndpoint = defaultConfig.gatewayEndpoint;
+let allowedOrigins = [...defaultConfig.allowedOrigins];
+
+// Status elements (optional in HTML)
+const originStatus = document.getElementById("origin-status");
+const endpointStatus = document.getElementById("endpoint-status");
+const thinkingStatus = document.getElementById("thinking-status");
+const voiceHelper = document.getElementById("voice-helper");
+const cancelBtn = document.getElementById("cancel-btn");
+
+// -------------------------
+// Stream + UI state
+// -------------------------
+let isStreaming = false;
+let activeController = null;
+
+const DEFAULT_REQUEST_META = {
+  reply_format: "paragraph",
+  tone: "friendly",
+};
+
+const thinkingFrames = ["Thinking.", "Thinking..", "Thinking...", "Thinking...."];
+let thinkingInterval = null;
+let thinkingIndex = 0;
+let activeThinkingBubble = null;
+
+const setStatusLine = (element, text, isWarning = false) => {
+  if (!element) return;
+  element.textContent = text;
+  element.classList.toggle("warning", isWarning);
+};
+
+const updateSendState = () => {
+  if (!sendBtn || !input) return;
+  sendBtn.disabled = isStreaming || input.value.trim().length === 0;
+};
+
+const updateThinkingText = () => {
+  const text = thinkingFrames[thinkingIndex % thinkingFrames.length];
+  thinkingIndex += 1;
+  if (thinkingStatus) thinkingStatus.textContent = text;
+  if (activeThinkingBubble) activeThinkingBubble.textContent = text;
+};
+
+const startThinking = (bubble) => {
+  activeThinkingBubble = bubble ?? activeThinkingBubble;
+  thinkingIndex = 0;
+  updateThinkingText();
+  if (!thinkingInterval) thinkingInterval = window.setInterval(updateThinkingText, 500);
+};
+
+const stopThinking = () => {
+  if (thinkingInterval) {
+    clearInterval(thinkingInterval);
+    thinkingInterval = null;
+  }
+  activeThinkingBubble = null;
+  if (thinkingStatus) thinkingStatus.textContent = "Standing by.";
+};
 
 const addMessage = (text, isUser) => {
   const row = document.createElement("div");
@@ -377,15 +360,253 @@ const addMessage = (text, isUser) => {
   return bubble;
 };
 
-// ===== Voice / Mic (Enlace STT) =====
+// -------------------------
+// Response meta helpers
+// -------------------------
+const buildResponseMeta = (headers) => {
+  if (!headers) return "";
+  const values = [
+    { key: "x-chattia-stt-iso2", label: "stt" },
+    { key: "x-chattia-voice-timeout-sec", label: "voice timeout" },
+    { key: "x-chattia-tts-iso2", label: "tts" },
+  ];
+  const items = values
+    .map(({ key, label }) => {
+      const value = headers.get(key);
+      return value ? `${label}: ${value}` : "";
+    })
+    .filter(Boolean);
+  return items.join(" · ");
+};
 
+const logResponseMeta = (headers) => {
+  const summary = buildResponseMeta(headers);
+  if (!summary) return;
+  console.info("Chattia response metadata:", summary);
+};
+
+// -------------------------
+// Language headers for Worker (allowed by Enlace CORS)
+// -------------------------
+let lastVoiceLanguage = "";
+
+const getPreferredLanguage = () =>
+  lastVoiceLanguage ||
+  navigator.language ||
+  (Array.isArray(navigator.languages) ? navigator.languages[0] : "") ||
+  "";
+
+const buildLanguageHeaders = (language) => {
+  const languages = Array.isArray(navigator.languages)
+    ? navigator.languages.filter(Boolean)
+    : [];
+  return {
+    "x-chattia-lang-hint": language || "",
+    "x-chattia-lang-list": languages.join(","),
+  };
+};
+
+// -------------------------
+// Worker config load (from EnlaceRepo)
+// -------------------------
+const deriveWorkerEndpoint = (assistantEndpoint) => {
+  if (!assistantEndpoint) return "";
+  try {
+    const url = new URL(assistantEndpoint, window.location.origin);
+    if (url.pathname.endsWith("/api/chat")) {
+      url.pathname = url.pathname.replace(/\/api\/chat\/?$/, "");
+    }
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+};
+
+const loadRegistryConfig = async () => {
+  if (!window.EnlaceRepo?.init || !window.EnlaceRepo?.getConfig) return;
+
+  try {
+    await window.EnlaceRepo.init();
+    const data = window.EnlaceRepo.getConfig() || {};
+
+    // endpoints
+    if (data.workerEndpoint) workerEndpoint = String(data.workerEndpoint);
+    else if (data.assistantEndpoint) {
+      const derived = deriveWorkerEndpoint(String(data.assistantEndpoint));
+      if (derived) workerEndpoint = derived;
+    }
+    gatewayEndpoint = String(data.gatewayEndpoint || "").trim();
+
+    // allowed origins
+    if (Array.isArray(data.allowedOrigins) && data.allowedOrigins.length > 0) {
+      allowedOrigins = data.allowedOrigins;
+    }
+
+    // Rebuild origin->asset map
+    const map = buildOriginAssetMap(data.allowedOrigins, data.allowedOriginAssetIds);
+    if (Object.keys(map).length) {
+      OPS_ASSET_BY_ORIGIN = map;
+      window.OPS_ASSET_BY_ORIGIN = OPS_ASSET_BY_ORIGIN;
+      window.OPS_ASSET_ID = getOpsAssetId();
+    }
+  } catch (error) {
+    console.warn("Unable to load worker registry config.", error);
+  }
+};
+
+// -------------------------
+// Endpoint/origin status (optional)
+// -------------------------
+const isOriginAllowed = (origin, allowedList) => {
+  const normalizedOrigin = normalizeOrigin(origin);
+  return allowedList.some((allowedOrigin) => normalizeOrigin(allowedOrigin) === normalizedOrigin);
+};
+
+const warnIfOriginMissing = () => {
+  const originAllowed = isOriginAllowed(window.location.origin, allowedOrigins);
+  if (!originAllowed) {
+    console.warn(`Origin ${window.location.origin} is not listed in worker_files/worker.config.json.`);
+  }
+  setStatusLine(
+    originStatus,
+    originAllowed
+      ? `Origin: ${window.location.origin}`
+      : `Origin: ${window.location.origin} (not listed)`,
+    !originAllowed
+  );
+};
+
+const getActiveEndpoint = () => gatewayEndpoint || workerEndpoint;
+
+const updateEndpointStatus = () => {
+  const activeEndpoint = getActiveEndpoint();
+  const isConfigured = Boolean(activeEndpoint);
+  setStatusLine(
+    endpointStatus,
+    isConfigured
+      ? `Endpoint: ${activeEndpoint}${gatewayEndpoint ? " (gateway)" : ""}`
+      : "Endpoint: not configured",
+    !isConfigured
+  );
+};
+
+// -------------------------
+// Streaming parse (SSE -> text deltas)
+// -------------------------
+const streamWorkerResponse = async (response, bubble) => {
+  if (!response.body) {
+    bubble.textContent = "We couldn't connect to the assistant stream.";
+    return bubble.textContent;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let hasChunk = false;
+
+  const appendText = (text) => {
+    if (!hasChunk) {
+      stopThinking();
+      bubble.textContent = "";
+      hasChunk = true;
+    }
+    bubble.textContent += text;
+    bubble.setAttribute("dir", getTextDirection(bubble.textContent));
+    chatLog.scrollTop = chatLog.scrollHeight;
+  };
+
+  let fullText = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() || "";
+
+    parts.forEach((part) => {
+      const lines = part.split("\n");
+      const dataLines = lines
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.replace(/^data:\s?/, ""));
+      const data = dataLines.join("\n").trim();
+
+      if (data && data !== "[DONE]") {
+        fullText += data;
+        appendText(data);
+      }
+    });
+  }
+
+  return fullText.trim();
+};
+
+// -------------------------
+// Errors (json or text)
+// -------------------------
+const stringifyWorkerValue = (value) => {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+const readWorkerError = async (response) => {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    try {
+      const payload = await response.json();
+      if (payload?.error) {
+        const errorValue = stringifyWorkerValue(payload.error);
+        const detailValue = stringifyWorkerValue(payload.detail);
+        return detailValue ? `${errorValue}: ${detailValue}` : errorValue;
+      }
+      if (payload?.message) return stringifyWorkerValue(payload.message);
+      return stringifyWorkerValue(payload);
+    } catch {
+      // fall through
+    }
+  }
+  return response.text();
+};
+
+// -------------------------
+// Cancel
+// -------------------------
+const setStreamingState = (active) => {
+  isStreaming = active;
+  updateSendState();
+};
+
+function cancelStream() {
+  if (activeController) {
+    try {
+      activeController.abort();
+    } catch {}
+    activeController = null;
+  }
+  setStreamingState(false);
+  stopThinking();
+}
+
+cancelBtn?.addEventListener("click", cancelStream);
+
+// -------------------------
+// Voice / Mic (Enlace STT)
+// -------------------------
 let micStream = null;
 let micRecorder = null;
 let micChunks = [];
 let micRecording = false;
 let voiceReplyRequested = false;
 let activeVoiceAudio = null;
-let lastVoiceLanguage = "";
+
 let micAudioContext = null;
 let micAnalyser = null;
 let micSource = null;
@@ -416,52 +637,47 @@ function setMicUI(isOn) {
   if (!btn) return;
   btn.classList.toggle("is-listening", isOn);
   btn.setAttribute("aria-pressed", isOn ? "true" : "false");
-  if (voiceHelper) {
-    voiceHelper.textContent = isOn ? "Listening... click to stop." : "";
-  }
-  if (input) {
-    input.placeholder = isOn ? "Listening..." : "Message in any language...";
-  }
+  if (voiceHelper) voiceHelper.textContent = isOn ? "Listening... click to stop." : "";
+  if (input) input.placeholder = isOn ? "Listening..." : "Message in any language...";
 }
 
 async function playVoiceReply(text) {
   if (!text) return;
-  if (!window.EnlaceRepo?.postTTS) {
-    throw new Error("Enlace TTS module is not loaded.");
-  }
+  if (!window.EnlaceRepo?.postTTS) throw new Error("Enlace TTS module is not loaded.");
+
   if (activeVoiceAudio) {
     activeVoiceAudio.pause();
     activeVoiceAudio = null;
   }
+
   const voiceLanguage = getPreferredLanguage();
   const res = await window.EnlaceRepo.postTTS(
     { text, language: voiceLanguage || undefined },
-    {
-      extraHeaders: buildLanguageHeaders(voiceLanguage),
-    }
+    { extraHeaders: buildLanguageHeaders(voiceLanguage) }
   );
+
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     throw new Error(`TTS failed (${res.status}): ${detail.slice(0, 200)}`);
   }
+
   logResponseMeta(res.headers);
+
   const audioBlob = await res.blob();
   const audioUrl = URL.createObjectURL(audioBlob);
   const audio = new Audio(audioUrl);
   activeVoiceAudio = audio;
+
   audio.addEventListener("ended", () => {
     URL.revokeObjectURL(audioUrl);
-    if (activeVoiceAudio === audio) {
-      activeVoiceAudio = null;
-    }
+    if (activeVoiceAudio === audio) activeVoiceAudio = null;
   });
+
   await audio.play();
 }
 
 async function startMic() {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error("Microphone not supported in this browser.");
-  }
+  if (!navigator.mediaDevices?.getUserMedia) throw new Error("Microphone not supported in this browser.");
   micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
   const mimeType = getSupportedMimeType();
@@ -476,6 +692,7 @@ async function startMic() {
   micRecording = true;
   setMicUI(true);
   startSilenceDetection();
+
   micMaxTimeoutId = window.setTimeout(async () => {
     if (!micRecording) return;
     try {
@@ -499,35 +716,34 @@ async function stopMicAndTranscribe() {
       micRecorder.requestData();
     } catch {}
   }
+
   micRecorder.stop();
   await stopped;
-  if (micChunks.length === 0) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
+
+  if (micChunks.length === 0) await new Promise((resolve) => setTimeout(resolve, 100));
 
   try {
     micStream?.getTracks()?.forEach((track) => track.stop());
   } catch {}
+
   micStream = null;
 
   const blob = new Blob(micChunks, { type: micRecorder.mimeType || "audio/webm" });
+
   micRecorder = null;
   micChunks = [];
   micRecording = false;
   setMicUI(false);
   stopSilenceDetection();
+
   if (micMaxTimeoutId) {
     clearTimeout(micMaxTimeoutId);
     micMaxTimeoutId = null;
   }
 
-  if (!blob || blob.size === 0) {
-    throw new Error("No audio captured. Please try again.");
-  }
+  if (!blob || blob.size === 0) throw new Error("No audio captured. Please try again.");
+  if (!window.EnlaceRepo?.postVoiceSTT) throw new Error("Enlace voice module is not loaded.");
 
-  if (!window.EnlaceRepo?.postVoiceSTT) {
-    throw new Error("Enlace voice module is not loaded.");
-  }
   const preferredLanguage = getPreferredLanguage();
   const res = await window.EnlaceRepo.postVoiceSTT(blob, {
     extraHeaders: buildLanguageHeaders(preferredLanguage),
@@ -539,12 +755,11 @@ async function stopMicAndTranscribe() {
   }
 
   logResponseMeta(res.headers);
+
   const detectedLanguage = res.headers.get("x-chattia-stt-iso2");
-  if (detectedLanguage) {
-    lastVoiceLanguage = detectedLanguage;
-  } else if (!lastVoiceLanguage && preferredLanguage) {
-    lastVoiceLanguage = preferredLanguage;
-  }
+  if (detectedLanguage) lastVoiceLanguage = detectedLanguage;
+  else if (!lastVoiceLanguage && preferredLanguage) lastVoiceLanguage = preferredLanguage;
+
   const data = await res.json();
   const transcript = data?.transcript ? String(data.transcript) : "";
   if (!transcript) throw new Error("No transcript returned.");
@@ -554,37 +769,38 @@ async function stopMicAndTranscribe() {
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.focus();
     voiceReplyRequested = true;
-    if (form?.requestSubmit) {
-      form.requestSubmit();
-    } else {
-      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-    }
+    if (form?.requestSubmit) form.requestSubmit();
+    else form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
   }
-  if (voiceHelper) {
-    voiceHelper.textContent = `Heard: “${transcript}”`;
-  }
+
+  if (voiceHelper) voiceHelper.textContent = `Heard: “${transcript}”`;
 
   return transcript;
 }
 
 function startSilenceDetection() {
   if (!micStream || micAudioContext) return;
+
   micAudioContext = new (window.AudioContext || window.webkitAudioContext)();
   micAnalyser = micAudioContext.createAnalyser();
   micAnalyser.fftSize = 2048;
   micSource = micAudioContext.createMediaStreamSource(micStream);
   micSource.connect(micAnalyser);
+
   const bufferLength = micAnalyser.fftSize;
   const dataArray = new Float32Array(bufferLength);
 
   const checkSilence = () => {
     if (!micRecording || !micAnalyser) return;
+
     micAnalyser.getFloatTimeDomainData(dataArray);
     let sumSquares = 0;
+
     for (let i = 0; i < bufferLength; i += 1) {
       const value = dataArray[i];
       sumSquares += value * value;
     }
+
     const rms = Math.sqrt(sumSquares / bufferLength);
     const db = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
 
@@ -631,20 +847,19 @@ function stopSilenceDetection() {
 
 async function onMicClick() {
   try {
-    if (!micRecording) {
-      await startMic();
-    } else {
-      await stopMicAndTranscribe();
-    }
+    if (!micRecording) await startMic();
+    else await stopMicAndTranscribe();
   } catch (error) {
     micRecording = false;
     voiceReplyRequested = false;
     setMicUI(false);
     stopSilenceDetection();
+
     if (micMaxTimeoutId) {
       clearTimeout(micMaxTimeoutId);
       micMaxTimeoutId = null;
     }
+
     try {
       micStream?.getTracks()?.forEach((track) => track.stop());
     } catch {}
@@ -655,199 +870,38 @@ async function onMicClick() {
     console.error("Mic error:", error);
 
     if (input) {
-      input.placeholder =
-        error?.message ? String(error.message) : "Microphone error";
+      input.placeholder = error?.message ? String(error.message) : "Microphone error";
     }
-    if (voiceHelper) {
-      voiceHelper.textContent = "Microphone unavailable.";
-    }
+    if (voiceHelper) voiceHelper.textContent = "Microphone unavailable.";
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   const btn = document.getElementById("micBtn");
   if (!btn) return;
-  const hasMediaSupport = Boolean(
-    navigator.mediaDevices?.getUserMedia && window.MediaRecorder
-  );
+
+  const hasMediaSupport = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
   btn.disabled = !hasMediaSupport;
-  btn.title = hasMediaSupport
-    ? "Voice reply (up to 30 seconds)"
-    : "Microphone not supported on this device";
-  if (!hasMediaSupport && voiceHelper) {
-    voiceHelper.textContent = "Microphone not supported in this browser.";
-  }
+  btn.title = hasMediaSupport ? "Voice reply (up to 30 seconds)" : "Microphone not supported on this device";
+
+  if (!hasMediaSupport && voiceHelper) voiceHelper.textContent = "Microphone not supported in this browser.";
   btn.addEventListener("click", onMicClick);
 });
 
-
-const setStreamingState = (active) => {
-  isStreaming = active;
-  updateSendState();
-};
-
-cancelBtn?.addEventListener("click", cancelStream);
-
-const loadRegistryConfig = async () => {
-  if (!window.EnlaceRepo?.init) return;
-  try {
-    await window.EnlaceRepo.init();
-    const data = window.EnlaceRepo.getConfig();
-    if (data.workerEndpoint) {
-      workerEndpoint = data.workerEndpoint;
-    } else if (data.assistantEndpoint) {
-      const derivedEndpoint = deriveWorkerEndpoint(data.assistantEndpoint);
-      if (derivedEndpoint) {
-        workerEndpoint = derivedEndpoint;
-      }
-    }
-    if (Array.isArray(data.allowedOrigins) && data.allowedOrigins.length > 0) {
-      allowedOrigins = data.allowedOrigins;
-    }
-  } catch (error) {
-    console.warn("Unable to load worker registry config.", error);
-  }
-};
-
-const getActiveEndpoint = () => gatewayEndpoint || workerEndpoint;
-const buildMessages = (message) => [
-  {
-    role: "user",
-    content: message,
-  },
-];
+// -------------------------
+// Chat submit
+// -------------------------
+const buildMessages = (message) => [{ role: "user", content: message }];
 
 const getLanguageMeta = () => {
   const languages = Array.isArray(navigator.languages)
     ? navigator.languages.filter(Boolean)
     : [];
   const primary = navigator.language || languages[0] || "";
-  return {
-    language_hint: primary,
-    language_list: languages,
-  };
+  return { language_hint: primary, language_list: languages };
 };
 
-const getPreferredLanguage = () =>
-  lastVoiceLanguage ||
-  navigator.language ||
-  (Array.isArray(navigator.languages) ? navigator.languages[0] : "") ||
-  "";
-
-const buildLanguageHeaders = (language) => {
-  const languages = Array.isArray(navigator.languages)
-    ? navigator.languages.filter(Boolean)
-    : [];
-  return {
-    "x-chattia-lang-hint": language || "",
-    "x-chattia-lang-list": languages.join(","),
-  };
-};
-
-const streamWorkerResponse = async (response, bubble) => {
-  if (!response.body) {
-    bubble.textContent = "We couldn't connect to the assistant stream.";
-    return bubble.textContent;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let hasChunk = false;
-  const appendText = (text) => {
-    if (!hasChunk) {
-      stopThinking();
-      bubble.textContent = "";
-      hasChunk = true;
-    }
-    bubble.textContent += text;
-    bubble.setAttribute("dir", getTextDirection(bubble.textContent));
-    chatLog.scrollTop = chatLog.scrollHeight;
-  };
-
-  let fullText = "";
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const parts = buffer.split("\n\n");
-    buffer = parts.pop() || "";
-    parts.forEach((part) => {
-      const lines = part.split("\n");
-      const dataLines = lines
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.replace(/^data:\s?/, ""));
-      const data = dataLines.join("\n").trim();
-      if (data && data !== "[DONE]") {
-        fullText += data;
-        appendText(data);
-      }
-    });
-  }
-  return fullText.trim();
-};
-
-const stringifyWorkerValue = (value) => {
-  if (typeof value === "string") return value;
-  if (value === null || value === undefined) return "";
-  try {
-    return JSON.stringify(value);
-  } catch (error) {
-    console.error(error);
-  }
-  return String(value);
-};
-
-const readWorkerError = async (response) => {
-  const contentType = response.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    try {
-      const payload = await response.json();
-      if (payload?.error) {
-        const errorValue = stringifyWorkerValue(payload.error);
-        const detailValue = stringifyWorkerValue(payload.detail);
-        return detailValue ? `${errorValue}: ${detailValue}` : errorValue;
-      }
-      if (payload?.message) {
-        return stringifyWorkerValue(payload.message);
-      }
-      return stringifyWorkerValue(payload);
-    } catch (error) {
-      console.error(error);
-    }
-  }
-  return response.text();
-};
-
-const warnIfOriginMissing = () => {
-  const originAllowed = isOriginAllowed(window.location.origin, allowedOrigins);
-  if (!originAllowed) {
-    console.warn(
-      `Origin ${window.location.origin} is not listed in worker_files/worker.config.json.`
-    );
-  }
-  setStatusLine(
-    originStatus,
-    originAllowed
-      ? `Origin: ${window.location.origin}`
-      : `Origin: ${window.location.origin} (not listed)`,
-    !originAllowed
-  );
-};
-
-const updateEndpointStatus = () => {
-  const activeEndpoint = getActiveEndpoint();
-  const isConfigured = Boolean(activeEndpoint);
-  setStatusLine(
-    endpointStatus,
-    isConfigured
-      ? `Endpoint: ${activeEndpoint}${gatewayEndpoint ? " (gateway)" : ""}`
-      : "Endpoint: not configured",
-    !isConfigured
-  );
-};
-
-form.addEventListener("submit", async (event) => {
+form?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const message = input.value.trim();
   if (!message || isStreaming) return;
@@ -870,19 +924,12 @@ form.addEventListener("submit", async (event) => {
 
   warnIfOriginMissing();
   setStreamingState(true);
+
   const controller = new AbortController();
   activeController = controller;
 
   try {
-    try {
-      if (!window.EnlaceRepo?.postChat) {
-        throw new Error("Enlace repo module is not loaded.");
-      }
-    } catch (error) {
-      assistantBubble.textContent = String(error?.message || error);
-      stopThinking();
-      return;
-    }
+    if (!window.EnlaceRepo?.postChat) throw new Error("Enlace repo module is not loaded.");
 
     const response = await window.EnlaceRepo.postChat(
       {
@@ -911,6 +958,7 @@ form.addEventListener("submit", async (event) => {
 
     logResponseMeta(response.headers);
     const assistantText = await streamWorkerResponse(response, assistantBubble);
+
     if (voiceReplyRequested && assistantText) {
       try {
         await playVoiceReply(assistantText);
@@ -919,28 +967,39 @@ form.addEventListener("submit", async (event) => {
       }
     }
   } catch (error) {
-    if (error.name === "AbortError") {
-      return;
-    }
+    if (error?.name === "AbortError") return;
     assistantBubble.textContent =
-      error?.message ||
-      "We couldn't reach the secure assistant. Please try again shortly.";
+      error?.message || "We couldn't reach the secure assistant. Please try again shortly.";
     console.error(error);
   } finally {
     activeController = null;
-    activeAssistantBubble = null;
     setStreamingState(false);
     stopThinking();
     voiceReplyRequested = false;
   }
 });
 
-const init = async () => {
-  await loadRegistryConfig();
-  warnIfOriginMissing();
-  updateEndpointStatus();
+// -------------------------
+// Boot
+// -------------------------
+function init() {
+  rotateBackgroundGradient();
+  applyTranslations();
+
+  input?.addEventListener("input", updateSendState);
+  input?.addEventListener("focus", () => {
+    chatLog.scrollTop = chatLog.scrollHeight;
+  });
+
   updateSendState();
   stopThinking();
-};
+
+  // async config load (does not block UI)
+  loadRegistryConfig().finally(() => {
+    warnIfOriginMissing();
+    updateEndpointStatus();
+    updateSendState();
+  });
+}
 
 init();
