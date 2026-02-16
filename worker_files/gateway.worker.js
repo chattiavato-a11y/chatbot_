@@ -60,6 +60,10 @@ const applySecurityHeaders = (headers) => {
   headers.set("X-Frame-Options", "DENY");
   headers.set("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
   headers.set("Cross-Origin-Resource-Policy", "same-origin");
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  headers.set("Cross-Origin-Embedder-Policy", "require-corp");
+  headers.set("X-DNS-Prefetch-Control", "off");
+  headers.set("X-Permitted-Cross-Domain-Policies", "none");
 };
 
 const ensureRequiredHeaders = (request, requiredHeaders) =>
