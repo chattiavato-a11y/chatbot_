@@ -12,6 +12,39 @@
   "use strict";
 
   const CONFIG_PATH_DEFAULT = "worker_files/worker.config.json";
+  const FALLBACK_CONFIG = {
+    assetRegistry: "worker_files/worker.assets.json",
+    workerEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev",
+    assistantEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev/api/chat",
+    voiceEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev/api/voice",
+    ttsEndpoint: "https://enlace.grabem-holdem-nuts-right.workers.dev/api/tts",
+    gatewayEndpoint: "",
+    workerEndpointAssetId: "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
+    gatewayEndpointAssetId: "",
+    allowedOrigins: [
+      "https://www.chattia.io",
+      "https://chattia.io",
+      "https://chattiavato-a11y.github.io",
+      "https://enlace.grabem-holdem-nuts-right.workers.dev",
+    ],
+    allowedOriginAssetIds: [
+      "asset_01J7Y2D4XABCD3EFGHJKMNPRTB",
+      "asset_01J7Y2D4XABCD3EFGHJKMNPRTC",
+      "asset_01J7Y2D4XABCD3EFGHJKMNPRTD",
+      "asset_01J7Y2D4XABCD3EFGHJKMNPRTA",
+    ],
+    requiredHeaders: ["Content-Type", "Accept", "X-Ops-Asset-Id"],
+    optionalHeaders: [
+      "X-Ops-Src-Sha512-B64",
+      "X-Chattia-Lang-Hint",
+      "X-Chattia-Lang-List",
+      "CF-Turnstile-Response",
+    ],
+    repoIdentity: {
+      header: "X-Ops-Src-Sha512-B64",
+      sha512_b64: "0ktRDMTkZ5fTzYCBvfX2cc7XM6N/6DZTmsFwRS0dfc9/ZV8GlSrdGGrqoX35oedn",
+    },
+  };
 
   // -------------------------
   // Local state
@@ -199,7 +232,14 @@
     const cfgPath = safeText(options.configPath || CONFIG_PATH_DEFAULT) || CONFIG_PATH_DEFAULT;
     const cfgUrl = new URL(cfgPath, window.location.href).toString();
 
-    const cfg = await loadJson(cfgUrl);
+    let cfg;
+    try {
+      cfg = await loadJson(cfgUrl);
+    } catch (error) {
+      cfg = { ...FALLBACK_CONFIG };
+      console.warn(`Using embedded fallback config because ${cfgUrl} could not be loaded.`, error);
+    }
+
     const verdict = validateConfig(cfg);
     if (!verdict.ok) throw new Error(verdict.error);
 
