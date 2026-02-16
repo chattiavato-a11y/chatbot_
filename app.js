@@ -274,8 +274,6 @@ let gatewayEndpoint = defaultConfig.gatewayEndpoint;
 let allowedOrigins = [...defaultConfig.allowedOrigins];
 
 // Status elements (optional in HTML)
-const originStatus = document.getElementById("origin-status");
-const endpointStatus = document.getElementById("endpoint-status");
 const thinkingStatus = document.getElementById("thinking-status");
 const voiceHelper = document.getElementById("voice-helper");
 const cancelBtn = document.getElementById("cancel-btn");
@@ -295,12 +293,6 @@ const thinkingFrames = ["Thinking.", "Thinking..", "Thinking...", "Thinking...."
 let thinkingInterval = null;
 let thinkingIndex = 0;
 let activeThinkingBubble = null;
-
-const setStatusLine = (element, text, isWarning = false) => {
-  if (!element) return;
-  element.textContent = text;
-  element.classList.toggle("warning", isWarning);
-};
 
 const updateSendState = () => {
   if (!sendBtn || !input) return;
@@ -456,41 +448,7 @@ const loadRegistryConfig = async () => {
   }
 };
 
-// -------------------------
-// Endpoint/origin status (optional)
-// -------------------------
-const isOriginAllowed = (origin, allowedList) => {
-  const normalizedOrigin = normalizeOrigin(origin);
-  return allowedList.some((allowedOrigin) => normalizeOrigin(allowedOrigin) === normalizedOrigin);
-};
-
-const warnIfOriginMissing = () => {
-  const originAllowed = isOriginAllowed(window.location.origin, allowedOrigins);
-  if (!originAllowed) {
-    console.warn(`Origin ${window.location.origin} is not listed in worker_files/worker.config.json.`);
-  }
-  setStatusLine(
-    originStatus,
-    originAllowed
-      ? `Origin: ${window.location.origin}`
-      : `Origin: ${window.location.origin} (not listed)`,
-    !originAllowed
-  );
-};
-
 const getActiveEndpoint = () => gatewayEndpoint || workerEndpoint;
-
-const updateEndpointStatus = () => {
-  const activeEndpoint = getActiveEndpoint();
-  const isConfigured = Boolean(activeEndpoint);
-  setStatusLine(
-    endpointStatus,
-    isConfigured
-      ? `Endpoint: ${activeEndpoint}${gatewayEndpoint ? " (gateway)" : ""}`
-      : "Endpoint: not configured",
-    !isConfigured
-  );
-};
 
 // -------------------------
 // Streaming parse (SSE -> text deltas)
@@ -922,7 +880,6 @@ form?.addEventListener("submit", async (event) => {
     return;
   }
 
-  warnIfOriginMissing();
   setStreamingState(true);
 
   const controller = new AbortController();
@@ -996,8 +953,6 @@ function init() {
 
   // async config load (does not block UI)
   loadRegistryConfig().finally(() => {
-    warnIfOriginMissing();
-    updateEndpointStatus();
     updateSendState();
   });
 }
