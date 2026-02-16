@@ -444,6 +444,11 @@ const loadRegistryConfig = async () => {
       window.OPS_ASSET_ID = getOpsAssetId();
     }
   } catch (error) {
+    const message = String(error?.message || "");
+    if (/Config fetch failed \(\d+\)\./.test(message)) {
+      console.info(`Worker registry config unavailable (${message}). Using built-in defaults.`);
+      return;
+    }
     console.warn("Unable to load worker registry config.", error);
   }
 };
