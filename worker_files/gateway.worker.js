@@ -47,12 +47,10 @@ const isOriginAllowed = (origin, allowedOrigins) =>
   Boolean(origin && allowedOrigins.includes(origin));
 
 const applySecurityHeaders = (headers) => {
-  if (!headers.has("Content-Security-Policy")) {
-    headers.set(
-      "Content-Security-Policy",
-      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
-    );
-  }
+  headers.set(
+    "Content-Security-Policy",
+    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"
+  );
   headers.set(
     "Strict-Transport-Security",
     "max-age=31536000; includeSubDomains; preload"
@@ -61,7 +59,7 @@ const applySecurityHeaders = (headers) => {
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("X-Frame-Options", "DENY");
   headers.set("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
-  headers.set("Cross-Origin-Resource-Policy", "cross-origin");
+  headers.set("Cross-Origin-Resource-Policy", "same-origin");
 };
 
 const ensureRequiredHeaders = (request, requiredHeaders) =>
