@@ -69,14 +69,16 @@
 
     <footer class="chat-footer">
       <form id="chat-form" class="input-shell" autocomplete="off">
-        <div class="hp-field-wrap" aria-hidden="true">
-          <label for="companySite">Company website</label>
+        <div class="hp-field-wrap" aria-hidden="true" role="presentation">
+          <label for="companySite">Leave this field empty</label>
           <input
             id="companySite"
             name="companySite"
             type="text"
             tabindex="-1"
-            autocomplete="off"
+            inputmode="none"
+            autocomplete="new-password"
+            spellcheck="false"
           />
         </div>
 

@@ -298,7 +298,7 @@ let activeThinkingBubble = null;
 const updateSendState = () => {
   if (!sendBtn || !input) return;
   const hasText = input.value.trim().length > 0;
-  sendBtn.disabled = isStreaming || !hasText || isHoneypotTriggered();
+  sendBtn.disabled = isStreaming || !hasText;
 };
 
 const updateThinkingText = () => {
@@ -861,10 +861,10 @@ const buildMessages = (message) => [{ role: "user", content: message }];
 
 const HONEYPOT_BLOCK_MESSAGE = "Request blocked.";
 
-const isHoneypotTriggered = () => Boolean(honeypotInput?.value?.trim());
+const getHoneypotValue = () => String(honeypotInput?.value || "").trim();
 
 const handleHoneypotTrap = () => {
-  if (!isHoneypotTriggered()) return false;
+  if (!getHoneypotValue()) return false;
 
   honeypotInput.value = "";
   input.value = "";
@@ -942,7 +942,7 @@ form?.addEventListener("submit", async (event) => {
           allowedOrigins,
           ...DEFAULT_REQUEST_META,
           ...getLanguageMeta(),
-          honeypot_triggered: false,
+          honeypot_triggered: Boolean(getHoneypotValue()),
           voice_language: lastVoiceLanguage || undefined,
         },
       },
@@ -990,7 +990,6 @@ function init() {
   applyTranslations();
 
   input?.addEventListener("input", updateSendState);
-  honeypotInput?.addEventListener("input", updateSendState);
 
   input?.addEventListener("focus", () => {
     chatLog.scrollTop = chatLog.scrollHeight;
