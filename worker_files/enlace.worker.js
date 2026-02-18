@@ -37,8 +37,7 @@
     optionalHeaders: [
       "X-Ops-Src-Sha512-B64",
       "X-Chattia-Lang-Hint",
-      "X-Chattia-Lang-List",
-      "CF-Turnstile-Response",
+      "X-Chattia-Lang-List"
     ],
     repoIdentity: {
       header: "X-Ops-Src-Sha512-B64",
