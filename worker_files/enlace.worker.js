@@ -126,7 +126,10 @@
   const hasHoneypotSignal = (value) => {
     const text = String(value ?? "").toLowerCase();
     if (!text) return false;
-    return /(companysite|website_url|honeypot|trap_field|bot_field)/.test(text);
+
+    // Keep detection focused on known trap field names. Do not block
+    // legitimate telemetry flags such as `honeypot_triggered: false`.
+    return /\b(companysite|website_url|trap_field|bot_field)\b/.test(text);
   };
 
   function tinyMlIntegrityScore(text) {
@@ -238,14 +241,44 @@
 
   async function init(options = {}) {
     const cfgPath = safeText(options.configPath || CONFIG_PATH_DEFAULT) || CONFIG_PATH_DEFAULT;
-    const cfgUrl = new URL(cfgPath, window.location.href).toString();
+    const candidatePaths = [
+      cfgPath,
+      "worker_files/registry.worker.config.json",
+      "worker.config.json",
+      CONFIG_PATH_DEFAULT,
+    ];
 
+    const tried = new Set();
     let cfg;
-    try {
-      cfg = await loadJson(cfgUrl);
-    } catch (error) {
+    let loadedFrom = "";
+    let lastError = null;
+
+    for (const path of candidatePaths) {
+      const normalizedPath = safeText(path);
+      if (!normalizedPath || tried.has(normalizedPath)) continue;
+      tried.add(normalizedPath);
+
+      const cfgUrl = new URL(normalizedPath, window.location.href).toString();
+      try {
+        cfg = await loadJson(cfgUrl);
+        loadedFrom = cfgUrl;
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (!cfg) {
       cfg = { ...FALLBACK_CONFIG };
-      console.warn(`Using embedded fallback config because ${cfgUrl} could not be loaded.`, error);
+      console.warn(
+        "Using embedded fallback config because all config sources failed.",
+        {
+          attempted: Array.from(tried),
+          lastError,
+        }
+      );
+    } else if (loadedFrom) {
+      console.info(`Loaded Enlace config from ${loadedFrom}`);
     }
 
     const verdict = validateConfig(cfg);
@@ -345,7 +378,8 @@
     const cleaned = sanitizeForSend(last);
     assertTinyMlSafe(cleaned, "chat.message");
 
-    if (hasHoneypotSignal(JSON.stringify(body || {}))) {
+    const serializedMeta = JSON.stringify(body?.meta || {});
+    if (hasHoneypotSignal(serializedMeta)) {
       throw new Error("Blocked by client integrity check (honeypot).");
     }
 
