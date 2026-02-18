@@ -14,6 +14,7 @@ const form = document.getElementById("chat-form");
 const input = document.getElementById("msgInput");
 const sendBtn = document.getElementById("send-btn");
 const chatLog = document.getElementById("chat-log");
+const honeypotInput = document.getElementById("companySite");
 
 // -------------------------
 // Defaults (fallback)
@@ -296,7 +297,8 @@ let activeThinkingBubble = null;
 
 const updateSendState = () => {
   if (!sendBtn || !input) return;
-  sendBtn.disabled = isStreaming || input.value.trim().length === 0;
+  const hasText = input.value.trim().length > 0;
+  sendBtn.disabled = isStreaming || !hasText || isHoneypotTriggered();
 };
 
 const updateThinkingText = () => {
@@ -856,6 +858,23 @@ document.addEventListener("DOMContentLoaded", () => {
 // -------------------------
 const buildMessages = (message) => [{ role: "user", content: message }];
 
+
+const HONEYPOT_BLOCK_MESSAGE = "Request blocked.";
+
+const isHoneypotTriggered = () => Boolean(honeypotInput?.value?.trim());
+
+const handleHoneypotTrap = () => {
+  if (!isHoneypotTriggered()) return false;
+
+  honeypotInput.value = "";
+  input.value = "";
+  updateSendState();
+
+  const assistantBubble = addMessage(HONEYPOT_BLOCK_MESSAGE, false);
+  assistantBubble.setAttribute("dir", "ltr");
+  return true;
+};
+
 const AUTHOR_RESPONSE = "Gabriel: I am the ohhThor and Cr3@to4";
 
 const isAuthorQuery = (message) => {
@@ -878,6 +897,8 @@ const getLanguageMeta = () => {
 
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (handleHoneypotTrap()) return;
+
   const message = input.value.trim();
   if (!message || isStreaming) return;
 
@@ -921,6 +942,7 @@ form?.addEventListener("submit", async (event) => {
           allowedOrigins,
           ...DEFAULT_REQUEST_META,
           ...getLanguageMeta(),
+          honeypot_triggered: false,
           voice_language: lastVoiceLanguage || undefined,
         },
       },
@@ -968,6 +990,8 @@ function init() {
   applyTranslations();
 
   input?.addEventListener("input", updateSendState);
+  honeypotInput?.addEventListener("input", updateSendState);
+
   input?.addEventListener("focus", () => {
     chatLog.scrollTop = chatLog.scrollHeight;
   });

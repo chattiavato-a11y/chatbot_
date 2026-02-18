@@ -25,6 +25,7 @@ const ML_FEATURES = [
   { name: "window_redirect", weight: 4, pattern: /(window\.|document\.)?location\s*(\.href)?\s*=\s*['"`]/i },
   { name: "top_redirect", weight: 4, pattern: /top\.location\s*=\s*['"`]/i },
   { name: "external_script", weight: 2, pattern: /<\s*script[^>]+src\s*=\s*['"]https?:\/\//i },
+  { name: "honeypot_marker", weight: 1, pattern: /(companySite|honeypot|trap_field|bot_field)/i },
 ];
 
 const HIGH_RISK_THRESHOLD = 6;

@@ -123,6 +123,12 @@
   // - “double check after sanitizer”
   // - Not a remote model; deterministic scoring
   // -------------------------
+  const hasHoneypotSignal = (value) => {
+    const text = String(value ?? "").toLowerCase();
+    if (!text) return false;
+    return /(companysite|website_url|honeypot|trap_field|bot_field)/.test(text);
+  };
+
   function tinyMlIntegrityScore(text) {
     const t = String(text || "").toLowerCase();
 
@@ -136,6 +142,7 @@
       has_storage: t.includes("localstorage.") || t.includes("sessionstorage."),
       has_onhandler: t.includes("onerror=") || t.includes("onload="),
       has_base64: t.includes("base64,"),
+      has_honeypot_marker: hasHoneypotSignal(t),
       long_text: t.length > 1200,
       many_angles: (t.match(/[<>]/g) || []).length > 12,
     };
@@ -150,6 +157,7 @@
     z += f.has_storage ? 0.9 : 0;
     z += f.has_onhandler ? 1.0 : 0;
     z += f.has_base64 ? 0.7 : 0;
+    z += f.has_honeypot_marker ? 2.4 : 0;
     z += f.long_text ? 0.4 : 0;
     z += f.many_angles ? 0.6 : 0;
 
@@ -336,6 +344,10 @@
     const last = messages.length ? String(messages[messages.length - 1]?.content || "") : "";
     const cleaned = sanitizeForSend(last);
     assertTinyMlSafe(cleaned, "chat.message");
+
+    if (hasHoneypotSignal(JSON.stringify(body || {}))) {
+      throw new Error("Blocked by client integrity check (honeypot).");
+    }
 
     // NOTE: Do NOT mutate the entire messages array aggressively here;
     // the CF Worker already sanitizes/guards. We only gate obvious malicious input.
