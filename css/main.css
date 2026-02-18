@@ -416,3 +416,12 @@ body {
   display: grid;
   gap: 4px;
 }
+
+.hp-field-wrap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
