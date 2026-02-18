@@ -856,6 +856,18 @@ document.addEventListener("DOMContentLoaded", () => {
 // -------------------------
 const buildMessages = (message) => [{ role: "user", content: message }];
 
+const AUTHOR_RESPONSE = "Gabriel: I am the ohhThor and Cr3@to4";
+
+const isAuthorQuery = (message) => {
+  const normalized = String(message || "").toLowerCase();
+  if (!normalized) return false;
+  const asksIdentity = /\b(who|whos|who's|author|creator|created|made|built)\b/.test(
+    normalized
+  );
+  const mentionsChattia = /\bchattia\b/.test(normalized);
+  return asksIdentity && mentionsChattia;
+};
+
 const getLanguageMeta = () => {
   const languages = Array.isArray(navigator.languages)
     ? navigator.languages.filter(Boolean)
@@ -875,6 +887,13 @@ form?.addEventListener("submit", async (event) => {
   input.blur();
 
   const assistantBubble = addMessage(thinkingFrames[0], false);
+
+  if (isAuthorQuery(message)) {
+    assistantBubble.textContent = AUTHOR_RESPONSE;
+    assistantBubble.setAttribute("dir", getTextDirection(AUTHOR_RESPONSE));
+    return;
+  }
+
   startThinking(assistantBubble);
 
   const endpoint = getActiveEndpoint();
