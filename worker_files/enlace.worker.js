@@ -122,13 +122,37 @@
   // - “double check after sanitizer”
   // - Not a remote model; deterministic scoring
   // -------------------------
-  const hasHoneypotSignal = (value) => {
-    const text = String(value ?? "").toLowerCase();
-    if (!text) return false;
+  const HONEYPOT_FIELD_NAMES = new Set(["companysite", "website_url", "trap_field", "bot_field"]);
 
-    // Keep detection focused on known trap field names. Do not block
-    // legitimate telemetry flags such as `honeypot_triggered: false`.
-    return /\b(companysite|website_url|trap_field|bot_field)\b/.test(text);
+  const isFilledTrapValue = (value) => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    if (typeof value === "string") return Boolean(value.trim());
+    if (Array.isArray(value)) return value.some((entry) => isFilledTrapValue(entry));
+    if (value && typeof value === "object") {
+      return Object.values(value).some((entry) => isFilledTrapValue(entry));
+    }
+    return false;
+  };
+
+  const hasHoneypotSignal = (value) => {
+    if (!value || typeof value !== "object") return false;
+
+    const stack = [value];
+    while (stack.length) {
+      const current = stack.pop();
+      if (!current || typeof current !== "object") continue;
+
+      for (const [key, entry] of Object.entries(current)) {
+        const normalizedKey = safeText(key).toLowerCase();
+        if (HONEYPOT_FIELD_NAMES.has(normalizedKey) && isFilledTrapValue(entry)) {
+          return true;
+        }
+        if (entry && typeof entry === "object") stack.push(entry);
+      }
+    }
+
+    return false;
   };
 
   function tinyMlIntegrityScore(text) {
@@ -377,8 +401,7 @@
     const cleaned = sanitizeForSend(last);
     assertTinyMlSafe(cleaned, "chat.message");
 
-    const serializedMeta = JSON.stringify(body?.meta || {});
-    if (hasHoneypotSignal(serializedMeta)) {
+    if (hasHoneypotSignal(body?.meta || {})) {
       throw new Error("Blocked by client integrity check (honeypot).");
     }
 
